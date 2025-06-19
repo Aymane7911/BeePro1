@@ -66,14 +66,13 @@ model Batch {
   updatedAt                 DateTime @updatedAt
   userId                    Int
 
-<<<<<<< HEAD
+
   // Add these missing fields that exist in your database
   honeyCertified           Float?
   honeyRemaining           Float?
   totalHoneyCollected      Float?
 
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
+
   user     beeusers @relation(fields: [userId], references: [id])
   apiaries Apiary[]
 }

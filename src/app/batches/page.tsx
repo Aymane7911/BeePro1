@@ -5,17 +5,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Menu, X, Search, ChevronDown, ChevronUp, Printer, PlusCircle, Check, AlertCircle, MapPin, Package, RefreshCw, Filter, Sparkles, Upload, Trash2, AlertTriangle, CheckCircle, Wallet, Plus, Home, Layers, Activity, Users, Settings, HelpCircle, FileText, Globe } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useRouter } from 'next/navigation';
-<<<<<<< HEAD
 import QRCode from 'qrcode';
 
 
 interface Apiary {
-  id: string;
-=======
-
-
-interface Apiary {
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   batchId: string,
   batchNumber: string,
   name: string;
@@ -23,32 +16,11 @@ interface Apiary {
   hiveCount: number;
   latitude: number;
   longitude: number;
-<<<<<<< HEAD
-  kilosCollected: number;
-  location?: ApiaryLocation | null;
-}
-
-interface User {
-  passportId?: string;
-  passportFile?: string;
-  // Add other user properties as needed
-  id?: string;
-  name?: string;
-  email?: string;
-  isProfileComplete: boolean;
-}
-
-interface FormApiary extends Apiary {
-  batchId: string;
-  batchNumber: string;
-  honeyCollected: number
-=======
   honeyCollected: number;
 }
 interface FormApiary extends Apiary {
   batchId: string;
   batchNumber: string;
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 }
 
 interface CertificationStatus {
@@ -61,29 +33,29 @@ interface CertificationStatus {
 interface Batch {
   id: string;
   batchNumber: string;
-<<<<<<< HEAD
-  batchName: string; // Changed from 'name' to 'batchName' to match Prisma model
+  batchName: string;
+  name: string;
   createdAt: string;
-  updatedAt: string;
-  status: string; // Changed from union type to string to match Prisma
+  status: string;
+  totalKg: number;
+  jarsProduced: number;
+  apiaries: Apiary[];
+  certificationStatus: CertificationStatus;
   containerType: string;
   labelType: string;
   weightKg: number;
-  jarsUsed: number; // Changed from 'jarsProduced' to 'jarsUsed' to match Prisma
-  
-  // Certification data fields
+  jarUsed: number;
+   // Certification data fields
   originOnly: number;
   qualityOnly: number;
   bothCertifications: number;
   uncertified: number;
-  
   // Percentage fields
   originOnlyPercent: number;
   qualityOnlyPercent: number;
   bothCertificationsPercent: number;
   uncertifiedPercent: number;
-  
-  // Progress tracking
+   // Progress tracking
   completedChecks: number;
   totalChecks: number;
   
@@ -102,24 +74,9 @@ interface Batch {
   honeyCertified?: number;
   honeyRemaining?: number;
   totalHoneyCollected?: number;
-  
-  // Relations
+   // Relations
   userId: number;
-  apiaries: Apiary[];
   
-  // Computed fields for compatibility with existing code
-  totalKg?: number; // Can be computed from weightKg or totalHoneyCollected
-  jarsProduced?: number; // Can be computed from jarsUsed
-  name?: string; // Can be computed from batchName
-=======
-  name: string;
-  createdAt: string;
-  status: 'pending' | 'completed';
-  totalKg: number;
-  jarsProduced: number;
-  apiaries: Apiary[];
-  certificationStatus: CertificationStatus;
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 }
 
 interface TokenStats {
@@ -147,19 +104,20 @@ interface CustomJar {
 }
 
 interface JarCertification {
-<<<<<<< HEAD
-  origin: boolean;
-  quality: boolean;
-}
-
-interface JarCertifications {
-  [key: string]: JarCertification; // Changed from number to string for jar.id
-=======
   origin?: boolean;
   quality?: boolean;
   both?: boolean;
   selectedType?: 'origin' | 'quality' | 'both';
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
+}
+
+interface User {
+  passportId?: string;
+  passportFile?: string;
+  // Add other user properties as needed
+  id?: string;
+  name?: string;
+  email?: string;
+  isProfileComplete: boolean;
 }
 
 interface LocationCoordinates {
@@ -231,17 +189,40 @@ export default function BatchesPage() {
   const miniGoogleMapRef = useRef<google.maps.Map | null>(null);
   const apiaryMarkers = useRef<google.maps.Marker[]>([]);
   const tempMarker = useRef<google.maps.Marker | null>(null);
-  
-<<<<<<< HEAD
-  // Jar size management states
+  const [data, setData] = useState({
+  tokenStats: {
+    originOnly: 0,
+    qualityOnly: 0
+  }
+});
+
+const [customJarSize, setCustomJarSize] = useState('');
+ 
+ const [user, setUser] = useState<User | null>(null);
+
+
+  const [showBatchModal, setShowBatchModal] = useState(false);
+const [selectedApiaries, setSelectedApiaries] = useState<SelectedApiary[]>([]); // Selected apiaries for current batch
+const [isLoadingApiaries, setIsLoadingApiaries] = useState(false);
+ const [availableApiaries, setAvailableApiaries] = useState<Apiary[]>([]); // List of all created apiaries
+const [selectedApiary, setSelectedApiary] = useState<Apiary | null>(null);
+const [isOpen, setIsOpen] = useState(false);
+const [batchNumber, setBatchNumber] = useState('');
+const [batchName, setBatchName] = useState(''); // Added batch name field
+const [selectedDropdownApiary, setSelectedDropdownApiary] = useState('');
+const [showApiaryModal, setShowApiaryModal] = useState(false);
+const [apiaryFormData, setApiaryFormData] = useState<ApiaryFormData>({
+  name: '',
+  number: '',
+  hiveCount: 0,
+  honeyCollected: 0,
+  location: null
+});
+const [batchHoneyCollected, setBatchHoneyCollected] = useState(0);
+ // Jar size management states
 const [showJarSizeManager, setShowJarSizeManager] = useState<boolean>(false);
 const [predefinedJarSizes, setPredefinedJarSizes] = useState<number[]>([250, 500, 1000]); // Default jar sizes
 const [newJarSize, setNewJarSize] = useState<string>('');
-
-
-
-// Add these helper functions
-
 // Add a new jar size to predefined sizes
 const addNewJarSize = () => {
   if (newJarSize && typeof newJarSize === 'number' && !predefinedJarSizes.includes(newJarSize)) {
@@ -261,99 +242,61 @@ const removeJarSize = (size: number) => {
   });
   setApiaryJars(updatedApiaryJars);
 };
+const getMaxQuantity = (): number => {
+  if (!newJarSize) return 0;
+  const sizeInGrams = convertToGrams(newJarSize, newJarUnit);
+  if (sizeInGrams === 0) return 0;
+  return Math.floor(
+    (getTotalHoneyFromBatch() - getAllocatedHoneyFromJars()) * 1000 / sizeInGrams
+  );
+};
 
-// Add these new state variables at the top of your component
+  // Add these new state variables at the top of your component
 const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 const [certificationData, setCertificationData] = useState(null);
 const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
-const generateQRCode = async (data) => {
-  try {
-    const qrText = JSON.stringify({
-      batchIds: data.batchIds,
-      certificationDate: data.certificationDate,
-      totalCertified: data.totalCertified,
-      certificationType: data.certificationType,
-      expiryDate: data.expiryDate,
-      verification: data.verification
-    });
+
+// Function to generate QR code data URL
+ // Function to generate QR code using the qrcode library
+  const generateQRCode = async (data) => {
+    try {
+      const qrText = JSON.stringify({
+        batchIds: data.batchIds,
+        certificationDate: data.certificationDate,
+        totalCertified: data.totalCertified,
+        certificationType: data.certificationType,
+        expiryDate: data.expiryDate,
+        verification: data.verification
+      });
+      
+      const qrDataUrl = await QRCode.toDataURL(qrText, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        },
+        errorCorrectionLevel: 'M'
+      });
+      
+      return qrDataUrl;
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      return '';
+    }
+  };
+
+  // Function to download QR code
+  const downloadQRCode = () => {
+    if (!qrCodeDataUrl) return;
     
-    const qrDataUrl = await QRCode.toDataURL(qrText, {
-      width: 200,
-      margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#FFFFFF'
-      }
-    });
-    
-    return qrDataUrl;
-  } catch (error) {
-    console.error('Error generating QR code:', error);
-    return '';
-  }
-};
-
-// Function to download QR code
-const downloadQRCode = () => {
-  if (!qrCodeDataUrl) return;
-  
-  const link = document.createElement('a');
-  link.download = `honey-certification-${Date.now()}.png`;
-  link.href = qrCodeDataUrl;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
-  const [showBatchModal, setShowBatchModal] = useState(false);
-const [selectedApiaries, setSelectedApiaries] = useState<SelectedApiary[]>([]); // Selected apiaries for current batch
-const [isLoadingApiaries, setIsLoadingApiaries] = useState(false);
- const [availableApiaries, setAvailableApiaries] = useState<Apiary[]>([]); // List of all created apiaries
-const [selectedApiary, setSelectedApiary] = useState<Apiary | null>(null);
-const [isOpen, setIsOpen] = useState(false);
-const [batchNumber, setBatchNumber] = useState('');
-const [batchName, setBatchName] = useState(''); // Added batch name field
-const [selectedDropdownApiary, setSelectedDropdownApiary] = useState('');
-const [showApiaryModal, setShowApiaryModal] = useState(false);
-const [apiaryFormData, setApiaryFormData] = useState<ApiaryFormData>({
-  name: '',
-  number: '',
-  hiveCount: 0,
-  honeyCollected: 0,
-  location: null
-});
-<<<<<<< HEAD
-const [data, setData] = useState({
-  tokenStats: {
-    originOnly: 0,
-    qualityOnly: 0
-  }
-});
-const [customJarSize, setCustomJarSize] = useState('');
- 
- const [user, setUser] = useState<User | null>(null);
-=======
-
-
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
-
-  
+    const link = document.createElement('a');
+    link.download = `honey-certification-${Date.now()}.png`;
+    link.href = qrCodeDataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   const [isUploading, setIsUploading] = useState(false);
   const router = useRouter();
   const mapRefs = useRef<MapRef[]>([]);
@@ -371,94 +314,83 @@ const [jarSizeDistribution, setJarSizeDistribution] = useState({
   jar600g: 0
 });
 const isFormValid = () => {
-<<<<<<< HEAD
+  console.log("Debug isFormValid:");
+  
   // Check if batches are selected
   if (!selectedBatches || selectedBatches.length === 0) {
+    console.log("❌ No batches selected");
     return false;
   }
+  console.log("✅ Batches selected:", selectedBatches);
 
   // Check if there's honey available from selected batches
-  if (getTotalHoneyFromBatch() <= 0) {
+  const totalHoney = getTotalHoneyFromBatch();
+  if (totalHoney <= 0) {
+    console.log("❌ No honey available:", totalHoney);
     return false;
   }
+  console.log("✅ Honey available:", totalHoney);
 
   // Check if we have jars defined for the batch
   if (!batchJars || batchJars.length === 0) {
+    console.log("❌ No jars defined");
     return false;
   }
-console.log("Debug isFormValid:");
-console.log("selectedBatches:", selectedBatches);
-console.log("getTotalHoneyFromBatch():", getTotalHoneyFromBatch());
-console.log("batchJars:", batchJars);
-console.log("batchJars.length:", batchJars?.length);
-console.log("isAllHoneyAllocated():", isAllHoneyAllocated());
-console.log("jarCertifications:", jarCertifications);
-console.log("tokenBalance:", tokenBalance);
-console.log("totalJarsNeeded:", batchJars.reduce((sum, jar) => sum + jar.quantity, 0));
-console.log("needsProductionReport():", needsProductionReport());
-console.log("needsLabReport():", needsLabReport());
-console.log("formData.productionReport:", formData.productionReport);
-console.log("formData.labReport:", formData.labReport);
-console.log("getAllocatedHoneyFromJars():", getAllocatedHoneyFromJars());
-console.log("batchJars details:", batchJars.map(jar => ({ size: jar.size, quantity: jar.quantity, totalWeight: (jar.size * jar.quantity) / 1000 })));
-  // Check if all honey is allocated to jars (recommended)
+  console.log("✅ Jars defined:", batchJars.length);
+
   // Check if at least some honey is allocated to jars
-if (getAllocatedHoneyFromJars() <= 0) {
-  return false;
-}
+  const allocatedHoney = getAllocatedHoneyFromJars();
+  if (allocatedHoney <= 0) {
+    console.log("❌ No honey allocated to jars:", allocatedHoney);
+    return false;
+  }
+  console.log("✅ Honey allocated to jars:", allocatedHoney);
 
   // Check if all jar types have certifications selected
   const allJarsHaveCertifications = batchJars.every(jar => {
     const certifications = jarCertifications[jar.id];
-    return certifications && (certifications.origin || certifications.quality);
+    const hasCertification = certifications && (certifications.origin || certifications.quality);
+    console.log(`Jar ${jar.id} certifications:`, certifications, "Has certification:", hasCertification);
+    return hasCertification;
   });
+  
   if (!allJarsHaveCertifications) {
+    console.log("❌ Not all jars have certifications");
     return false;
   }
+  console.log("✅ All jars have certifications");
 
   // Check token balance - calculate total jars needed
   const totalJarsNeeded = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
   if (tokenBalance < totalJarsNeeded) {
+    console.log("❌ Insufficient tokens. Need:", totalJarsNeeded, "Have:", tokenBalance);
     return false;
   }
+  console.log("✅ Sufficient tokens. Need:", totalJarsNeeded, "Have:", tokenBalance);
 
   // Check required documents based on selected certifications
-  if (needsProductionReport() && !formData.productionReport) {
-    return false;
-  }
+  const needsProdReport = needsProductionReport();
+  const needsLabRep = needsLabReport();
   
-  if (needsLabReport() && !formData.labReport) {
+  console.log("Needs production report:", needsProdReport);
+  console.log("Has production report:", !!formData.productionReport);
+  console.log("Needs lab report:", needsLabRep);
+  console.log("Has lab report:", !!formData.labReport);
+
+  if (needsProdReport && !formData.productionReport) {
+    console.log("❌ Production report required but not provided");
     return false;
   }
 
-  // All validations passed
-=======
-  // Check if we have jars defined
-  const totalJars = getTotalJarsAcrossApiaries();
-  if (totalJars === 0) return false;
-  
-  // Check if all jar types have certifications selected
-  const allJarsHaveCertifications = Object.values(apiaryJars).flat().every(jar => 
-    jarCertifications[jar.id]?.selectedType
-  );
-  if (!allJarsHaveCertifications) return false;
-  
-  // Check token balance
-  if (tokenCalculation.remaining < 0) return false;
-  
-  // Check required documents
-  if (needsProductionReport() && !formData.productionReport) return false;
-  if (needsLabReport() && !formData.labReport) return false;
-  
-  // Check if all apiaries have valid coordinates
-  const allApiariesHaveLocation = formData.apiaries.every(apiary => 
-    apiary.latitude && apiary.longitude
-  );
-  if (!allApiariesHaveLocation) return false;
-  
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
+  if (needsLabRep && !formData.labReport) {
+    console.log("❌ Lab report required but not provided");
+    return false;
+  }
+
+  console.log("✅ All validations passed - form is valid");
   return true;
 };
+
 
 const createBatch = async () => {
   // Improved validation with proper array checking
@@ -535,9 +467,6 @@ const createBatch = async () => {
     }
 
     // Update data state with new batch (ensure data exists)
-<<<<<<< HEAD
-   
-=======
     if (data && data.batches) {
       setData({
         ...data,
@@ -545,7 +474,6 @@ const createBatch = async () => {
         tokenStats: data.tokenStats,
       });
     }
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
     setNotification({
       show: true,
@@ -578,85 +506,15 @@ const createBatch = async () => {
   }
 };
 
-<<<<<<< HEAD
-// 3. Add progress bar component to display in batch list
-const CertificationProgressBar = ({ batch }: { batch: Batch }) => {
-  const totalHoney = batch.totalHoneyCollected || 0;
-  const certifiedHoney = batch.honeyCertified || 0;
-  const progressPercentage = totalHoney > 0 ? (certifiedHoney / totalHoney) * 100 : 0;
-  const remainingHoney = totalHoney - certifiedHoney;
-
-  return (
-    <div className="mt-2">
-      <div className="flex justify-between text-xs text-gray-600 mb-1">
-        <span>Certification Progress</span>
-        <span>{certifiedHoney.toFixed(1)}kg / {totalHoney}kg</span>
-      </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
-        <div 
-          className={`h-2 rounded-full transition-all duration-300 ${
-            progressPercentage === 100 
-              ? 'bg-green-500' 
-              : progressPercentage > 0 
-                ? 'bg-yellow-500' 
-                : 'bg-gray-300'
-          }`}
-          style={{ width: `${Math.min(progressPercentage, 100)}%` }}
-        ></div>
-      </div>
-      <div className="flex justify-between text-xs mt-1">
-        <span className={`${progressPercentage === 100 ? 'text-green-600' : 'text-yellow-600'}`}>
-          {progressPercentage === 100 ? 'Fully Certified' : `${remainingHoney.toFixed(1)}kg remaining`}
-        </span>
-        <span className="text-gray-500">
-          {progressPercentage.toFixed(1)}%
-        </span>
-      </div>
-    </div>
-  );
-};
-
-const getBatchStatusBadge = (batch: Batch) => {
-  const totalHoney = batch.totalHoneyCollected || 0;
-  const certifiedHoney = batch.honeyCertified || 0;
-  const progressPercentage = totalHoney > 0 ? (certifiedHoney / totalHoney) * 100 : 0;
-
-  if (progressPercentage === 100) {
-    return (
-      <span className="inline-flex px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-        Completed
-      </span>
-    );
-  } else if (progressPercentage > 0) {
-    return (
-      <span className="inline-flex px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-        Partially Certified ({progressPercentage.toFixed(0)}%)
-      </span>
-    );
-  } else {
-    return (
-      <span className="inline-flex px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
-        Pending
-      </span>
-    );
-  }
-};
-
-
-
-
-
-=======
 
 const isAllHoneyAllocated = () => {
-  const totalHoneyAvailable = getTotalHoneyFromApiaries();
+  const totalHoneyAvailable = getTotalHoneyFromBatch();
   const totalHoneyInJars = Object.values(apiaryJars).flat().reduce((sum, jar) => 
     sum + (jar.size * jar.quantity / 1000), 0
   );
   return Math.abs(totalHoneyAvailable - totalHoneyInJars) < 0.001; // Allow for small floating point differences
 };
 
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 // 2. Add helper function to check remaining honey for specific apiary
 const getRemainingHoneyForApiary = (apiaryIndex: number) => {
   const apiary = formData.apiaries[apiaryIndex];
@@ -722,6 +580,34 @@ const calculateMaxJarsForSize = (totalHoneyToCertify, jarSize) => {
   };
 };
   const [tokenBalance, setTokenBalance] = useState<number>(0);
+  // Add jar to batch
+const addJarToBatch = () => {
+  if (!newJarSize || !newJarQuantity) return;
+  
+  const remainingHoney = getTotalHoneyFromBatch() - getAllocatedHoneyFromJars();
+  const jarHoneyNeeded = (newJarSize * newJarQuantity) / 1000;
+  
+  if (jarHoneyNeeded > remainingHoney + 0.001) { // Small tolerance
+    alert(`Not enough honey remaining. You have ${remainingHoney.toFixed(2)} kg left, but need ${jarHoneyNeeded.toFixed(2)} kg for these jars.`);
+    return;
+  }
+  
+  const newJar = {
+    id: Date.now() + Math.random(),
+    size: newJarSize,
+    quantity: newJarQuantity
+  };
+  
+  setBatchJars([...batchJars, newJar]);
+  setNewJarSize('');
+  setNewJarQuantity(1);
+};
+
+// Remove jar from batch
+const removeJarFromBatch = (jarId) => {
+  setBatchJars(batchJars.filter(jar => jar.id !== jarId));
+};
+
 
 
 
@@ -733,10 +619,6 @@ const calculateMaxJarsForSize = (totalHoneyToCertify, jarSize) => {
     passportId: '',
     passportScan: null
   });
-<<<<<<< HEAD
-  const [isSubmitting, setIsSubmitting] = useState(false);
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -752,27 +634,15 @@ const [formData, setFormData] = useState({
   certificationType: '',
   productionReport: null as File | null,
   labReport: null as File | null,
-<<<<<<< HEAD
-  // ADDED: Include batch-level information
-  batchId: '',
-  batchTotalKg: 0, // Store the batch total separately
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   apiaries: [{
     batchId: '',
     batchNumber: '',
     name: '',
     number: '',
     hiveCount: 0,
-<<<<<<< HEAD
-    latitude: null as number | null,
-    longitude: null as number | null,
-    kilosCollected: 0, // Individual apiary amount
-=======
     latitude: null as number | null,  // Changed from 0 to null
     longitude: null as number | null, // Changed from 0 to null
     kilosCollected: 0,
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   }]
 });
 const [mapsLinkInput, setMapsLinkInput] = useState('');
@@ -857,7 +727,59 @@ const handleMapsLinkSubmit = async () => {
   }
 };
   
- 
+ const getRemainingHoneyForBatch = (batch) => {
+  if (!batch) return 0;
+  
+  // Use the original amount as the base, not the current totalHoneyCollected
+  const originalAmount = batch.originalHoneyCollected || batch.totalHoneyCollected || batch.weightKg || 0 ;
+  
+  // Get the total amount that has been certified across all sessions
+  const totalCertified = batch.totalHoneyCertified || 0;
+  
+  // Calculate remaining honey
+  const remaining = Math.max(0, originalAmount - totalCertified);
+  
+  return remaining;
+};
+
+
+// Updated function to get total remaining honey from all selected batches
+const getTotalRemainingHoneyFromBatch = () => {
+  if (!selectedBatches || selectedBatches.length === 0) return 0;
+  
+  return selectedBatches.reduce((total, batchId) => {
+    const batch = batches.find(b => b.id === batchId);
+    return total + getRemainingHoneyForBatch(batch);
+  }, 0);
+};
+
+const getTotalHoneyFromBatch = () => {
+  if (!selectedBatches || selectedBatches.length === 0) return 0;
+  
+  return selectedBatches.reduce((total, batchId) => {
+    const batch = batches.find(b => b.id === batchId);
+    if (!batch) return total;
+    
+    // Use remaining honey instead of original total to prevent allocation beyond available honey
+    const remainingHoney = getRemainingHoneyForBatch(batch);
+    return total + remainingHoney;
+  }, 0);
+};
+
+const [batchJars, setBatchJars] = useState([]);
+const [newJarQuantity, setNewJarQuantity] = useState<number>(1);
+const [newJarUnit, setNewJarUnit] = useState<string>('g');
+
+// Helper function to get total allocated honey from jars
+const getAllocatedHoneyFromJars = () => {
+  return batchJars.reduce((sum, jar) => sum + (jar.size * jar.quantity) / 1000, 0);
+};
+// Helper function to convert jar size to grams
+const convertToGrams = (size: string, unit: string): number => {
+  const numValue = parseFloat(size);
+  if (isNaN(numValue) || numValue <= 0) return 0;
+  return unit === 'lbs' ? Math.round(numValue * 453.592) : Math.round(numValue);
+};
 
 
 
@@ -875,11 +797,7 @@ useEffect(() => {
           name: apiary.name,
           number: apiary.number,
           hiveCount: apiary.hiveCount,
-<<<<<<< HEAD
-          kilosCollected: apiary.honeyCollected || 0,
-=======
           kilosCollected: apiary.kilosCollected || 0,
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
           latitude: apiary.latitude || 0,    // Ensure it's never null/undefined
           longitude: apiary.longitude || 0   // Ensure it's never null/undefined
         }));
@@ -897,82 +815,6 @@ useEffect(() => {
 }, [showCompleteForm, selectedBatches, batches]);
   
 
-<<<<<<< HEAD
-  {/* Helper function for enhanced certification data */}
-
-// Add this function to your component
-const getEnhancedCertificationData = (batch: Batch) => {
-  const data = [];
-  
-  // Use the correct property names from Prisma model
-  if (batch.originOnly && batch.originOnly > 0) {
-    data.push({
-      name: 'Origin Only',
-      value: batch.originOnly,
-      color: '#3B82F6', // Blue
-    });
-  }
-  
-  if (batch.qualityOnly && batch.qualityOnly > 0) {
-    data.push({
-      name: 'Quality Only',
-      value: batch.qualityOnly,
-      color: '#10B981', // Green
-    });
-  }
-  
-  if (batch.bothCertifications && batch.bothCertifications > 0) {
-    data.push({
-      name: 'Both Certifications',
-      value: batch.bothCertifications,
-      color: '#8B5CF6', // Purple
-    });
-  }
-  
-  if (batch.uncertified && batch.uncertified > 0) {
-    data.push({
-      name: 'Uncertified',
-      value: batch.uncertified,
-      color: '#6B7280', // Gray
-    });
-  }
-  
-  // If no data, show placeholder
-  if (data.length === 0) {
-    data.push({
-      name: 'No Data',
-      value: 1,
-      color: '#E5E7EB',
-    });
-  }
-  
-  return data;
-};
-
-// Helper function to normalize batch data for display
-const normalizeBatchForDisplay = (batch: any): Batch => {
-  return {
-    ...batch,
-    // Add computed fields for backward compatibility
-    name: batch.batchName || batch.name,
-    totalKg: batch.totalKg || batch.weightKg || batch.totalHoneyCollected || 0,
-    jarsProduced: batch.jarsProduced || batch.jarsUsed || 0,
-    
-    // Ensure all required fields have default values
-    originOnly: batch.originOnly || 0,
-    qualityOnly: batch.qualityOnly || 0,
-    bothCertifications: batch.bothCertifications || 0,
-    uncertified: batch.uncertified || 0,
-    
-    honeyCertified: batch.honeyCertified || 0,
-    honeyRemaining: batch.honeyRemaining || 0,
-    totalHoneyCollected: batch.totalHoneyCollected || batch.weightKg || 0,
-  };
-};
-
-
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
   // Fetch batches from API
 useEffect(() => {
@@ -1056,23 +898,6 @@ useEffect(() => {
     
     // Get existing apiaries from the selected batches
     selectedBatchObjects.forEach(batch => {
-<<<<<<< HEAD
-  if (batch.apiaries && batch.apiaries.length > 0) {
-    batch.apiaries.forEach(apiary => {
-      existingApiaries.push({
-        ...apiary,
-        batchId: batch.id,
-        batchNumber: batch.batchNumber,
-        honeyCollected: 0 // Set to 0 since honeyCollected is batch-based, not apiary-based
-      });
-    });
-  }
-});
-
-    
-    // If no existing apiaries, initialize with empty form
-   if (existingApiaries.length === 0) {
-=======
       if (batch.apiaries && batch.apiaries.length > 0) {
         batch.apiaries.forEach(apiary => {
           existingApiaries.push({
@@ -1086,16 +911,10 @@ useEffect(() => {
     
     // If no existing apiaries, initialize with empty form
     if (existingApiaries.length === 0) {
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   setFormData({
     certificationType: '',
     productionReport: null as File | null,
     labReport: null as File | null,
-<<<<<<< HEAD
-    batchId: '', // Add missing batchId
-    batchTotalKg: 0, // Add missing batchTotalKg
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
     apiaries: [{
       batchId: '',
       batchNumber: '',
@@ -1103,26 +922,6 @@ useEffect(() => {
       number: '',
       hiveCount: 0,
       kilosCollected: 0,
-<<<<<<< HEAD
-      honeyCollected: 0, // Individual apiary honey collected (0 since it's batch-based)
-      latitude: null,
-      longitude: null
-    }]
-  });
-} else {
-   const totalBatchHoney = selectedBatchObjects.reduce((sum, batch) => {
-    return sum + (batch.totalHoneyCollected || 0);
-  }, 0);
-      // Use existing apiaries
-      setFormData({
-    certificationType: '',
-    productionReport: null as File | null,
-    labReport: null as File | null,
-    batchId: selectedBatchObjects.length === 1 ? selectedBatchObjects[0].id : '', // Single batch ID or empty for multiple
-    batchTotalKg: totalBatchHoney, // Use total honey collected from batches, not apiary kilos
-    apiaries: existingApiaries // Keep honeyCollected as 0 for all apiaries
-  });
-=======
       latitude: null,  // Changed from 0 to null
       longitude: null  // Changed from 0 to null
     }]
@@ -1135,7 +934,6 @@ useEffect(() => {
         labReport: null as File | null,
         apiaries: existingApiaries
       });
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
     }
   }
 }, [selectedBatches, showCompleteForm, batches]);
@@ -1143,13 +941,8 @@ useEffect(() => {
   // Handle profile form changes
 
   const handleProfileChange = ( 
-<<<<<<< HEAD
-  field: 'batchNumber' | 'name' | 'number' | 'hiveCount' | 'latitude' | 'longitude' | 'kilosCollected'| 'passportScan' | 'passportId', 
-  value: string | File | number | null
-=======
   field: 'batchNumber' | 'name' | 'number' | 'hiveCount' | 'latitude' | 'longitude' | 'kilosCollected', 
   value: string | number
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 ) => {
     setProfileData({
       ...profileData,
@@ -1159,93 +952,6 @@ useEffect(() => {
 
   // Handle file upload
   const handleFileUpload = (e) => {
-<<<<<<< HEAD
-  const file = e.target.files[0];
-  if (file) {
-    // Validate file type and size
-    const allowedTypes = ['image/png', 'image/jpeg', 'application/pdf'];
-    const maxSize = 10 * 1024 * 1024; // 10MB
-
-    if (!allowedTypes.includes(file.type)) {
-      alert('Please upload a PNG, JPG, or PDF file.');
-      e.target.value = ''; // Clear the input
-      return;
-    }
-
-    if (file.size > maxSize) {
-      alert('File size must be less than 10MB.');
-      e.target.value = ''; // Clear the input
-      return;
-    }
-
-    handleProfileChange('passportScan', file);
-  }
-};
-
-  // Handle profile completion form submission
-  const handleProfileSubmit = async (e) => {
-  e.preventDefault();
-  
-  // Validate required fields
-  if (!profileData.passportId.trim()) {
-    alert('Please enter your Passport ID.');
-    return;
-  }
-
-  try {
-    setIsSubmitting(true);
-
-    // Get JWT token from localStorage (adjust the key name if different)
-    const token = localStorage.getItem('authToken') || localStorage.getItem('token') || localStorage.getItem('accessToken');
-    
-    if (!token) {
-      alert('Authentication token not found. Please log in again.');
-      return;
-    }
-
-    // Create FormData object to handle file upload
-    const formData = new FormData();
-    formData.append('passportId', profileData.passportId.trim());
-    
-    if (profileData.passportScan) {
-      formData.append('passportScan', profileData.passportScan);
-    }
-
-    const response = await fetch('/api/user/profile', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    const result = await response.json();
-
-    if (response.ok && result.success) {
-      // Close profile form and show success message
-      setShowProfileForm(false);
-      setShowProfileCompletedMessage(true);
-      
-      // Reset form data
-      setProfileData({
-        passportId: '',
-        passportScan: null
-      });
-      
-      console.log('Profile updated successfully:', result);
-    } else {
-      // Handle error
-      console.error('Profile update failed:', result.error);
-      alert('Failed to update profile: ' + (result.error || 'Unknown error'));
-    }
-  } catch (error) {
-    console.error('Error submitting profile:', error);
-    alert('An error occurred while updating your profile. Please try again.');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-=======
     const file = e.target.files[0];
     if (file) {
       handleProfileChange('passportScan', file);
@@ -1259,7 +965,6 @@ useEffect(() => {
     setShowProfileForm(false);
     alert('Profile information updated successfully!');
   };
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   
 
   // 3. Function to fetch saved apiary locations
@@ -1335,75 +1040,6 @@ useEffect(() => {
     setSelectAll(!selectAll);
   };
 
-<<<<<<< HEAD
-  // Add these state variables
-const [batchJars, setBatchJars] = useState([]);
-const [newJarQuantity, setNewJarQuantity] = useState<number>(1);
-const [newJarUnit, setNewJarUnit] = useState<string>('g');
-
-// Helper function to get total allocated honey from jars
-const getAllocatedHoneyFromJars = () => {
-  return batchJars.reduce((sum, jar) => sum + (jar.size * jar.quantity) / 1000, 0);
-};
-// Helper function to convert jar size to grams
-const convertToGrams = (size: string, unit: string): number => {
-  const numValue = parseFloat(size);
-  if (isNaN(numValue) || numValue <= 0) return 0;
-  return unit === 'lbs' ? Math.round(numValue * 453.592) : Math.round(numValue);
-};
-
-// Helper function to get max quantity for current jar size
-const getMaxQuantity = (): number => {
-  if (!newJarSize) return 0;
-  const sizeInGrams = convertToGrams(newJarSize, newJarUnit);
-  if (sizeInGrams === 0) return 0;
-  return Math.floor(
-    (getTotalHoneyFromBatch() - getAllocatedHoneyFromJars()) * 1000 / sizeInGrams
-  );
-};
-// Check if all honey is allocated
-const isAllHoneyAllocated = () => {
-  const totalHoney = getTotalHoneyFromBatch();
-  const allocatedHoney = getAllocatedHoneyFromJars();
-  return Math.abs(totalHoney - allocatedHoney) < 0.001; // Small tolerance for floating point precision
-};
-
-// Add jar to batch
-const addJarToBatch = () => {
-  if (!newJarSize || !newJarQuantity) return;
-  
-  const remainingHoney = getTotalHoneyFromBatch() - getAllocatedHoneyFromJars();
-  const jarHoneyNeeded = (newJarSize * newJarQuantity) / 1000;
-  
-  if (jarHoneyNeeded > remainingHoney + 0.001) { // Small tolerance
-    alert(`Not enough honey remaining. You have ${remainingHoney.toFixed(2)} kg left, but need ${jarHoneyNeeded.toFixed(2)} kg for these jars.`);
-    return;
-  }
-  
-  const newJar = {
-    id: Date.now() + Math.random(),
-    size: newJarSize,
-    quantity: newJarQuantity
-  };
-  
-  setBatchJars([...batchJars, newJar]);
-  setNewJarSize('');
-  setNewJarQuantity(1);
-};
-
-// Remove jar from batch
-const removeJarFromBatch = (jarId) => {
-  setBatchJars(batchJars.filter(jar => jar.id !== jarId));
-};
-
-// Update getTotalJarsAcrossApiaries to use batch jars
-const getTotalJarsAcrossApiaries = () => {
-  return batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
-};
-
-
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   // Handle print button click
   const handlePrint = () => {
     // Check if any of the selected batches are pending
@@ -1418,8 +1054,8 @@ const getTotalJarsAcrossApiaries = () => {
       setShowCompleteForm(true);
     }
   };
-<<<<<<< HEAD
- const isProfileComplete = (user: User | null | undefined): boolean => {
+
+const isProfileComplete = (user: User | null | undefined): boolean => {
   // If isProfileComplete is explicitly set in the database, use that
   if (user?.isProfileComplete === true) {
     return true;
@@ -1430,45 +1066,38 @@ const getTotalJarsAcrossApiaries = () => {
   // Fallback to checking individual fields
   return !!(user?.passportId && user?.passportFile);
 };
-  // Handle batch completion
+
+  
+// handleCompleteBatch
 const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
-  
-  try {
-    setIsLoading(true);
 
-    // STEP 1: Get authentication token
-=======
-
-  // Handle batch completion
- const handleCompleteBatch = async (e) => {
-  e.preventDefault();
   const tokensUsed = tokenCalculation.tokensNeeded;
 
   // Check if all jars have certification types selected
-  const allJarsHaveCertifications = Object.values(apiaryJars).flat().every(jar => 
+  const allJarsHaveCertifications = Object.values(apiaryJars).flat().every(jar =>
     jarCertifications[jar.id]?.selectedType
   );
-  
+
   if (!allJarsHaveCertifications) {
     alert('Please select a certification type for all jar types');
     return;
   }
-  
+
   // Check required documents based on selected certifications
-  const needsProductionReport = Object.values(jarCertifications).some(cert => 
+  const needsProductionReport = Object.values(jarCertifications).some(cert =>
     cert?.selectedType === 'origin' || cert?.selectedType === 'both'
   );
-  
-  const needsLabReport = Object.values(jarCertifications).some(cert => 
+
+  const needsLabReport = Object.values(jarCertifications).some(cert =>
     cert?.selectedType === 'quality' || cert?.selectedType === 'both'
   );
-  
+
   if (needsProductionReport && !formData.productionReport) {
     alert('Please upload a production report for origin/both certifications');
     return;
   }
-  
+
   if (needsLabReport && !formData.labReport) {
     alert('Please upload a lab report for quality/both certifications');
     return;
@@ -1484,31 +1113,29 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
   try {
     setIsLoading(true);
 
-    // Get token with fallbacks
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
+    // STEP 1: Get authentication token
     const token = localStorage.getItem('authtoken') ||
                   localStorage.getItem('auth_token') ||
                   localStorage.getItem('token') ||
                   sessionStorage.getItem('authtoken') ||
                   sessionStorage.getItem('auth_token') ||
                   sessionStorage.getItem('token');
-        
+
     if (!token) {
       throw new Error('No auth token found');
     }
 
-<<<<<<< HEAD
     // STEP 2: Fetch fresh user data and verify profile completeness
     const userResponse = await fetch('/api/user/profile', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    
+
     if (!userResponse.ok) {
       throw new Error('Failed to fetch user profile');
     }
-    
+
     const userData = await userResponse.json();
-    
+
     if (!isProfileComplete(userData)) {
       setShowCompleteForm(false);
       setShowProfileNotification(true);
@@ -1533,43 +1160,34 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       return;
     }
 
-    // STEP 7: Validate jar certifications (updated structure)
-    const allJarsHaveCertifications = batchJars.every(jar => {
+    // STEP 7: Validate jar certifications
+    const allJarsHaveCertificationsUpdated = batchJars.every(jar => {
       const certifications = jarCertifications[jar.id];
       return certifications && (certifications.origin || certifications.quality);
     });
-    
-    if (!allJarsHaveCertifications) {
+
+    if (!allJarsHaveCertificationsUpdated) {
       alert('Please select a certification type for all jar types');
       return;
     }
 
     // STEP 8: Calculate total jars needed and validate token balance
     const totalJarsNeeded = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
-    
+
     if (tokenBalance < totalJarsNeeded) {
       alert(`Insufficient tokens. Need ${totalJarsNeeded}, have ${tokenBalance}`);
       return;
     }
 
     // STEP 9: Validate required documents
-    if (needsProductionReport() && !formData.productionReport) {
-      alert('Please upload a production report for the selected certifications');
-      return;
-    }
-    
-    if (needsLabReport() && !formData.labReport) {
-      alert('Please upload a lab report for the selected certifications');
-      return;
+    if (needsProductionReport && !formData.productionReport) {
+        alert('Please upload a production report for the selected certifications');
+        return;
     }
 
-    // STEP 10: Validate apiary coordinates (if still applicable)
-    if (formData.apiaries && formData.apiaries.length > 0) {
-      const incompleteApiaries = formData.apiaries.filter(apiary => !apiary.latitude || !apiary.longitude);
-      if (incompleteApiaries.length > 0) {
-        alert('Please set coordinates for all apiaries before completing the batch');
+    if (needsLabReport && !formData.labReport) {
+        alert('Please upload a lab report for the selected certifications');
         return;
-      }
     }
 
     // STEP 11: Calculate total certified amount from batch jars
@@ -1578,29 +1196,16 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
     }, 0);
 
     // STEP 12: Calculate and update token balance
-    const tokensUsed = totalJarsNeeded;
     const currentBalance = parseInt(localStorage.getItem('tokenBalance') || '0');
     const newBalance = currentBalance - tokensUsed;
-    
+
     // Update localStorage and state
     localStorage.setItem('tokenBalance', newBalance.toString());
     setTokenBalance(newBalance);
 
     // Dispatch token update event
-=======
-    // STEP 4: UPDATE TOKEN BALANCE IMMEDIATELY WHEN "PAY TOKEN" IS CLICKED
-    // Update localStorage first
-    const currentBalance = parseInt(localStorage.getItem('tokenBalance') || '0');
-    const newBalance = currentBalance - tokensUsed;
-    localStorage.setItem('tokenBalance', newBalance.toString());
-
-    // Update state immediately
-    setTokenBalance(newBalance);
-
-    // Dispatch custom event to update token balance across the app
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
     window.dispatchEvent(new CustomEvent('tokensUpdated', {
-      detail: { 
+      detail: {
         action: 'deduct',
         tokensDeducted: tokensUsed,
         newBalance: newBalance,
@@ -1609,110 +1214,85 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       }
     }));
 
-<<<<<<< HEAD
     // STEP 13: Process each batch (FIXED VERSION)
-for (const batchId of selectedBatches) {
-  // Get the current batch data
-  const currentBatch = batches.find(b => b.id === batchId);
-  
-  // Get the current available honey (could be remaining from previous certifications)
-  const currentAvailableHoney = getRemainingHoneyForBatch(currentBatch);
-  
-  // Store original amount if not already stored
-  const originalHoneyCollected = currentBatch.originalHoneyCollected || currentBatch.totalHoneyCollected || currentAvailableHoney;
-  
-  // For batch-based approach, all certified amount comes from this batch
-  const batchCertifiedAmount = totalCertifiedAmount;
-  const newHoneyRemaining = Math.max(0, currentAvailableHoney - batchCertifiedAmount);
-
-  // Prepare batch-specific apiaries if they exist
-  const batchApiaries = formData.apiaries ? formData.apiaries.filter(apiary => 
-    apiary.batchId === batchId || !apiary.batchId
-  ) : [];
-
-      const batchData = {
-    batchId,
-    updatedFields: {
-      status: newHoneyRemaining > 0 ? 'partially_completed' : 'completed', // Set status based on remaining honey
-      // FIXED: Keep totalHoneyCollected as the current available amount (what user sees)
-      totalHoneyCollected: newHoneyRemaining, // This is what shows in the main display
-      totalKg: batchCertifiedAmount, // This is the amount being certified now
-      weightKg: batchCertifiedAmount, // Also update weightKg for compatibility
-      // Store total jars produced from this certification session
-      jarsProduced: totalJarsNeeded,
-      jarsUsed: totalJarsNeeded,
-      jarCertifications: jarCertifications,
-      certificationDate: new Date().toISOString().split('T')[0],
-      expiryDate: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      completedChecks: 4,
-      totalChecks: 4,
-      // FIXED: Store the original amount before any certification for tracking
-      originalHoneyCollected: originalHoneyCollected,
-      // FIXED: Store the amounts properly
-      honeyCertified: batchCertifiedAmount, // Amount certified in this session
-      honeyRemaining: newHoneyRemaining, // Amount remaining after this certification
-      // FIXED: Track cumulative certified amount if there were previous certifications
-      totalHoneyCertified: (currentBatch.honeyCertified || 0) + batchCertifiedAmount
-    },
-        apiaries: batchApiaries.map(apiary => {
-      const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batchId}-${apiary.number}`] : undefined;
-      const currentApiaryHoney = storedValue !== undefined ? storedValue : apiary.kilosCollected;
-      
-      // For batch-based approach, distribute certified amount proportionally
-      const apiaryProportion = currentAvailableHoney > 0 ? currentApiaryHoney / currentAvailableHoney : 0;
-      const apiaryCertifiedAmount = batchCertifiedAmount * apiaryProportion;
-      const newApiaryRemaining = Math.max(0, currentApiaryHoney - apiaryCertifiedAmount);
-
-          return {
-        name: apiary.name,
-        number: apiary.number,
-        hiveCount: apiary.hiveCount,
-        latitude: apiary.latitude !== 0 ? apiary.latitude : null,
-        longitude: apiary.longitude !== 0 ? apiary.longitude : null,
-        kilosCollected: newApiaryRemaining, // This will show the remaining amount
-        honeyCertified: apiaryCertifiedAmount
-      };
-    }),
-    // Add batch jars and jar certifications for the API
-    batchJars: batchJars,
-    jarCertifications: jarCertifications
-  };
-=======
-    // Process each batch individually
     for (const batchId of selectedBatches) {
+      // Get the current batch data
+      const currentBatch = batches.find(b => b.id === batchId);
+
+      // Get the current available honey (could be remaining from previous certifications)
+      const currentAvailableHoney = getRemainingHoneyForBatch(currentBatch);
+
+      // FIXED: Store original amount if not already stored - use the actual original amount
+      const originalHoneyCollected = currentBatch.originalHoneyCollected || 
+                                   currentBatch.totalHoneyCollected || 
+                                   (currentAvailableHoney + (currentBatch.honeyCertified || 0));
+
+      // For batch-based approach, all certified amount comes from this batch
+      const batchCertifiedAmount = totalCertifiedAmount;
+      const newHoneyRemaining = Math.max(0, currentAvailableHoney - batchCertifiedAmount);
+
+      // FIXED: Calculate cumulative certified amount properly
+      const previouslyCertified = currentBatch.totalHoneyCertified || currentBatch.honeyCertified || 0;
+      const totalCumulativeCertified = previouslyCertified + batchCertifiedAmount;
+
+      // Prepare batch-specific apiaries if they exist
+      const batchApiaries = formData.apiaries ? formData.apiaries.filter(apiary =>
+        apiary.batchId === batchId || !apiary.batchId
+      ) : [];
+
       const batchData = {
         batchId,
         updatedFields: {
-          status: 'Completed',
-          jarCertifications: jarCertifications, // This will now work with the updated schema
+          status: newHoneyRemaining > 0 ? 'partially_completed' : 'completed',
+          // FIXED: Keep totalHoneyCollected as the ORIGINAL amount, not remaining
+          totalHoneyCollected: originalHoneyCollected, // Always keep the original amount
+          totalKg: batchCertifiedAmount, // Amount being certified now
+          weightKg: batchCertifiedAmount, // Also update weightKg for compatibility
+          jarsProduced: totalJarsNeeded,
+          jarsUsed: totalJarsNeeded,
+          jarCertifications: jarCertifications,
           certificationDate: new Date().toISOString().split('T')[0],
           expiryDate: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           completedChecks: 4,
-          totalChecks: 4
+          totalChecks: 4,
+          // Store the original amount before any certification for tracking
+          originalHoneyCollected: originalHoneyCollected,
+          // FIXED: Store the amounts properly
+          honeyCertified: batchCertifiedAmount, // Amount certified in this session only
+          honeyRemaining: newHoneyRemaining, // Amount remaining after this certification  
+          // FIXED: Track cumulative certified amount across all sessions
+          totalHoneyCertified: totalCumulativeCertified
         },
-        apiaries: formData.apiaries
-          .filter(apiary => apiary.batchId === batchId || !apiary.batchId)
-          .map(apiary => {
-            const storedValue = apiaryHoneyValues[`${batchId}-${apiary.number}`];
-            return {
-              name: apiary.name,
-              number: apiary.number,
-              hiveCount: apiary.hiveCount,
-              latitude: apiary.latitude !== 0 ? apiary.latitude : null,
-              longitude: apiary.longitude !== 0 ? apiary.longitude : null,
-              kilosCollected: storedValue !== undefined ? storedValue : apiary.kilosCollected
-            };
-          })
+        apiaries: batchApiaries.map(apiary => {
+          const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batchId}-${apiary.number}`] : undefined;
+          const currentApiaryHoney = storedValue !== undefined ? storedValue : apiary.kilosCollected;
+
+          // For batch-based approach, distribute certified amount proportionally
+          const apiaryProportion = currentAvailableHoney > 0 ? currentApiaryHoney / currentAvailableHoney : 0;
+          const apiaryCertifiedAmount = batchCertifiedAmount * apiaryProportion;
+          const newApiaryRemaining = Math.max(0, currentApiaryHoney - apiaryCertifiedAmount);
+
+          return {
+            name: apiary.name,
+            number: apiary.number,
+            hiveCount: apiary.hiveCount,
+            latitude: apiary.latitude !== 0 ? apiary.latitude : null,
+            longitude: apiary.longitude !== 0 ? apiary.longitude : null,
+            kilosCollected: newApiaryRemaining,
+            honeyCertified: apiaryCertifiedAmount
+          };
+        }),
+        batchJars: batchJars,
+        jarCertifications: jarCertifications
       };
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
       const batchFormData = new FormData();
       batchFormData.append('data', JSON.stringify(batchData));
-      
+
       if (formData.productionReport) {
         batchFormData.append('productionReport', formData.productionReport);
       }
-      
+
       if (formData.labReport) {
         batchFormData.append('labReport', formData.labReport);
       }
@@ -1732,77 +1312,63 @@ for (const batchId of selectedBatches) {
       }
     }
 
-<<<<<<< HEAD
     // STEP 14: Update local state with the same values sent to database
-   const updatedBatches: Batch[] = batches.map(batch => {
-  if (selectedBatches.includes(batch.id)) {
-    // Get current available honey (could be remaining from previous certifications)
-    const currentAvailableHoney = getRemainingHoneyForBatch(batch);
-    
-    // Store original amount if not already stored
-    const originalHoneyCollected = batch.originalHoneyCollected || batch.totalHoneyCollected || currentAvailableHoney;
-    
-    const batchCertifiedAmount = totalCertifiedAmount;
-    const newHoneyRemaining = Math.max(0, currentAvailableHoney - batchCertifiedAmount);
+    const updatedBatches: Batch[] = batches.map(batch => {
+      if (selectedBatches.includes(batch.id)) {
+        // Get current available honey
+        const currentAvailableHoney = getRemainingHoneyForBatch(batch);
 
-         return {
-      ...batch,
-      status: newHoneyRemaining > 0 ? 'partially_completed' : 'completed',
-      // FIXED: Keep totalHoneyCollected as what user sees (remaining amount)
-      totalHoneyCollected: newHoneyRemaining, // This shows in main display
-      totalKg: batchCertifiedAmount, // Amount certified in this session
-      weightKg: batchCertifiedAmount, // For compatibility with different field names
-      jarsProduced: totalJarsNeeded,
-      jarsUsed: totalJarsNeeded,
-      jarCertifications: jarCertifications,
-      // FIXED: Store tracking amounts properly
-      originalHoneyCollected: originalHoneyCollected, // Original amount before any certification
-      honeyCertified: batchCertifiedAmount, // Amount certified in this session
-      honeyRemaining: newHoneyRemaining, // Amount remaining after this certification
-      totalHoneyCertified: (batch.honeyCertified || 0) + batchCertifiedAmount, // Cumulative certified
-      // Update apiaries with new remaining honey amounts
-      apiaries: batch.apiaries ? batch.apiaries.map(apiary => {
-        const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batch.id}-${apiary.number}`] : undefined;
-        const currentApiaryHoney = storedValue !== undefined ? storedValue : apiary.kilosCollected;
-        
-        // Distribute certified amount proportionally
-        const apiaryProportion = currentAvailableHoney > 0 ? currentApiaryHoney / currentAvailableHoney : 0;
-        const apiaryCertifiedAmount = batchCertifiedAmount * apiaryProportion;
-        const newApiaryRemaining = Math.max(0, currentApiaryHoney - apiaryCertifiedAmount);
-            
+        // FIXED: Store original amount properly - use the actual original amount
+        const originalHoneyCollected = batch.originalHoneyCollected || 
+                                     batch.totalHoneyCollected || 
+                                     (currentAvailableHoney + (batch.honeyCertified || 0));
+
+        const batchCertifiedAmount = totalCertifiedAmount;
+        const newHoneyRemaining = Math.max(0, currentAvailableHoney - batchCertifiedAmount);
+
+        // FIXED: Calculate cumulative certified amount properly
+        const previouslyCertified = batch.totalHoneyCertified || batch.honeyCertified || 0;
+        const totalCumulativeCertified = previouslyCertified + batchCertifiedAmount;
+
+        return {
+          ...batch,
+          status: newHoneyRemaining > 0 ? 'partially_completed' : 'completed',
+          // FIXED: Keep totalHoneyCollected as the ORIGINAL amount, not remaining
+          totalHoneyCollected: originalHoneyCollected, // Always the original amount
+          totalKg: batchCertifiedAmount, // Amount certified in this session
+          weightKg: batchCertifiedAmount, // For compatibility
+          jarsProduced: totalJarsNeeded,
+          jarsUsed: totalJarsNeeded,
+          jarCertifications: jarCertifications,
+          // FIXED: Store tracking amounts properly
+          originalHoneyCollected: originalHoneyCollected, // Original amount before any certification
+          honeyCertified: batchCertifiedAmount, // Amount certified in this session only
+          honeyRemaining: newHoneyRemaining, // Amount remaining after this certification
+          totalHoneyCertified: totalCumulativeCertified, // Cumulative certified across all sessions
+          // Update apiaries with new remaining honey amounts
+          apiaries: batch.apiaries ? batch.apiaries.map(apiary => {
+            const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batch.id}-${apiary.number}`] : undefined;
+            const currentApiaryHoney = storedValue !== undefined ? storedValue : apiary.kilosCollected;
+
+            // Distribute certified amount proportionally
+            const apiaryProportion = currentAvailableHoney > 0 ? currentApiaryHoney / currentAvailableHoney : 0;
+            const apiaryCertifiedAmount = batchCertifiedAmount * apiaryProportion;
+            const newApiaryRemaining = Math.max(0, currentApiaryHoney - apiaryCertifiedAmount);
+
             return {
               ...apiary,
               kilosCollected: newApiaryRemaining,
               honeyCertified: apiaryCertifiedAmount
             };
           }) : []
-=======
-    // Update local state
-    const updatedBatches = batches.map(batch => {
-      if (selectedBatches.includes(batch.id) && batch.apiaries && batch.apiaries.length > 0) {
-        return {
-          ...batch,
-          status: 'completed',
-          jarCertifications: jarCertifications,
-          apiaries: batch.apiaries.map(apiary => {
-            const storedValue = apiaryHoneyValues[`${batch.id}-${apiary.number}`];
-            return {
-              ...apiary,
-              kilosCollected: storedValue !== undefined ? storedValue : apiary.kilosCollected
-            };
-          })
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
         };
       }
       return batch;
     });
 
     setBatches(updatedBatches);
-<<<<<<< HEAD
 
     // STEP 15: Reset form state
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
     setShowCompleteForm(false);
     setSelectedBatches([]);
     setFormData({
@@ -1812,7 +1378,6 @@ for (const batchId of selectedBatches) {
       apiaries: []
     });
 
-<<<<<<< HEAD
     // STEP 16: Prepare certification data for QR code
     const certData = {
       batchIds: selectedBatches,
@@ -1866,50 +1431,32 @@ for (const batchId of selectedBatches) {
         tokenStats: updatedTokenStats
       });
     }
-    
+
     if (setTokenBalance && typeof setTokenBalance === 'function') {
       setTokenBalance(prev => prev - totalJarsNeeded);
     }
-=======
-    setNotification({
-      show: true,
-      message: "Batch information completed successfully!",
-      type: 'success'
-    });
 
-    setTimeout(() => {
-      setShowProfileNotification(true);
-    }, 500);
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error completing batches:', error);
-    
+
     // RESTORE TOKEN BALANCE ON ERROR
-<<<<<<< HEAD
-    const tokensUsed = batchJars ? batchJars.reduce((sum, jar) => sum + jar.quantity, 0) : 0;
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
-    const originalBalance = parseInt(localStorage.getItem('tokenBalance') || '0') + tokensUsed;
+    const tokensUsedOnError = batchJars ? batchJars.reduce((sum, jar) => sum + jar.quantity, 0) : 0;
+    const originalBalance = parseInt(localStorage.getItem('tokenBalance') || '0') + tokensUsedOnError;
     localStorage.setItem('tokenBalance', originalBalance.toString());
     setTokenBalance(originalBalance);
-    
+
     // Dispatch restore event
     window.dispatchEvent(new CustomEvent('tokensUpdated', {
-      detail: { 
+      detail: {
         action: 'restore',
-        tokensRestored: tokensUsed,
+        tokensRestored: tokensUsedOnError,
         newBalance: originalBalance
       }
     }));
 
     setNotification({
       show: true,
-<<<<<<< HEAD
       message: error.message || 'An error occurred while completing the batch',
-=======
-      message: error.message,
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
       type: 'error'
     });
   } finally {
@@ -2180,21 +1727,6 @@ async function saveApiaryToDatabase(apiaryData: any) {
 
 
 
-<<<<<<< HEAD
-  const getTotalHoneyFromBatch = () => {
-  let total = 0;
-  selectedBatches.forEach(batchId => {
-    const batch = batches.find(b => b.id === batchId);
-    if (batch) {
-      // Use the same logic as in the table to get the total kg value
-      const batchTotal = batch.totalKg || batch.weightKg || batch.totalHoneyCollected || 0;
-      total += typeof batchTotal === 'number' ? batchTotal : 0;
-    }
-  });
-  return total;
-};
-  
-=======
   const getTotalHoneyFromApiaries = () => {
   return formData.apiaries.reduce((total, apiary) => total + (apiary.kilosCollected || 0), 0);
 };
@@ -2207,7 +1739,6 @@ async function saveApiaryToDatabase(apiaryData: any) {
   const totalJars = jarSizeDistribution.jar250g + jarSizeDistribution.jar400g + jarSizeDistribution.jar600g;
   
 }, [jarSizeDistribution, tokenBalance, certificationAmounts]);
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   
 
   // Handle apiary form field changes
@@ -2345,48 +1876,6 @@ async function saveApiaryToDatabase(apiaryData: any) {
   // Add these to your state declarations
 const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 const [isDeleting, setIsDeleting] = useState(false);
-<<<<<<< HEAD
-// Helper function to get remaining honey for a specific batch
-// Helper function to get remaining honey for a specific batch
-const getRemainingHoneyForBatch = (batch) => {
-  if (!batch) return 0;
-  
-  // For batches that have been processed (completed or partially completed)
-  if (batch.status === 'completed' || batch.status === 'partially_completed') {
-    // If honeyRemaining is explicitly set, use that
-    if (typeof batch.honeyRemaining === 'number') {
-      return batch.honeyRemaining;
-    }
-    // If no honeyRemaining but we have totalHoneyCollected, use that
-    // (this represents the current available amount after any certifications)
-    if (typeof batch.totalHoneyCollected === 'number') {
-      return batch.totalHoneyCollected;
-    }
-  }
-  
-  // For new/unprocessed batches, totalHoneyCollected is the full amount
-  if (batch.totalHoneyCollected) {
-    return batch.totalHoneyCollected;
-  }
-  
-  // Fallback to totalKg or weightKg
-  return batch.totalKg || batch.weightKg || 0;
-};
-
-// Updated function to get total remaining honey from all selected batches
-const getTotalRemainingHoneyFromBatch = () => {
-  if (!selectedBatches || selectedBatches.length === 0) return 0;
-  
-  return selectedBatches.reduce((total, batchId) => {
-    const batch = batches.find(b => b.id === batchId);
-    return total + getRemainingHoneyForBatch(batch);
-  }, 0);
-};
-
-
-
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
 // Handler for the delete button click
 const handleDelete = () => {
@@ -2888,14 +2377,10 @@ const getJarsForApiary = (apiaryIndex: number) => {
   return apiaryJars[apiaryIndex] || [];
 };
 
-<<<<<<< HEAD
-
-=======
 // Helper function to get total jars across all apiaries
 const getTotalJarsAcrossApiaries = () => {
   return Object.values(apiaryJars).flat().reduce((sum, jar) => sum + jar.quantity, 0);
 };
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
 // Helper function to add jar to specific apiary
 const addJarToApiary = (apiaryIndex: number) => {
@@ -3347,6 +2832,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
             setShowBatchModal(false);
             setBatchNumber('');
             setBatchName('');
+            setBatchHoneyCollected(0);
             setSelectedApiaries([]);
           }}
           className="text-gray-500 hover:text-gray-700"
@@ -3355,7 +2841,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Batch Number */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -3387,6 +2873,26 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
           />
           <p className="text-xs text-gray-500 mt-1">
             If left empty, will default to "{batchNumber ? `${batchNumber}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}` : 'BatchNumber_YYYY-MM-DDTHH-MM-SS'}"
+          </p>
+        </div>
+
+        {/* Total Honey Collected */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Total Honey Collected (kg) <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={batchHoneyCollected || ''}
+            onChange={(e) => setBatchHoneyCollected(parseFloat(e.target.value) || 0)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            placeholder="Enter total honey collected"
+            required
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Total honey collected from all apiaries in this batch
           </p>
         </div>
       </div>
@@ -3459,15 +2965,10 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                     console.log('Is already selected:', isAlreadySelected);
                     
                     if (!isAlreadySelected) {
-                      // Add the apiary with batchHoneyCollected property (separate from stored kilosCollected)
-                      const newApiary = { 
-                        ...apiary, 
-                        batchHoneyCollected: 0 // This is the honey collected specifically for this batch
-                      };
-                      
+                      // Add the apiary without any batch-specific properties
                       setSelectedApiaries(prev => {
                         const prevArray = Array.isArray(prev) ? prev : [];
-                        const newArray = [...prevArray, newApiary];
+                        const newArray = [...prevArray, apiary];
                         console.log('New selected apiaries:', newArray);
                         return newArray;
                       });
@@ -3596,99 +3097,64 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                     Remove
                   </button>
                 </div>
-                
-                {/* Batch-specific honey collection - Mandatory */}
-                <div className="border-t pt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Honey Collected for THIS Batch (kg) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      value={apiary.kilosCollected || ''}
-                      onChange={(e) => {
-                        const newValue = parseFloat(e.target.value) || 0;
-                        setSelectedApiaries(prev => {
-                          const prevArray = Array.isArray(prev) ? prev : [];
-                          return prevArray.map(a => 
-                            a.id === apiary.id ? { ...a, batchHoneyCollected: newValue } : a
-                          );
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                      placeholder="0.0"
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      This is the amount of honey collected from this apiary specifically for this batch
-                    </p>
-                  </div>
-                </div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Summary Section */}
-      {selectedApiaries.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h5 className="font-medium text-blue-900 mb-3">Batch Summary</h5>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-blue-700 font-medium">Total Apiaries</p>
-              <p className="text-blue-900 text-lg font-bold">{selectedApiaries.length}</p>
-            </div>
-            <div>
-              <p className="text-blue-700 font-medium">Total Hives</p>
-              <p className="text-blue-900 text-lg font-bold">
-                {selectedApiaries.reduce((sum, apiary) => sum + (apiary.hiveCount || 0), 0)}
-              </p>
-            </div>
-            <div>
-              <p className="text-blue-700 font-medium">Batch Honey (kg)</p>
-              <p className="text-blue-900 text-lg font-bold">
-                {selectedApiaries.reduce((sum, apiary) => sum + (apiary.batchHoneyCollected || 0), 0).toFixed(1)}
-              </p>
-            </div>
-            <div>
-              <p className="text-blue-700 font-medium">Total Stored Honey (kg)</p>
-              <p className="text-blue-900 text-lg font-bold">
-                {selectedApiaries.reduce((sum, apiary) => sum + (apiary.kilosCollected || 0), 0).toFixed(1)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-xs">
-        <p><strong>🔍 Apiary Data Debug:</strong></p>
-        {Array.isArray(availableApiaries) && availableApiaries.map(apiary => (
-          <div key={apiary.id} className="mt-2 p-2 bg-white rounded border">
-            <p><strong>{apiary.name}</strong> (ID: {apiary.id})</p>
-            <p>• Number: {apiary.number}</p>
-            <p>• Hive Count: {apiary.hiveCount}</p>
-            <p>• Kilos Collected: {apiary.kilosCollected} (type: {typeof apiary.kilosCollected})</p>
-            <p>• Location: lat: {apiary.latitude}, lng: {apiary.longitude}</p>
-            <p>• Full Object Keys: {Object.keys(apiary).join(', ')}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mb-4 p-2 bg-yellow-100 border border-yellow-300 rounded text-xs">
-        <p><strong>Debug Info:</strong></p>
-        <p>Batch Number: "{batchNumber}" (length: {batchNumber?.length || 0})</p>
-        <p>Selected Apiaries: {Array.isArray(selectedApiaries) ? selectedApiaries.length : 'Not an array'}</p>
-        <p>All apiaries have batch honey defined?: {Array.isArray(selectedApiaries) && selectedApiaries.every(a => a.batchHoneyCollected !== undefined && a.batchHoneyCollected !== null && a.batchHoneyCollected !== '') ? 'YES' : 'NO'}</p>
-        <p>Button should be enabled: {
-          batchNumber?.trim() && 
-          Array.isArray(selectedApiaries) && 
-          selectedApiaries.length > 0 && 
-          selectedApiaries.every(a => a.batchHoneyCollected !== undefined && a.batchHoneyCollected !== null && a.batchHoneyCollected !== '') ? 'YES' : 'NO'
-        }</p>
-      </div>
+     {/* Enhanced Batch Summary - Replace the existing batch summary */}
+<div className="bg-blue-50 p-4 rounded-lg mb-6">
+  <h5 className="font-medium text-blue-800 mb-2">Batch Summary</h5>
+  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+    <div>
+      <span className="text-gray-600">Selected Batches:</span>
+      <span className="ml-2 font-bold">{selectedBatches.length}</span>
+    </div>
+    <div>
+      <span className="text-gray-600">Original Total:</span>
+      <span className="ml-2 font-bold text-gray-800">
+        {selectedBatches.reduce((total, batchId) => {
+          const batch = batches.find(b => b.id === batchId);
+          if (!batch) return total;
+          const originalTotal = batch.totalKg || batch.weightKg || batch.totalHoneyCollected || 0;
+          return total + (typeof originalTotal === 'number' ? originalTotal : 0);
+        }, 0).toFixed(2)} kg
+      </span>
+    </div>
+    <div>
+      <span className="text-gray-600">Previously Certified:</span>
+      <span className="ml-2 font-bold text-yellow-600">
+        {selectedBatches.reduce((total, batchId) => {
+          const batch = batches.find(b => b.id === batchId);
+          return total + (batch?.honeyCertified || 0);
+        }, 0).toFixed(2)} kg
+      </span>
+    </div>
+    <div>
+      <span className="text-gray-600">Available for Jars:</span>
+      <span className="ml-2 font-bold text-green-600">
+        {getTotalRemainingHoneyFromBatch().toFixed(2)} kg
+      </span>
+    </div>
+  </div>
+  
+  {getTotalRemainingHoneyFromBatch() === 0 && selectedBatches.length > 0 && (
+    <div className="mt-3 p-2 bg-orange-100 border border-orange-200 rounded">
+      <p className="text-orange-700 text-sm font-medium">
+        ⚠️ All honey from selected batches has been previously certified
+      </p>
+    </div>
+  )}
+  
+  {getTotalRemainingHoneyFromBatch() > 0 && (
+    <div className="mt-3 p-2 bg-green-100 border border-green-200 rounded">
+      <p className="text-green-700 text-sm font-medium">
+        ✓ {getTotalRemainingHoneyFromBatch().toFixed(2)} kg available for certification
+      </p>
+    </div>
+  )}
+</div>
 
       {/* Action Buttons */}
       <div className="flex justify-end space-x-3 pt-4 border-t">
@@ -3697,6 +3163,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
             setShowBatchModal(false);
             setBatchNumber('');
             setBatchName('');
+            setBatchHoneyCollected(0);
             setSelectedApiaries([]);
             setSelectedDropdownApiary('');
           }}
@@ -3708,15 +3175,16 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
           onClick={createBatch}
           disabled={
             !batchNumber?.trim() || 
+            !batchHoneyCollected ||
+            batchHoneyCollected <= 0 ||
             !Array.isArray(selectedApiaries) || 
-            selectedApiaries.length === 0 ||
-            !selectedApiaries.every(apiary => apiary.batchHoneyCollected !== undefined && apiary.batchHoneyCollected !== null && apiary.batchHoneyCollected !== '')
+            selectedApiaries.length === 0
           }
           className={`px-6 py-2 rounded-md text-white font-medium transition-colors ${
             batchNumber?.trim() && 
+            batchHoneyCollected > 0 &&
             Array.isArray(selectedApiaries) && 
-            selectedApiaries.length > 0 &&
-            selectedApiaries.every(apiary => apiary.batchHoneyCollected !== undefined && apiary.batchHoneyCollected !== null && apiary.batchHoneyCollected !== '')
+            selectedApiaries.length > 0
               ? 'bg-green-600 hover:bg-green-700' 
               : 'bg-gray-300 cursor-not-allowed'
           }`}
@@ -4262,7 +3730,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
         </div>
       )}
 
-      {/* Batch list table */}
+     {/* Batch list table */}
       {!isLoading && !error && (
         <div className="bg-white p-4 rounded-lg shadow">
           <div className="overflow-x-auto">
@@ -4328,11 +3796,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                       className="px-4 py-3 cursor-pointer"
                       onClick={() => toggleExpand(batch.id)}
                     >
-<<<<<<< HEAD
                       {batch.batchName || batch.name}
-=======
-                      {batch.name}
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                     </td>
                     <td 
                       className="px-4 py-3 cursor-pointer"
@@ -4345,34 +3809,33 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                       onClick={() => toggleExpand(batch.id)}
                     >
                       <span
-                        className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                          batch.status === 'completed' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                      >
-                        {batch.status === 'completed' ? 'Completed' : 'Pending'}
-                      </span>
+  className={`inline-flex px-2 py-1 text-xs rounded-full ${
+    batch.status === 'completed'
+      ? 'bg-green-100 text-green-800'
+      : batch.status === 'partially_completed'
+      ? 'bg-orange-100 text-orange-800'
+      : 'bg-yellow-100 text-yellow-800'
+  }`}
+>
+  {batch.status === 'completed'
+    ? 'Completed'
+    : batch.status === 'partially_completed'
+    ? 'Partial'
+    : 'Pending'}
+</span>
+
                     </td>
                     <td 
                       className="px-4 py-3 cursor-pointer"
                       onClick={() => toggleExpand(batch.id)}
                     >
-<<<<<<< HEAD
                       {typeof (batch.totalKg || batch.weightKg || batch.totalHoneyCollected) === 'number' ? (batch.totalKg || batch.weightKg || batch.totalHoneyCollected).toLocaleString() : '0'}
-=======
-                      {typeof batch.totalKg === 'number' ? batch.totalKg.toLocaleString() : '0'}
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                     </td>
                     <td 
                       className="px-4 py-3 cursor-pointer"
                       onClick={() => toggleExpand(batch.id)}
                     >
-<<<<<<< HEAD
                       {typeof (batch.jarsProduced || batch.jarsUsed) === 'number' ? (batch.jarsProduced || batch.jarsUsed).toLocaleString() : '0'}
-=======
-                      {typeof batch.jarsProduced === 'number' ? batch.jarsProduced.toLocaleString() : '0'}
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                     </td>
                     <td 
                       className="px-4 py-3 cursor-pointer"
@@ -4398,50 +3861,8 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                     <tr>
                       <td colSpan="9" className="px-4 py-4 bg-gray-50 border-b">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-<<<<<<< HEAD
                           
                           {/* Enhanced Batch Details */}
-=======
-                          {/* Certification pie chart */}
-                          <div className="bg-white p-4 rounded-lg shadow">
-                            <h3 className="text-sm font-semibold mb-2">Certification Status</h3>
-                            <div className="h-64">
-                              <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                  <Pie
-                                    data={getCertificationData(batch)}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                  >
-                                    {getCertificationData(batch).map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                  </Pie>
-                                  <Tooltip formatter={(value) => `${value} kg`} />
-                                </PieChart>
-                              </ResponsiveContainer>
-                            </div>
-                          </div>
-
-                          {notification.show && (
-                            <div className="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg">
-                            {notification.message}
-                         <button 
-                            onClick={() => setNotification({ ...notification, show: false })}
-                            className="ml-2 text-gray-300 hover:text-white"
-                          >
-      ×
-                         </button>
-                         </div>
-                         )}
-                     
-                          {/* Batch details */}
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                           <div className="bg-white p-4 rounded-lg shadow">
                             <h3 className="text-sm font-semibold mb-2">Batch Details</h3>
                             <div className="space-y-2">
@@ -4453,7 +3874,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                                 <span className="text-gray-600">Created Date:</span>
                                 <span className="font-medium">{new Date(batch.createdAt).toLocaleDateString()}</span>
                               </div>
-<<<<<<< HEAD
                               
                               {/* Total Honey Information */}
                               <div className="border-t pt-2 mt-3">
@@ -4462,14 +3882,14 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                                 <div className="flex justify-between">
                                   <span className="text-gray-600">Total Collected:</span>
                                   <span className="font-medium text-blue-600">
-                                    {typeof (batch.totalHoneyCollected || batch.weightKg) === 'number' ? (batch.totalHoneyCollected || batch.weightKg).toFixed(2) : '0'} kg
+                                    {typeof (batch.totalHoneyCollected || batch.weightKg || batch.totalKg) === 'number' ? (batch.totalHoneyCollected || batch.weightKg || batch.totalKg).toFixed(2) : '0'} kg
                                   </span>
                                 </div>
                                 
                                 <div className="flex justify-between">
                                   <span className="text-gray-600">Honey Certified:</span>
                                   <span className="font-medium text-green-600">
-                                    {typeof (batch.honeyCertified || batch.originOnly + batch.qualityOnly + batch.bothCertifications) === 'number' ? (batch.honeyCertified || batch.originOnly + batch.qualityOnly + batch.bothCertifications).toFixed(2) : '0'} kg
+                                    {typeof (batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))) === 'number' ? (batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))).toFixed(2) : '0'} kg
                                   </span>
                                 </div>
                                 
@@ -4481,11 +3901,11 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                                 </div>
                                 
                                 {/* Certification Efficiency */}
-                                {(batch.totalHoneyCollected || batch.weightKg) > 0 && (
+                                {(batch.totalHoneyCollected || batch.weightKg || batch.totalKg) > 0 && (
                                   <div className="flex justify-between">
                                     <span className="text-gray-600">Certification Rate:</span>
                                     <span className="font-medium text-purple-600">
-                                      {(((batch.honeyCertified || batch.originOnly + batch.qualityOnly + batch.bothCertifications) / (batch.totalHoneyCollected || batch.weightKg)) * 100).toFixed(1)}%
+                                      {(((batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))) / (batch.totalHoneyCollected || batch.weightKg || batch.totalKg)) * 100).toFixed(1)}%
                                     </span>
                                   </div>
                                 )}
@@ -4502,7 +3922,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                                 
                                 <div className="flex justify-between">
                                   <span className="text-gray-600">Certified Weight:</span>
-                                  <span className="font-medium">{typeof (batch.weightKg || batch.totalHoneyCollected) === 'number' ? (batch.weightKg || batch.totalHoneyCollected).toFixed(2) : '0'} kg</span>
+                                  <span className="font-medium">{typeof (batch.weightKg || batch.totalHoneyCollected || batch.totalKg) === 'number' ? (batch.weightKg || batch.totalHoneyCollected || batch.totalKg).toFixed(2) : '0'} kg</span>
                                 </div>
                               </div>
                               
@@ -4539,7 +3959,12 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                               <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                   <Pie
-                                    data={getEnhancedCertificationData(batch)}
+                                    data={[
+                                      { name: 'Origin Only', value: batch.originOnly || 0, color: '#3B82F6' },
+                                      { name: 'Quality Only', value: batch.qualityOnly || 0, color: '#10B981' },
+                                      { name: 'Both Certifications', value: batch.bothCertifications || 0, color: '#8B5CF6' },
+                                      { name: 'Uncertified', value: batch.uncertified || 0, color: '#6B7280' }
+                                    ].filter(item => item.value > 0)}
                                     cx="50%"
                                     cy="50%"
                                     innerRadius={60}
@@ -4548,7 +3973,12 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                                     dataKey="value"
                                     label={({ name, percent, value }) => `${name}: ${value.toFixed(1)}kg (${(percent * 100).toFixed(0)}%)`}
                                   >
-                                    {getEnhancedCertificationData(batch).map((entry, index) => (
+                                    {[
+                                      { name: 'Origin Only', value: batch.originOnly || 0, color: '#3B82F6' },
+                                      { name: 'Quality Only', value: batch.qualityOnly || 0, color: '#10B981' },
+                                      { name: 'Both Certifications', value: batch.bothCertifications || 0, color: '#8B5CF6' },
+                                      { name: 'Uncertified', value: batch.uncertified || 0, color: '#6B7280' }
+                                    ].filter(item => item.value > 0).map((entry, index) => (
                                       <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                   </Pie>
@@ -4597,6 +4027,12 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                                       <span className="text-gray-600">Hives:</span>
                                       <span className="font-medium">{apiary.hiveCount}</span>
                                     </div>
+                                    {apiary.kilosCollected && (
+                                      <div className="flex justify-between">
+                                        <span className="text-gray-600">Honey collected:</span>
+                                        <span className="font-medium">{apiary.kilosCollected} kg</span>
+                                      </div>
+                                    )}
                                     {apiary.latitude && apiary.longitude && (
                                       <div className="flex justify-between">
                                         <span className="text-gray-600">Location:</span>
@@ -4615,65 +4051,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                               </div>
                             )}
                           </div>
-=======
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Total Weight:</span>
-                                <span className="font-medium">{typeof batch.totalKg === 'number' ? batch.totalKg.toLocaleString() : '0'} kg</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Jars Produced:</span>
-                                <span className="font-medium">{typeof batch.jarsProduced === 'number' ? batch.jarsProduced.toLocaleString() : '0'}</span>
-                                </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Status:</span>
-                                <span className={`font-medium ${batch.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
-                                  {batch.status === 'completed' ? 'Completed' : 'Pending'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          {/* Apiaries list */}
-<div className="bg-white p-4 rounded-lg shadow">
-  <h3 className="text-sm font-semibold mb-2">Associated Apiaries</h3>
-  {batch.apiaries && batch.apiaries.length > 0 ? (
-    <div className="space-y-3">
-      {batch.apiaries.map((apiary, index) => (
-        <div key={index} className="border-b pb-2 last:border-b-0">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Name:</span>
-            <span className="font-medium">{apiary.name}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Number:</span>
-            <span className="font-medium">{apiary.number}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Hives:</span>
-            <span className="font-medium">{apiary.hiveCount}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Honey collected:</span>
-            <span className="font-medium">{apiary.kilosCollected} kg</span>
-          </div>
-          {apiary.latitude && apiary.longitude && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Location:</span>
-              <span className="font-medium flex items-center">
-                <MapPin className="h-3 w-3 mr-1 text-gray-400" />
-                {apiary.latitude.toFixed(4)}, {apiary.longitude.toFixed(4)}
-              </span>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  ) : (
-    <div className="text-center py-4 text-gray-500 italic">
-      No apiaries associated with this batch
-    </div>
-  )}
-</div>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                         </div>
                       </td>
                     </tr>
@@ -4684,7 +4061,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
             </table>
           </div>
 
-<<<<<<< HEAD
           {/* Notification */}
           {notification.show && (
             <div className="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg">
@@ -4698,8 +4074,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
             </div>
           )}
 
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
           {/* Empty state */}
           {filteredBatches.length === 0 && (
             <div className="text-center py-8">
@@ -4719,62 +4093,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
 
       {/* Token statistics */}
       <div className="bg-white p-4 rounded-lg shadow">
-<<<<<<< HEAD
-        <h2 className="text-lg font-semibold mb-4">Certification Tokens</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Token Status</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Total tokens:</span>
-                <span className="font-medium">{tokenStats.totalTokens}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Remaining tokens:</span>
-                <span className="font-medium">{tokenStats.remainingTokens}</span>
-              </div>
-              <div className="relative pt-1">
-                <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
-                  <div
-                    style={{ width: `${(tokenStats.remainingTokens / tokenStats.totalTokens) * 100}%` }}
-                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-yellow-500"
-                  ></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-600 mb-2">Token Distribution</h3>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={[
-                    { name: 'Origin Only', value: tokenStats.originOnly, color: '#3182CE' },
-                    { name: 'Quality Only', value: tokenStats.qualityOnly, color: '#38A169' },
-                    { name: 'Both', value: tokenStats.bothCertifications, color: '#805AD5' },
-                  ]}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" name="Tokens" fill="#FBBF24">
-                    {[
-                      { name: 'Origin Only', value: tokenStats.originOnly, color: '#3182CE' },
-                      { name: 'Quality Only', value: tokenStats.qualityOnly, color: '#38A169' },
-                      { name: 'Both', value: tokenStats.bothCertifications, color: '#805AD5' },
-                    ].map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      </div>
-=======
   <h2 className="text-lg font-semibold mb-4">Certification Tokens</h2>
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div className="bg-gray-50 p-4 rounded-lg">
@@ -4829,7 +4147,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
     </div>
   </div>
 </div>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
       {/* Print notification dialog */}
       {showPrintNotification && (
@@ -4863,7 +4180,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
         </div>
       )}
 
-   {/* Complete batch form */}
+{/* Complete batch form */}
 {showCompleteForm && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
     <div className="bg-white p-6 rounded-lg shadow-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
@@ -4879,8 +4196,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
       <form onSubmit={handleCompleteBatch}>
         <div className="space-y-6">
           
-<<<<<<< HEAD
-         {/* Enhanced Selected Batches Info - Updated with better UI */}
+         {/* Enhanced Selected Batches Info - Updated to use weightKg */}
           <div className="bg-gray-50 p-4 rounded-lg border">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium text-gray-800">
@@ -4897,8 +4213,9 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                 if (!batch) return null;
                 
                 const remainingHoney = getRemainingHoneyForBatch(batch);
-                const originalHoney = batch.originalHoneyCollected || batch.totalHoneyCollected || remainingHoney;
-                const totalCertified = batch.totalHoneyCertified || 0;
+                // FIXED: Use weightKg as the source of truth for original honey
+                const originalHoney = batch.weightKg || batch.totalHoneyCollected || 0;
+                const totalCertified = batch.honeyCertified || 0;
                 const hasBeenCertified = totalCertified > 0;
                 const isFullyProcessed = batch.status === 'completed';
                 const isPartiallyProcessed = batch.status === 'partially_completed';
@@ -4962,25 +4279,10 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                       )}
                     </div>
                   </div>
-=======
-          {/* Selected Batches Info */}
-          <div>
-            <p className="text-gray-600 mb-2">
-              You are completing {selectedBatches.length} {selectedBatches.length === 1 ? 'batch' : 'batches'}:
-            </p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {selectedBatches.map(batchId => {
-                const batch = batches.find(b => b.id === batchId);
-                return (
-                  <span key={batchId} className="inline-flex px-2 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full">
-                    {batch.batchNumber} ({batch.totalHoneyCollected} kg from batch record)
-                  </span>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                 );
               })}
             </div>
             
-<<<<<<< HEAD
             {/* Summary Section */}
             <div className="mt-4 pt-3 border-t border-gray-200">
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -4992,7 +4294,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                   <div className="text-green-900 font-semibold">
                     {selectedBatches.reduce((total, id) => {
                       const batch = batches.find(b => b.id === id);
-                      return total + (batch?.totalHoneyCertified || 0);
+                      return total + (batch?.honeyCertified || 0);
                     }, 0)} kg
                   </div>
                   <div className="text-green-600 text-xs">Previously Certified</div>
@@ -5423,332 +4725,32 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
         <div>
           <span className="text-gray-600">Total Jars:</span>
           <span className="ml-2 font-bold">{batchJars.reduce((sum, jar) => sum + jar.quantity, 0)}</span>
-=======
-            {/* Total Available Honey from Apiaries */}
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-2">Total Honey Available for Certification</h4>
-              <p className="text-2xl font-bold text-blue-900">
-                {getTotalHoneyFromApiaries()} kg
-              </p>
-              <p className="text-sm text-blue-600 mt-1">
-                (Based on actual honey collected from all apiaries)
-              </p>
-            </div>
-          </div>
-
-          {/* Token Balance Display */}
-          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-  <div className="flex items-center justify-between">
-    <div className="flex items-center">
-      <Wallet className="h-6 w-6 text-yellow-600 mr-3" />
-      <div>
-        <h4 className="font-medium text-yellow-800">Your Token Balance</h4>
-        <div className="flex items-center space-x-2">
-          <p className="text-2xl font-bold text-yellow-900">{tokenBalance}</p>
-          {getTotalJarsAcrossApiaries() > 0 && (
-            <>
-              <span className="text-gray-400">→</span>
-              <p className="text-2xl font-bold text-green-600">
-                {Math.max(0, tokenBalance - getTotalJarsAcrossApiaries())}
-              </p>
-              <span className="text-sm text-gray-500">(after completion)</span>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-    <div className="text-right">
-      <p className="text-sm text-yellow-700">Tokens Needed: {getTotalJarsAcrossApiaries()}</p>
-      <p className={`font-bold ${tokenBalance - getTotalJarsAcrossApiaries() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-        Remaining: {tokenBalance - getTotalJarsAcrossApiaries()} tokens
-      </p>
-    </div>
-  </div>
-  <div className="flex justify-between items-center mt-3">
-    <div className="text-sm text-yellow-700">
-      Need more tokens? 
-    </div>
-    <button
-      type="button"
-      onClick={() => router.push('/buy-token')}
-      className="px-3 py-1 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 flex items-center text-sm"
-    >
-      <PlusCircle className="h-4 w-4 mr-1" />
-      Buy Tokens
-    </button>
-  </div>
-  {tokenBalance - getTotalJarsAcrossApiaries() < 0 && (
-    <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-md">
-      <p className="text-red-700 text-sm">
-        ⚠️ Insufficient tokens! You need {Math.abs(tokenBalance - getTotalJarsAcrossApiaries())} more tokens.
-        <button
-          type="button"
-          onClick={() => router.push('/buy-token')}
-          className="ml-2 underline hover:no-underline"
-        >
-          Buy tokens now
-        </button>
-      </p>
-    </div>
-  )}
-</div>
-
-          {/* Custom Jar Definition Section */}
-          <div className="border rounded-md p-4 mb-4">
-  <h4 className="font-medium mb-3">Define Jars for Each Apiary</h4>
-  <p className="text-sm text-gray-600 mb-4">
-    Define jars for each apiary individually based on their honey production.
-  </p>
-
-  {formData.apiaries.map((apiary, apiaryIndex) => (
-  <div key={apiaryIndex} className="border rounded-md p-4 mb-6 bg-gray-50">
-    <h5 className="font-medium mb-3 text-lg">
-      {apiary.name} ({apiary.number})
-      <span className="ml-2 text-sm font-normal text-blue-600">
-        Available: {apiary.kilosCollected} kg
-      </span>
-    </h5>
-
-    {/* Add New Jar Form */}
-    <div className={`bg-white p-4 rounded-lg mb-4 ${isApiaryFullyAllocated(apiaryIndex) ? 'opacity-50' : ''}`}>
-      <h6 className="font-medium mb-3">
-        Add Jars for This Apiary
-        {isApiaryFullyAllocated(apiaryIndex) && (
-          <span className="ml-2 text-sm text-green-600 font-normal">
-            ✓ All honey allocated
-          </span>
-        )}
-      </h6>
-
-      {!isApiaryFullyAllocated(apiaryIndex) ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Jar Size (grams)</label>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={newJarForApiary[apiaryIndex]?.size || 0}
-              onChange={(e) =>
-                setNewJarForApiary({
-                  ...newJarForApiary,
-                  [apiaryIndex]: {
-                    ...newJarForApiary[apiaryIndex],
-                    size: parseInt(e.target.value) || 0,
-                    quantity: newJarForApiary[apiaryIndex]?.quantity || 1,
-                  },
-                })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., 250, 400, 850"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-            <input
-              type="number"
-              min="1"
-              max={Math.floor(
-                getRemainingHoneyForApiary(apiaryIndex) * 1000 /
-                  (newJarForApiary[apiaryIndex]?.size || 1)
-              )}
-              value={newJarForApiary[apiaryIndex]?.quantity || 1}
-              onChange={(e) =>
-                setNewJarForApiary({
-                  ...newJarForApiary,
-                  [apiaryIndex]: {
-                    ...newJarForApiary[apiaryIndex],
-                    size: newJarForApiary[apiaryIndex]?.size || 0,
-                    quantity: parseInt(e.target.value) || 1,
-                  },
-                })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="How many jars"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Max:{' '}
-              {Math.floor(
-                getRemainingHoneyForApiary(apiaryIndex) * 1000 /
-                  (newJarForApiary[apiaryIndex]?.size || 1)
-              )}{' '}
-              jars
-            </p>
-          </div>
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={() => addJarToApiary(apiaryIndex)}
-              disabled={!newJarForApiary[apiaryIndex]?.size}
-              className={`w-full px-4 py-2 rounded-md flex items-center justify-center ${
-                newJarForApiary[apiaryIndex]?.size > 0
-                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Jars
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <Check className="h-5 w-5 text-green-600 mr-2" />
-            <p className="text-green-800 font-medium">
-              All honey from this apiary has been allocated to jars
-            </p>
-          </div>
-          <p className="text-green-600 text-sm mt-1">
-            Delete some jars if you want to create different jar configurations
-          </p>
-        </div>
-      )}
-    </div>
-
-    {/* Jars list */}
-    {getJarsForApiary(apiaryIndex).length > 0 && (
-      <div className="space-y-3">
-        <h6 className="font-medium">Defined Jars for This Apiary</h6>
-        {getJarsForApiary(apiaryIndex).map((jar) => (
-          <div key={jar.id} className="flex items-center justify-between p-3 bg-white border rounded-md">
-            <div className="flex items-center space-x-4">
-              <div className="text-sm">
-                <span className="font-medium">{jar.quantity}x {jar.size}g jars</span>
-                <span className="text-gray-500 ml-2">
-                  = {((jar.size * jar.quantity) / 1000).toFixed(2)} kg total
-                </span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => removeJarFromApiary(apiaryIndex, jar.id)}
-              className="text-red-500 hover:text-red-700"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
-
-        <div className={`p-3 rounded-lg ${isApiaryFullyAllocated(apiaryIndex) ? 'bg-green-50 border border-green-200' : 'bg-blue-50'}`}>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="text-gray-600">Total Jars:</span>
-              <span className="ml-2 font-bold">
-                {getJarsForApiary(apiaryIndex).reduce((sum, jar) => sum + jar.quantity, 0)}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-600">Total Weight:</span>
-              <span className="ml-2 font-bold">
-                {getJarsForApiary(apiaryIndex)
-                  .reduce((sum, jar) => sum + (jar.size * jar.quantity) / 1000, 0)
-                  .toFixed(2)}{' '}
-                kg
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-600">Remaining:</span>
-              <span className={`ml-2 font-bold ${isApiaryFullyAllocated(apiaryIndex) ? 'text-green-600' : 'text-blue-600'}`}>
-                {getRemainingHoneyForApiary(apiaryIndex).toFixed(2)} kg
-                {isApiaryFullyAllocated(apiaryIndex) && (
-                  <span className="ml-1 text-green-500">✓</span>
-                )}
-              </span>
-            </div>
-          </div>
-          {isApiaryFullyAllocated(apiaryIndex) && (
-            <div className="mt-2 text-center">
-              <span className="text-green-700 text-sm font-medium">
-                🎯 Perfect allocation! All honey from this apiary is assigned to jars.
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
-
-    {/* Empty placeholder if no jars defined */}
-    {getJarsForApiary(apiaryIndex).length === 0 && !isApiaryFullyAllocated(apiaryIndex) && (
-      <div
-        className="border border-dashed border-gray-300 rounded-md p-4 text-center cursor-pointer hover:bg-gray-50"
-        onClick={() => {
-          if (!newJarForApiary[apiaryIndex]) {
-            setNewJarForApiary({
-              ...newJarForApiary,
-              [apiaryIndex]: { size: 250, quantity: 1 },
-            });
-          }
-        }}
-      >
-        <PlusCircle className="h-6 w-6 mx-auto text-gray-400 mb-2" />
-        <p className="text-gray-500">Click to add jars for this apiary</p>
-      </div>
-    )}
-  </div>
-))}
-
-
-  {/* Overall Summary */}
-  {Object.keys(apiaryJars).length > 0 && (
-    <div className={`p-4 rounded-lg ${isAllHoneyAllocated() ? 'bg-green-50 border border-green-200' : 'bg-yellow-50'}`}>
-    <div className="flex items-center justify-between mb-2">
-      <h5 className="font-medium">Overall Summary</h5>
-      {isAllHoneyAllocated() && (
-        <span className="flex items-center text-green-600 text-sm font-medium">
-          <Check className="h-4 w-4 mr-1" />
-          Complete Allocation
-        </span>
-      )}
-    </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-        <div>
-          <span className="text-gray-600">Total Jars:</span>
-          <span className="ml-2 font-bold">{getTotalJarsAcrossApiaries()}</span>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
         </div>
         <div>
           <span className="text-gray-600">Total Weight:</span>
           <span className="ml-2 font-bold">
-<<<<<<< HEAD
             {batchJars.reduce((sum, jar) => sum + (jar.size * jar.quantity / 1000), 0).toFixed(2)} kg
-=======
-            {Object.values(apiaryJars).flat().reduce((sum, jar) => sum + (jar.size * jar.quantity / 1000), 0).toFixed(2)} kg
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
           </span>
         </div>
         <div>
           <span className="text-gray-600">Total Available:</span>
           <span className="ml-2 font-bold text-blue-600">
-<<<<<<< HEAD
             {getTotalHoneyFromBatch()} kg
-=======
-            {getTotalHoneyFromApiaries()} kg
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
           </span>
         </div>
         <div>
           <span className="text-gray-600">Tokens Needed:</span>
           <span className="ml-2 font-bold text-yellow-600">
-<<<<<<< HEAD
             {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} tokens
-=======
-            {getTotalJarsAcrossApiaries()} tokens
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
           </span>
         </div>
       </div>
     </div>
   )}
 </div>
-<<<<<<< HEAD
 
 {/* Certification Selection for Jars - BATCH BASED (Updated) */}
 {batchJars.length > 0 && (
-=======
-          {/* Certification Selection for Jars */}
-{Object.keys(apiaryJars).length > 0 && (
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   <div className="border rounded-md p-4 mb-4">
     <h4 className="font-medium mb-3">Select Certifications for Your Jars</h4>
     <p className="text-sm text-gray-600 mb-4">
@@ -5756,11 +4758,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
     </p>
     
     <div className="space-y-4">
-<<<<<<< HEAD
       {batchJars.map((jar, index) => (
-=======
-      {Object.values(apiaryJars).flat().map((jar, index) => (
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
         <div key={jar.id} className="border rounded-md p-4 bg-gray-50">
           <div className="flex items-center justify-between mb-4">
             <h5 className="font-medium">
@@ -5770,11 +4768,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
               </span>
             </h5>
           </div>
-<<<<<<< HEAD
                     
-=======
-          
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Origin Certification */}
             <div className="flex items-center">
@@ -5784,21 +4778,13 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                 checked={jarCertifications[jar.id]?.origin || false}
                 onChange={(e) => {
                   const currentCertification = jarCertifications[jar.id] || {};
-<<<<<<< HEAD
                   const updatedCertification = {
-=======
-                  const updatedCertification: JarCertification = {
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                     ...currentCertification,
                     origin: e.target.checked,
                     selectedType: getSelectedType({
                       ...currentCertification,
                       origin: e.target.checked
-<<<<<<< HEAD
                     })
-=======
-                    }) as 'origin' | 'quality' | 'both' | undefined
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                   };
                   
                   setJarCertifications({
@@ -5823,30 +4809,15 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                 checked={jarCertifications[jar.id]?.quality || false}
                 onChange={(e) => {
                   const currentCertification = jarCertifications[jar.id] || {};
-<<<<<<< HEAD
                   const updatedCertification = {
-=======
-                  const updatedCertification: JarCertification = {
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                     ...currentCertification,
                     quality: e.target.checked,
                     selectedType: getSelectedType({
                       ...currentCertification,
                       quality: e.target.checked
-<<<<<<< HEAD
                     })
                   };
                   
-=======
-                    }) as 'origin' | 'quality' | 'both' | undefined
-                  };
-                  
-                  // Remove the 'both' property if it exists to avoid type conflicts
-                  if ('both' in updatedCertification) {
-                    delete updatedCertification.both;
-                  }
-                  
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                   setJarCertifications({
                     ...jarCertifications,
                     [jar.id]: updatedCertification
@@ -5871,7 +4842,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
             </div>
           )}
 
-<<<<<<< HEAD
           {/* Show selected certifications */}
           {(jarCertifications[jar.id]?.origin || jarCertifications[jar.id]?.quality) && (
             <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
@@ -6018,232 +4988,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
     Complete & Pay {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} Tokens
   </button>
 </div>
-=======
-                    {/* Show selected certifications */}
-                    {(jarCertifications[jar.id]?.origin || jarCertifications[jar.id]?.quality) && (
-                      <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                        <p className="text-blue-700 text-sm">
-                          ✓ Selected: {[
-                            jarCertifications[jar.id]?.origin && 'Origin',
-                            jarCertifications[jar.id]?.quality && 'Quality'
-                          ].filter(Boolean).join(' + ')}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Certification Summary */}
-              <div className="bg-yellow-50 p-4 rounded-lg mt-4">
-                <h5 className="font-medium mb-2">Certification Summary</h5>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Origin Only:</span>
-                    <span className="ml-2 font-bold text-blue-600">
-                      {Object.values(jarCertifications).filter(cert => cert?.origin && !cert?.quality).length} jar types
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Quality Only:</span>
-                    <span className="ml-2 font-bold text-green-600">
-                      {Object.values(jarCertifications).filter(cert => cert?.quality && !cert?.origin).length} jar types
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Both Selected:</span>
-                    <span className="ml-2 font-bold text-purple-600">
-                      {Object.values(jarCertifications).filter(cert => cert?.origin && cert?.quality).length} jar types
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Total Tokens:</span>
-                    <span className="ml-2 font-bold text-yellow-600">
-                      {Object.values(apiaryJars).flat().reduce((sum, jar) => sum + jar.quantity, 0)} tokens
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* File Upload Section - only show if jars are defined and certifications selected */}
-          {Object.keys(apiaryJars).length > 0 && hasRequiredCertifications() && (
-            <div className="border rounded-md p-4 mb-4">
-              <h4 className="font-medium mb-3">Required Documents</h4>
-              
-              {/* Production Report Upload - for Origin certification */}
-              {needsProductionReport() && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Production Report <span className="text-red-500">*</span>
-                    <span className="text-xs text-gray-500 ml-2">(Required for Origin certification)</span>
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors">
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                      onChange={(e) => setFormData({
-                        ...formData, 
-                        productionReport: e.target.files[0]
-                      })}
-                      className="hidden"
-                      id="production-report-upload"
-                    />
-                    <label 
-                      htmlFor="production-report-upload" 
-                      className="cursor-pointer flex flex-col items-center"
-                    >
-                      <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600 text-center">
-                        {formData.productionReport 
-                          ? `Selected: ${formData.productionReport.name}`
-                          : 'Click to upload production report (PDF, DOC, DOCX, JPG, PNG)'
-                        }
-                      </p>
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {/* Lab Report Upload - for Quality certification */}
-              {needsLabReport() && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Lab Report <span className="text-red-500">*</span>
-                    <span className="text-xs text-gray-500 ml-2">(Required for Quality certification)</span>
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-green-400 transition-colors">
-                    <input
-                      type="file"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                      onChange={(e) => setFormData({
-                        ...formData, 
-                        labReport: e.target.files[0]
-                      })}
-                      className="hidden"
-                      id="lab-report-upload"
-                    />
-                    <label 
-                      htmlFor="lab-report-upload" 
-                      className="cursor-pointer flex flex-col items-center"
-                    >
-                      <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-600 text-center">
-                        {formData.labReport 
-                          ? `Selected: ${formData.labReport.name}`
-                          : 'Click to upload lab report (PDF, DOC, DOCX, JPG, PNG)'
-                        }
-                      </p>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Apiaries Information - SIMPLIFIED VERSION */}
-<div className="border rounded-md p-4 mb-4">
-  <h4 className="font-medium mb-3">Apiaries Information</h4>
-  <p className="text-sm text-gray-600 mb-4">
-    Review the apiaries associated with the selected batches.
-  </p>
-  
-  {formData.apiaries.length === 0 ? (
-    <div className="text-center py-4 text-gray-500 italic">
-      No apiaries associated with selected batches
-    </div>
-  ) : (
-    <div className="space-y-6">
-      {formData.apiaries.map((apiary, index) => {
-        // Debug logs for each apiary
-        console.log(`Apiary ${index} (${apiary.name}):`, apiary);
-        console.log(`Latitude: ${apiary.latitude} (type: ${typeof apiary.latitude})`);
-        console.log(`Longitude: ${apiary.longitude} (type: ${typeof apiary.longitude})`);
-        console.log(`Latitude === 0:`, apiary.latitude === 0);
-        console.log(`Longitude === 0:`, apiary.longitude === 0);
-        console.log(`Latitude == null:`, apiary.latitude == null);
-        console.log(`Longitude == null:`, apiary.longitude == null);
-        console.log('---');
-        
-        return (
-          <div key={index} className="border rounded-md p-4 bg-gray-50">
-            <div className="flex justify-between items-center mb-4">
-              <h5 className="font-medium text-lg">
-                {apiary.name} ({apiary.number})
-                {apiary.batchNumber && (
-                  <span className="ml-2 text-xs bg-gray-100 px-2 py-1 rounded">
-                    From Batch: {apiary.batchNumber}
-                  </span>
-                )}
-              </h5>
-            </div>
-            
-            {/* Apiary Information Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <span className="block text-sm font-medium text-gray-700 mb-1">
-                  Number of Hives
-                </span>
-                <div className="px-3 py-2 bg-white border border-gray-200 rounded-md text-gray-900">
-                  {apiary.hiveCount}
-                </div>
-              </div>
-              <div>
-                <span className="block text-sm font-medium text-gray-700 mb-1">
-                  Honey Collected (kg)
-                </span>
-                <div className="px-3 py-2 bg-white border border-gray-200 rounded-md text-gray-900 font-bold text-blue-600">
-                  {apiary.kilosCollected}
-                </div>
-              </div>
-              <div>
-                <span className="block text-sm font-medium text-gray-700 mb-1">
-                  Latitude
-                </span>
-                <div className="px-3 py-2 bg-white border border-gray-200 rounded-md text-gray-900">
-                  {apiary.latitude != null ? apiary.latitude.toFixed(4) : 'Not specified'}
-                </div>
-              </div>
-              <div>
-                <span className="block text-sm font-medium text-gray-700 mb-1">
-                  Longitude
-                </span>
-                <div className="px-3 py-2 bg-white border border-gray-200 rounded-md text-gray-900">
-                  {apiary.longitude != null ? apiary.longitude.toFixed(4) : 'Not specified'}
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  )}
-</div>
-
-          {/* Form Actions */}
-          <div className="flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={() => setShowCompleteForm(false)}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-  type="submit"
-  disabled={!isFormValid()}
-  className={`px-4 py-2 rounded-md flex items-center ${
-    isFormValid()
-      ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-  }`}
->
-  <Check className="h-4 w-4 mr-2" />
-  Complete & Pay {tokenCalculation.tokensNeeded} Tokens
-</button>
-          </div>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
         </div>
       </form>
     </div>
@@ -6390,7 +5134,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
     </div>
   </div>
 )}
-<<<<<<< HEAD
 
 {/* Success Popup with QR Code */}
 {showSuccessPopup && certificationData && (
@@ -6404,9 +5147,9 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
       </div>
 
       {/* Success Message */}
-     <h3 className="text-xl font-semibold text-gray-900 mb-2">
-          Batch Certification Complete!
-        </h3>
+      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+        Batch Certification Complete!
+      </h3>
       <p className="text-gray-600 mb-6">
         Your honey has been successfully certified and is now ready for distribution.
       </p>
@@ -6487,30 +5230,30 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
         </button>
         
         <button
-            onClick={() => {
-  setShowSuccessPopup(false);
-  setSelectedBatches([]);
-  setBatchJars([]);
-  setJarCertifications({});
-  setFormData({
-    certificationType: '',
-    productionReport: null,
-    labReport: null,
-    batchId: '',
-    batchTotalKg: 0,
-    apiaries: []
-  });
-              // Show regular notification
-              setNotification({
-                show: true,
-                message: `Batch certification completed successfully! ${certificationData?.totalCertified} kg certified in ${certificationData?.totalJars} jars.`,
-                type: 'success'
-              });
-            }}
-            className="w-full px-4 py-3 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 font-medium"
-          >
-            Continue
-          </button>
+          onClick={() => {
+            setShowSuccessPopup(false);
+            setSelectedBatches([]);
+            setBatchJars([]);
+            setJarCertifications({});
+            setFormData({
+              certificationType: '',
+              productionReport: null,
+              labReport: null,
+              batchId: '',
+              batchTotalKg: 0,
+              apiaries: []
+            });
+            // Show regular notification
+            setNotification({
+              show: true,
+              message: `Batch certification completed successfully! ${certificationData?.totalCertified} kg certified in ${certificationData?.totalJars} jars.`,
+              type: 'success'
+            });
+          }}
+          className="w-full px-4 py-3 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 font-medium"
+        >
+          Continue
+        </button>
       </div>
 
       {/* Additional Info */}
@@ -6520,8 +5263,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
     </div>
   </div>
 )}
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
     {/* Floating Action Menu - ADD THIS RIGHT AFTER CERTIFICATION ANALYTICS SECTION */}
           <div className="fixed bottom-6 right-6 z-50">
             {/* Background overlay when menu is open */}

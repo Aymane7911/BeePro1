@@ -20,7 +20,7 @@ interface BatchRequestBody {
   batchName?: string;
   apiaries?: ApiaryObject[]; // Changed to match what frontend sends
   totalHives?: number;
-  totalHoney?: number;
+  totalKg?: number; // Updated to totalKg
 }
 
 // GET: Fetch batches for logged-in user (unchanged)
@@ -131,12 +131,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-<<<<<<< HEAD
     // FIXED: Changed totalHoney to totalKg to match frontend
     const { batchNumber, batchName, apiaries = [], totalHives, totalKg } = body;
-=======
-    const { batchNumber, batchName, apiaries = [], totalHives, totalHoney } = body;
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
     console.log('[POST] Request body:', body);
 
@@ -144,14 +140,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Batch number is required' }, { status: 400 });
     }
 
-<<<<<<< HEAD
     // FIXED: Add validation for totalKg
     if (!totalKg || totalKg <= 0) {
       return NextResponse.json({ message: 'Total honey amount (kg) is required and must be greater than 0' }, { status: 400 });
     }
 
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
     // FIXED: Validate apiaries array (not apiaryReferences)
     if (!Array.isArray(apiaries) || apiaries.length === 0) {
       return NextResponse.json({ message: 'At least one apiary is required' }, { status: 400 });
@@ -197,12 +190,8 @@ export async function POST(request: NextRequest) {
         batchName: finalBatchName,
         containerType: 'Glass',
         labelType: 'Standard',
-<<<<<<< HEAD
         // FIXED: Use totalKg instead of totalHoney
         weightKg: totalKg,
-=======
-        weightKg: totalHoney || 0,
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
         originOnly: 0,
         qualityOnly: 0,
         bothCertifications: 0,

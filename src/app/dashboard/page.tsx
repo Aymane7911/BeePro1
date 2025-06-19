@@ -65,10 +65,6 @@ interface BatchData {
   id?: string;
   batchNumber?: string;
   status?: string;
-<<<<<<< HEAD
-  honeyCollected: number;
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   completedChecks?: number;
   totalChecks?: number;
   certificationDate?: string | null;
@@ -92,7 +88,7 @@ interface ProcessedBatch {
   totalChecks: number;
   certificationDate: string | null;
   expiryDate: string | null;
-  totalKg: number;
+  totalKg: number; // This should come from batch, not calculated from apiaries
   jarsUsed: number;
   originOnly: number;
   qualityOnly: number;
@@ -156,6 +152,7 @@ const honeyStatusData = [];
 export default function JarManagementDashboard() {
   const [data, setData] = useState<AppData>(initialData);
   const [loading, setLoading] = useState(false);
+  
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleString());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [token] = useState("HCT-73829-ABC45"); // Placeholder token
@@ -188,12 +185,11 @@ export default function JarManagementDashboard() {
   name: '',
   number: '',
   hiveCount: 0,
-<<<<<<< HEAD
-=======
   honeyCollected: 0,
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   location: null
 });
+const [totalKg, setTotalKg] = useState(0);
+const [batchHoneyCollected, setBatchHoneyCollected] = useState(0);
 const [isLoggingOut, setIsLoggingOut] = useState(false);
 const [isOpen, setIsOpen] = useState(false);
   
@@ -203,10 +199,6 @@ const [isOpen, setIsOpen] = useState(false);
   const headers: { [key: string]: string } = {
   'Content-Type': 'application/json',
 };
-<<<<<<< HEAD
- 
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
 
   if (token) {
@@ -239,10 +231,6 @@ const [isOpen, setIsOpen] = useState(false);
   const [batchNumber, setBatchNumber] = useState('');
   const [notification, setNotification] = useState({ show: false, message: '' });
   const [batchName, setBatchName] = useState(''); // Added batch name field
-<<<<<<< HEAD
-  const [batchHoneyCollected, setBatchHoneyCollected] = useState(0);
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 
 
   {/* Add this function to extract coordinates from Google Maps links */}
@@ -340,17 +328,14 @@ const extractCoordinatesFromMapsLink = async (url) => {
   }
 };
 
+
 {/* Add this function to handle maps link processing */}
 const handleMapsLinkSubmit = async () => {
   if (!mapsLinkInput.trim()) {
     alert('Please enter a Google Maps link or coordinates');
     return;
   }
-<<<<<<< HEAD
-   
-=======
 
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   try {
     const coordinates = await extractCoordinatesFromMapsLink(mapsLinkInput);
     
@@ -1285,11 +1270,7 @@ const [tokenBalance, setTokenBalance] = useState(0); // Start with 0
 const toggleSidebar = () => {
   setSidebarOpen(!sidebarOpen);
 };
-<<<<<<< HEAD
-const [totalKg, setTotalKg] = useState(0);
-=======
 
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
 const refreshData = () => {
   setLoading(true);
   
@@ -1334,7 +1315,7 @@ const handleBuyTokens = () => {
   setShowBuyTokensModal(false);
 };
 
-  const createBatch = async () => {
+ const createBatch = async () => {
   // Improved validation with proper array checking
   if (!batchNumber?.trim() || !Array.isArray(selectedApiaries) || selectedApiaries.length === 0) {
     setNotification({
@@ -1345,19 +1326,11 @@ const handleBuyTokens = () => {
     return;
   }
 
-<<<<<<< HEAD
-  // Check if totalKg is provided and valid
-  if (!totalKg || totalKg <= 0) {
+  // FIXED: Check batchHoneyCollected instead of totalKg
+  if (!batchHoneyCollected || batchHoneyCollected <= 0) {
     setNotification({
       show: true,
       message: 'Please enter the total honey collection amount',
-=======
-  // Check if any selected apiary doesn't have honey collection amount set
-  if (selectedApiaries.some(apiary => !apiary.kilosCollected || apiary.kilosCollected <= 0)) {
-    setNotification({
-      show: true,
-      message: 'Please set honey collection amount for all selected apiaries',
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
     });
     setTimeout(() => setNotification({ show: false, message: '' }), 3000);
     return;
@@ -1392,19 +1365,13 @@ const handleBuyTokens = () => {
       batchName: finalBatchName,
       apiaries: apiariesForBatch,
       totalHives: selectedApiaries.reduce((sum, apiary) => sum + (apiary.hiveCount || 0), 0),
-<<<<<<< HEAD
-      // FIXED: Changed totalHoney to totalKg to match backend expectation
-      totalKg: totalKg, // Use the totalKg state variable directly
-=======
-      totalHoney: selectedApiaries.reduce(
-  (sum, apiary) => sum + (apiary.kilosCollected ?? 0),
-  0
-),
-
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
+      // FIXED: Use batchHoneyCollected instead of totalKg
+      totalKg: batchHoneyCollected,
+      // ADDED: Store the batch total honey amount
+      honeyCollected: batchHoneyCollected,
     };
 
-    console.log('Creating batch with data:', formData); // Debug log
+    console.log('Creating batch with data:', formData);
 
     const response = await fetch('/api/create-batch', {
       method: 'POST',
@@ -1443,11 +1410,9 @@ const handleBuyTokens = () => {
     setBatchNumber('');
     setBatchName('');
     setSelectedApiaries([]);
-    setSelectedDropdownApiary(''); // Reset dropdown state
-<<<<<<< HEAD
-    setTotalKg(0); // FIXED: Reset totalKg instead of batch object
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
+    setSelectedDropdownApiary('');
+    // FIXED: Reset batchHoneyCollected instead of totalKg
+    setBatchHoneyCollected(0);
     setShowBatchModal(false);
 
   } catch (error) {
@@ -1466,6 +1431,7 @@ const handleBuyTokens = () => {
 };
 
 
+
 const [showAllBatches, setShowAllBatches] = useState(false);
 const [expandedBatches, setExpandedBatches] = useState<string[]>([]);
 
@@ -1478,15 +1444,17 @@ const [expandedBatches, setExpandedBatches] = useState<string[]>([]);
       }
     };
     
-    interface BatchData {
+   interface BatchData {
   id?: string;
   batchNumber?: string;
   status?: string;
+  honeyCollected: number; // This should be the batch total, not sum of apiaries
   completedChecks?: number;
   totalChecks?: number;
   certificationDate?: string | null;
   expiryDate?: string | null;
   weightKg?: number;
+  totalKg?: number; // ADDED: Batch total amount
   jarsUsed?: number;
   originOnly?: number;
   qualityOnly?: number;
@@ -1494,7 +1462,7 @@ const [expandedBatches, setExpandedBatches] = useState<string[]>([]);
   uncertified?: number;
   containerType?: string;
   labelType?: string;
-  [key: string]: any; // Allow for other properties
+  [key: string]: any;
 }
 
 // Convert data.batches to an array if it isn't already
@@ -1506,29 +1474,17 @@ const batchesArray: BatchData[] = Array.isArray(data.batches) ? data.batches : [
   name: batch.batchNumber || '',
   status: batch.status || 'Pending',
   completedChecks: batch.completedChecks || 0,
-<<<<<<< HEAD
-  totalChecks: batch.totalChecks || 10,
-  certificationDate: batch.certificationDate || null,
-  expiryDate: batch.expiryDate || null,
-  totalKg: batch.weightKg || 0,
-=======
   totalChecks: batch.totalChecks || 10, // Provide a default if missing
   certificationDate: batch.certificationDate || null,
   expiryDate: batch.expiryDate || null,
   totalKg: batch.weightKg || 0, // Make sure we use weightKg here
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   jarsUsed: batch.jarsUsed || 0,
   originOnly: batch.originOnly || 0,
   qualityOnly: batch.qualityOnly || 0,
   bothCertifications: batch.bothCertifications || 0,
   uncertified: batch.uncertified || 0,
-<<<<<<< HEAD
-  containerType: batch.containerType || '', // Add default empty string
-  labelType: batch.labelType || '',         // Add default empty string
-=======
   containerType: batch.containerType,
   labelType: batch.labelType,
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
   // Initialize percentage properties
   originOnlyPercent: 0,
   qualityOnlyPercent: 0,
@@ -2360,7 +2316,7 @@ const handleLocationCancel = () => {
         </p>
       </header>
 
-     {/* Create Batch Modal */}
+ {/* Create Batch Modal */}
 {showBatchModal && (
   <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-30">
     <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-screen overflow-y-auto mx-4">
@@ -2371,6 +2327,7 @@ const handleLocationCancel = () => {
             setShowBatchModal(false);
             setBatchNumber('');
             setBatchName('');
+            setBatchHoneyCollected(0);
             setSelectedApiaries([]);
           }}
           className="text-gray-500 hover:text-gray-700"
@@ -2379,63 +2336,7 @@ const handleLocationCancel = () => {
         </button>
       </div>
 
-<<<<<<< HEAD
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-  {/* Batch Number */}
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Batch Number <span className="text-red-500">*</span>
-    </label>
-    <input
-      type="text"
-      name="batchNumber"
-      value={batchNumber || ''}
-      onChange={(e) => setBatchNumber(e.target.value)}
-      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-      placeholder="Enter batch number"
-      autoFocus
-    />
-  </div>
-
-  {/* Batch Name */}
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      Batch Name (Optional)
-    </label>
-    <input
-      type="text"
-      name="batchName"
-      value={batchName || ''}
-      onChange={(e) => setBatchName(e.target.value)}
-      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-      placeholder="Enter batch name (optional)"
-    />
-    <p className="text-xs text-gray-500 mt-1">
-      If left empty, will default to "{batchNumber ? `${batchNumber}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}` : 'BatchNumber_YYYY-MM-DDTHH-MM-SS'}"
-    </p>
-  </div> 
-
- {/* Total Honey Collected - Fixed to use totalKg */}
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Total Honey Collected (kg) <span className="text-red-500">*</span>
-  </label>
-  <input
-    type="number"
-    min="0"
-    step="0.1"
-    value={totalKg || ''}
-    onChange={(e) => setTotalKg(parseFloat(e.target.value) || 0)}
-    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-    placeholder="Enter total honey collected"
-    required
-  />
-  <p className="text-xs text-gray-500 mt-1">
-    Total honey collected from all apiaries in this batch
-  </p>
-</div>
-=======
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* Batch Number */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2469,7 +2370,26 @@ const handleLocationCancel = () => {
             If left empty, will default to "{batchNumber ? `${batchNumber}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}` : 'BatchNumber_YYYY-MM-DDTHH-MM-SS'}"
           </p>
         </div>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
+
+        {/* Total Honey Collected */}
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Total Honey Collected (kg) <span className="text-red-500">*</span>
+  </label>
+  <input
+  type="number"
+  min="0"
+  step="0.1"
+  value={batchHoneyCollected || ''}
+  onChange={(e) => setBatchHoneyCollected(parseFloat(e.target.value) || 0)}
+  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
+  placeholder="Enter total honey collected"
+  required
+/>
+  <p className="text-xs text-gray-500 mt-1">
+    Total honey collected from all apiaries in this batch
+  </p>
+</div>
       </div>
 
       {/* Select Apiaries Section */}
@@ -2540,15 +2460,10 @@ const handleLocationCancel = () => {
                     console.log('Is already selected:', isAlreadySelected);
                     
                     if (!isAlreadySelected) {
-                      // Add the apiary with batchHoneyCollected property (separate from stored kilosCollected)
-                      const newApiary = { 
-                        ...apiary, 
-                        batchHoneyCollected: 0 // This is the honey collected specifically for this batch
-                      };
-                      
+                      // Add the apiary without any batch-specific properties
                       setSelectedApiaries(prev => {
                         const prevArray = Array.isArray(prev) ? prev : [];
-                        const newArray = [...prevArray, newApiary];
+                        const newArray = [...prevArray, apiary];
                         console.log('New selected apiaries:', newArray);
                         return newArray;
                       });
@@ -2629,25 +2544,6 @@ const handleLocationCancel = () => {
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
-<<<<<<< HEAD
-=======
-                            Total Honey Collected (kg)
-                          </label>
-                          <input
-                            type="number"
-                            value={apiary.kilosCollected || 0}
-                            readOnly
-                            className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-gray-700 text-sm cursor-not-allowed"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Stored: {apiary.kilosCollected || 0}kg | 
-                            Raw data: {JSON.stringify(apiary.kilosCollected)}
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                             Location
                           </label>
                           <input
@@ -2680,101 +2576,39 @@ const handleLocationCancel = () => {
                     Remove
                   </button>
                 </div>
-<<<<<<< HEAD
-=======
-                
-                
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
               </div>
             ))}
           </div>
         )}
       </div>
 
-<<<<<<< HEAD
-      {/* Summary Section - Updated to use batch.weightKg */}
-=======
-      {/* Summary Section */}
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
-      {selectedApiaries.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h5 className="font-medium text-blue-900 mb-3">Batch Summary</h5>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-blue-700 font-medium">Total Apiaries</p>
-              <p className="text-blue-900 text-lg font-bold">{selectedApiaries.length}</p>
-            </div>
-            <div>
-              <p className="text-blue-700 font-medium">Total Hives</p>
-              <p className="text-blue-900 text-lg font-bold">
-                {selectedApiaries.reduce((sum, apiary) => sum + (apiary.hiveCount || 0), 0)}
-              </p>
-            </div>
-            <div>
-<<<<<<< HEAD
-  <p className="text-blue-700 font-medium">Batch Honey (kg)</p>
-  <p className="text-blue-900 text-lg font-bold">
-    {totalKg?.toFixed(1) || '0.0'}
-  </p>
-</div>
-=======
-              <p className="text-blue-700 font-medium">Batch Honey (kg)</p>
-              <p className="text-blue-900 text-lg font-bold">
-                {selectedApiaries.reduce((sum, apiary) => sum + (apiary.batchHoneyCollected || 0), 0).toFixed(1)}
-              </p>
-            </div>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
-            <div>
-              <p className="text-blue-700 font-medium">Total Stored Honey (kg)</p>
-              <p className="text-blue-900 text-lg font-bold">
-                {selectedApiaries.reduce((sum, apiary) => sum + (apiary.kilosCollected || 0), 0).toFixed(1)}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-<<<<<<< HEAD
-
-      {/* Action Buttons - Updated validation to use batch.weightKg */}
-=======
-      
-      
-
-      
-
       {/* Action Buttons */}
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
       <div className="flex justify-end space-x-3 pt-4 border-t">
         <button
           onClick={() => {
             setShowBatchModal(false);
             setBatchNumber('');
             setBatchName('');
+            setBatchHoneyCollected(0);
             setSelectedApiaries([]);
             setSelectedDropdownApiary('');
-<<<<<<< HEAD
-            // Reset batch object
-            setTotalKg(0);
-=======
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
           }}
           className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
         >
           Cancel
         </button>
         <button
-<<<<<<< HEAD
   onClick={createBatch}
   disabled={
     !batchNumber?.trim() || 
-    !totalKg ||
-    totalKg <= 0 ||
+    !batchHoneyCollected ||
+    batchHoneyCollected <= 0 ||
     !Array.isArray(selectedApiaries) || 
     selectedApiaries.length === 0
   }
   className={`px-6 py-2 rounded-md text-white font-medium transition-colors ${
     batchNumber?.trim() && 
-    totalKg > 0 &&
+    batchHoneyCollected > 0 &&
     Array.isArray(selectedApiaries) && 
     selectedApiaries.length > 0
       ? 'bg-green-600 hover:bg-green-700' 
@@ -2784,27 +2618,6 @@ const handleLocationCancel = () => {
   <Package className="h-4 w-4 inline mr-2" />
   Create Batch
 </button>
-=======
-          onClick={createBatch}
-          disabled={
-            !batchNumber?.trim() || 
-            !Array.isArray(selectedApiaries) || 
-            selectedApiaries.length === 0 ||
-            !selectedApiaries.every(apiary => apiary.batchHoneyCollected !== undefined && apiary.batchHoneyCollected !== null && apiary.batchHoneyCollected !== '')
-          }
-          className={`px-6 py-2 rounded-md text-white font-medium transition-colors ${
-            batchNumber?.trim() && 
-            Array.isArray(selectedApiaries) && 
-            selectedApiaries.length > 0 &&
-            selectedApiaries.every(apiary => apiary.batchHoneyCollected !== undefined && apiary.batchHoneyCollected !== null && apiary.batchHoneyCollected !== '')
-              ? 'bg-green-600 hover:bg-green-700' 
-              : 'bg-gray-300 cursor-not-allowed'
-          }`}
-        >
-          <Package className="h-4 w-4 inline mr-2" />
-          Create Batch
-        </button>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
       </div>
     </div>
   </div>
@@ -2907,24 +2720,7 @@ const handleLocationCancel = () => {
                     />
                   </div>
 
-<<<<<<< HEAD
                   
-=======
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Honey Collected (kg)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      value={apiaryFormData.honeyCollected || 0}
-                      onChange={(e) => setApiaryFormData(prev => ({ ...prev, honeyCollected: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
-                      placeholder="0.0"
-                    />
-                  </div>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                 </div>
               </div>
             </div>
@@ -3011,57 +2807,6 @@ const handleLocationCancel = () => {
                 {savedApiaryLocations && savedApiaryLocations.length > 0 ? (
                   <>
                     <select
-<<<<<<< HEAD
-  value=""
-  onChange={(e) => {
-    const locationId = e.target.value;
-    console.log('Selected location ID:', locationId, typeof locationId);
-    
-    if (locationId && locationId !== "") {
-      const selectedLocation = savedApiaryLocations.find(loc => {
-        console.log('Comparing:', loc.id, 'vs', locationId);
-        return String(loc.id) === String(locationId);
-      });
-      
-      console.log('Found location:', selectedLocation);
-      
-      if (selectedLocation) {
-        const apiaryLocation = {
-          id: selectedLocation.id,
-          name: selectedLocation.name,
-          latitude: selectedLocation.latitude,
-          longitude: selectedLocation.longitude,
-          lat: selectedLocation.latitude,
-          lng: selectedLocation.longitude,
-          createdAt: selectedLocation.createdAt
-        };
-        
-        setApiaryFormData(prev => ({
-          ...prev,
-          location: apiaryLocation
-        }));
-
-        // Center the map on the selected location
-        if (miniGoogleMapRef.current) {
-          const newCenter = new google.maps.LatLng(selectedLocation.latitude, selectedLocation.longitude);
-          miniGoogleMapRef.current.setCenter(newCenter);
-          miniGoogleMapRef.current.setZoom(15);
-        }
-      } else {
-        console.error('Location not found with ID:', locationId);
-      }
-    }
-  }}
-  className="w-full px-3 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
->
-  <option value="">🏠 Select from your saved locations...</option>
-  {savedApiaryLocations.map(location => (
-    <option key={location.id} value={String(location.id)}>
-      📍 {location.name} - {location.latitude?.toFixed(4)}, {location.longitude?.toFixed(4)}
-    </option>
-  ))}
-</select>
-=======
                       value=""
                       onChange={(e) => {
                         const locationId = e.target.value;
@@ -3106,7 +2851,6 @@ const handleLocationCancel = () => {
                         </option>
                       ))}
                     </select>
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                     
                     <p className="text-xs text-purple-600 mt-2">
                       💡 Choose from locations you've previously saved to quickly set up your apiary
@@ -3284,10 +3028,7 @@ const handleLocationCancel = () => {
                   name: '',
                   number: '',
                   hiveCount: 0,
-<<<<<<< HEAD
-=======
                   honeyCollected: 0,
->>>>>>> bc4b0064770fda7b4a3ad525998222858d435f08
                   location: null
                 });
               }}
@@ -4252,6 +3993,5 @@ const handleLocationCancel = () => {
    
   );
   };
-
 
 

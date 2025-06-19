@@ -43,8 +43,18 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
+    "prettier": "^3.5.3",
     "prisma": "^6.7.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "trailingComma": "all",
+    "printWidth": 100,
+    "tabWidth": 2
   }
+  
+
+
 }

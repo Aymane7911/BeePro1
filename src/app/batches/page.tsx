@@ -6,6 +6,7 @@ import { Menu, X, Search, ChevronDown, ChevronUp, Printer, PlusCircle, Check, Al
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
+import { storeCertificationData } from '@/lib/certificationStorage';
 
 
 interface Apiary {
@@ -195,7 +196,7 @@ export default function BatchesPage() {
     qualityOnly: 0
   }
 });
-
+const [isSubmitting, setIsSubmitting] = useState(false);
 const [customJarSize, setCustomJarSize] = useState('');
  
  const [user, setUser] = useState<User | null>(null);
@@ -258,33 +259,42 @@ const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
 
 // Function to generate QR code data URL
  // Function to generate QR code using the qrcode library
-  const generateQRCode = async (data) => {
-    try {
-      const qrText = JSON.stringify({
-        batchIds: data.batchIds,
-        certificationDate: data.certificationDate,
-        totalCertified: data.totalCertified,
-        certificationType: data.certificationType,
-        expiryDate: data.expiryDate,
-        verification: data.verification
-      });
-      
-      const qrDataUrl = await QRCode.toDataURL(qrText, {
-        width: 200,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        },
-        errorCorrectionLevel: 'M'
-      });
-      
-      return qrDataUrl;
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      return '';
-    }
-  };
+ const generateQRCode = async (data) => {
+  try {
+    // Create URL parameters from certification data
+    const urlParams = new URLSearchParams({
+      batchIds: data.batchIds.join(','),
+      certificationDate: data.certificationDate,
+      totalCertified: data.totalCertified,
+      certificationType: data.certificationType,
+      expiryDate: data.expiryDate,
+      verification: data.verification,
+      totalJars: data.totalJars
+    });
+    
+    // Create the certification verification URL
+    // Replace 'your-domain.com' with your actual domain
+   const certificationUrl = `https://localhost:3000/cert/${data.verification}`;
+    
+    // Alternative shorter URL approach using verification code only:
+    // const certificationUrl = `https://your-domain.com/cert/${data.verification}`;
+    
+    const qrDataUrl = await QRCode.toDataURL(certificationUrl, {
+      width: 200,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      errorCorrectionLevel: 'M'
+    });
+    
+    return qrDataUrl;
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    return '';
+  }
+};
 
   // Function to download QR code
   const downloadQRCode = () => {
@@ -297,6 +307,8 @@ const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
     link.click();
     document.body.removeChild(link);
   };
+
+
   const [isUploading, setIsUploading] = useState(false);
   const router = useRouter();
   const mapRefs = useRef<MapRef[]>([]);
@@ -390,6 +402,61 @@ const isFormValid = () => {
   console.log("✅ All validations passed - form is valid");
   return true;
 };
+
+// Add this function to your component or create a separate utility file
+
+const storeCertificationData = async (certData: any, userData: any) => {
+  try {
+    const token = localStorage.getItem('authtoken') ||
+                  localStorage.getItem('auth_token') ||
+                  localStorage.getItem('token') ||
+                  sessionStorage.getItem('authtoken') ||
+                  sessionStorage.getItem('auth_token') ||
+                  sessionStorage.getItem('token');
+
+    if (!token) {
+      throw new Error('No auth token found');
+    }
+
+    const certificationPayload = {
+      verificationCode: certData.verification,
+      batchIds: certData.batchIds.join(','), // Store as comma-separated string
+      certificationDate: certData.certificationDate,
+      totalCertified: parseFloat(certData.totalCertified),
+      certificationType: certData.certificationType,
+      expiryDate: certData.expiryDate,
+      totalJars: certData.totalJars,
+      companyName: userData.companyName || null,
+      beekeeperName: userData.name || `${userData.firstname} ${userData.lastname}` || null,
+      location: userData.location || null,
+      userId: userData.id
+    };
+
+    const response = await fetch('/api/certification/store', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(certificationPayload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.error || 'Failed to store certification data');
+    }
+
+    const result = await response.json();
+    console.log('Certification stored successfully:', result);
+    return result;
+
+  } catch (error) {
+    console.error('Error storing certification:', error);
+    throw error;
+  }
+};
+
+
 
 
 const createBatch = async () => {
@@ -940,33 +1007,103 @@ useEffect(() => {
   
   // Handle profile form changes
 
-  const handleProfileChange = ( 
-  field: 'batchNumber' | 'name' | 'number' | 'hiveCount' | 'latitude' | 'longitude' | 'kilosCollected', 
-  value: string | number
+  const handleProfileChange = (
+  field: 'batchNumber' | 'name' | 'number' | 'hiveCount' | 'latitude' | 'longitude' | 'kilosCollected' | 'passportScan' | 'passportId', 
+  value: string | File | number | null
 ) => {
-    setProfileData({
-      ...profileData,
-      [field]: value
-    });
-  };
+  setProfileData({
+    ...profileData,
+    [field]: value
+  });
+};
 
-  // Handle file upload
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      handleProfileChange('passportScan', file);
+// Handle file upload
+const handleFileUpload = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    // Validate file type and size
+    const allowedTypes = ['image/png', 'image/jpeg', 'application/pdf'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload a PNG, JPG, or PDF file.');
+      e.target.value = ''; // Clear the input
+      return;
     }
-  };
+    
+    if (file.size > maxSize) {
+      alert('File size must be less than 10MB.');
+      e.target.value = ''; // Clear the input
+      return;
+    }
+    
+    handleProfileChange('passportScan', file);
+  }
+};
 
-  // Handle profile completion form submission
-  const handleProfileSubmit = (e) => {
-    e.preventDefault();
-    // In a real app, you would save the profile data to a database
-    setShowProfileForm(false);
-    alert('Profile information updated successfully!');
-  };
+// Handle profile completion form submission
+const handleProfileSubmit = async (e) => {
+  e.preventDefault();
   
-
+  // Validate required fields
+  if (!profileData.passportId.trim()) {
+    alert('Please enter your Passport ID.');
+    return;
+  }
+  
+  try {
+    setIsSubmitting(true);
+    
+    // Get JWT token from localStorage (adjust the key name if different)
+    const token = localStorage.getItem('authToken') || localStorage.getItem('token') || localStorage.getItem('accessToken');
+    
+    if (!token) {
+      alert('Authentication token not found. Please log in again.');
+      return;
+    }
+    
+    // Create FormData object to handle file upload
+    const formData = new FormData();
+    formData.append('passportId', profileData.passportId.trim());
+    
+    if (profileData.passportScan) {
+      formData.append('passportScan', profileData.passportScan);
+    }
+    
+    const response = await fetch('/api/user/profile', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    
+    const result = await response.json();
+    
+    if (response.ok && result.success) {
+      // Close profile form and show success message
+      setShowProfileForm(false);
+      setShowProfileCompletedMessage(true);
+      
+      // Reset form data
+      setProfileData({
+        passportId: '',
+        passportScan: null
+      });
+      
+      console.log('Profile updated successfully:', result);
+    } else {
+      // Handle error
+      console.error('Profile update failed:', result.error);
+      alert('Failed to update profile: ' + (result.error || 'Unknown error'));
+    }
+  } catch (error) {
+    console.error('Error submitting profile:', error);
+    alert('An error occurred while updating your profile. Please try again.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   // 3. Function to fetch saved apiary locations
   const fetchSavedApiaryLocations = async () => {
     try {
@@ -1068,16 +1205,17 @@ const isProfileComplete = (user: User | null | undefined): boolean => {
 };
 
   
-// handleCompleteBatch
+// Enhanced handleCompleteBatch with proper original value preservation
 const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
 
-  const tokensUsed = tokenCalculation.tokensNeeded;
+  const tokensUsed = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
 
-  // Check if all jars have certification types selected
-  const allJarsHaveCertifications = Object.values(apiaryJars).flat().every(jar =>
-    jarCertifications[jar.id]?.selectedType
-  );
+  // Validation checks (keeping existing validation logic)
+  const allJarsHaveCertifications = batchJars.every(jar => {
+    const certifications = jarCertifications[jar.id];
+    return certifications && (certifications.origin || certifications.quality);
+  });
 
   if (!allJarsHaveCertifications) {
     alert('Please select a certification type for all jar types');
@@ -1085,35 +1223,53 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
   }
 
   // Check required documents based on selected certifications
-  const needsProductionReport = Object.values(jarCertifications).some(cert =>
-    cert?.selectedType === 'origin' || cert?.selectedType === 'both'
-  );
+  const needsProductionReport = batchJars.some(jar => {
+    const cert = jarCertifications[jar.id];
+    return cert?.origin;
+  });
 
-  const needsLabReport = Object.values(jarCertifications).some(cert =>
-    cert?.selectedType === 'quality' || cert?.selectedType === 'both'
-  );
+  const needsLabReport = batchJars.some(jar => {
+    const cert = jarCertifications[jar.id];
+    return cert?.quality;
+  });
 
   if (needsProductionReport && !formData.productionReport) {
-    alert('Please upload a production report for origin/both certifications');
+    alert('Please upload a production report for origin certifications');
     return;
   }
 
   if (needsLabReport && !formData.labReport) {
-    alert('Please upload a lab report for quality/both certifications');
+    alert('Please upload a lab report for quality certifications');
     return;
   }
 
-  // Validate that all apiaries have coordinates
-  const incompleteApiaries = formData.apiaries.filter(apiary => !apiary.latitude || !apiary.longitude);
-  if (incompleteApiaries.length > 0) {
-    alert('Please set coordinates for all apiaries before completing the batch');
+  // Additional validation checks...
+  if (!selectedBatches || selectedBatches.length === 0) {
+    alert('Please select at least one batch');
+    return;
+  }
+
+  if (getTotalRemainingHoneyFromBatch() <= 0) {
+    alert('No honey available from selected batches');
+    return;
+  }
+
+  if (!batchJars || batchJars.length === 0) {
+    alert('Please define jar configurations for the batch');
+    return;
+  }
+
+  const totalJarsNeeded = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
+
+  if (tokenBalance < totalJarsNeeded) {
+    alert(`Insufficient tokens. Need ${totalJarsNeeded}, have ${tokenBalance}`);
     return;
   }
 
   try {
     setIsLoading(true);
 
-    // STEP 1: Get authentication token
+    // Get authentication token
     const token = localStorage.getItem('authtoken') ||
                   localStorage.getItem('auth_token') ||
                   localStorage.getItem('token') ||
@@ -1125,7 +1281,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       throw new Error('No auth token found');
     }
 
-    // STEP 2: Fetch fresh user data and verify profile completeness
+    // Fetch fresh user data
     const userResponse = await fetch('/api/user/profile', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -1142,134 +1298,132 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       return;
     }
 
-    // STEP 3: Validate batches selection
-    if (!selectedBatches || selectedBatches.length === 0) {
-      alert('Please select at least one batch');
-      return;
-    }
-
-    // STEP 4: Check if there's honey available from selected batches
-    if (getTotalHoneyFromBatch() <= 0) {
-      alert('No honey available from selected batches');
-      return;
-    }
-
-    // STEP 5: Check if we have jars defined for the batch
-    if (!batchJars || batchJars.length === 0) {
-      alert('Please define jar configurations for the batch');
-      return;
-    }
-
-    // STEP 7: Validate jar certifications
-    const allJarsHaveCertificationsUpdated = batchJars.every(jar => {
-      const certifications = jarCertifications[jar.id];
-      return certifications && (certifications.origin || certifications.quality);
-    });
-
-    if (!allJarsHaveCertificationsUpdated) {
-      alert('Please select a certification type for all jar types');
-      return;
-    }
-
-    // STEP 8: Calculate total jars needed and validate token balance
-    const totalJarsNeeded = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
-
-    if (tokenBalance < totalJarsNeeded) {
-      alert(`Insufficient tokens. Need ${totalJarsNeeded}, have ${tokenBalance}`);
-      return;
-    }
-
-    // STEP 9: Validate required documents
-    if (needsProductionReport && !formData.productionReport) {
-        alert('Please upload a production report for the selected certifications');
-        return;
-    }
-
-    if (needsLabReport && !formData.labReport) {
-        alert('Please upload a lab report for the selected certifications');
-        return;
-    }
-
-    // STEP 11: Calculate total certified amount from batch jars
+    // Calculate total certified amount from batch jars
     const totalCertifiedAmount = batchJars.reduce((sum, jar) => {
       return sum + (jar.size * jar.quantity / 1000); // Convert grams to kg
     }, 0);
 
-    // STEP 12: Calculate and update token balance
-    const currentBalance = parseInt(localStorage.getItem('tokenBalance') || '0');
-    const newBalance = currentBalance - tokensUsed;
+    // STEP 1: Pre-calculate all batch updates for immediate UI refresh
+    const batchUpdates = selectedBatches.map(batchId => {
+      const currentBatch = batches.find(b => b.id === batchId);
+      const currentAvailableHoney = getRemainingHoneyForBatch(currentBatch);
+      
+      // PRESERVE ORIGINAL VALUES - Don't overwrite totalKg, totalHoneyCollected, or weightKg
+      const originalHoneyCollected = currentBatch.originalHoneyCollected || 
+                                   currentBatch.totalHoneyCollected || 
+                                   currentBatch.totalKg ||
+                                   currentBatch.weightKg ||
+                                   (currentAvailableHoney + (currentBatch.honeyCertified || 0));
 
-    // Update localStorage and state
-    localStorage.setItem('tokenBalance', newBalance.toString());
-    setTokenBalance(newBalance);
+      const batchCertifiedAmount = totalCertifiedAmount;
+      const newHoneyRemaining = Math.max(0, currentAvailableHoney - batchCertifiedAmount);
+      
+      const previouslyCertified = currentBatch.totalHoneyCertified || currentBatch.honeyCertified || 0;
+      const totalCumulativeCertified = previouslyCertified + batchCertifiedAmount;
 
-    // Dispatch token update event
+      return {
+        batchId,
+        updates: {
+          status: newHoneyRemaining > 0 ? 'partially_completed' : 'completed',
+          // KEEP ORIGINAL VALUES INTACT
+          totalHoneyCollected: originalHoneyCollected, // Keep original
+          totalKg: originalHoneyCollected, // Keep original - this should always show original collected amount
+          weightKg: originalHoneyCollected, // Keep original
+          // CERTIFICATION TRACKING
+          jarsProduced: (currentBatch.jarsProduced || 0) + totalJarsNeeded, // Add to existing
+          jarsUsed: (currentBatch.jarsUsed || 0) + totalJarsNeeded, // Add to existing
+          jarCertifications: {
+            ...currentBatch.jarCertifications,
+            ...jarCertifications
+          },
+          certificationDate: new Date().toISOString().split('T')[0],
+          expiryDate: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          completedChecks: 4,
+          totalChecks: 4,
+          originalHoneyCollected: originalHoneyCollected, // Store original separately
+          honeyCertified: batchCertifiedAmount, // Current certification amount
+          honeyRemaining: newHoneyRemaining, // Remaining uncertified
+          totalHoneyCertified: totalCumulativeCertified, // Cumulative certified
+          // Update apiaries
+          apiaries: currentBatch.apiaries ? currentBatch.apiaries.map(apiary => {
+            const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batchId}-${apiary.number}`] : undefined;
+            const currentApiaryHoney = storedValue !== undefined ? storedValue : apiary.kilosCollected;
+            
+            const apiaryProportion = currentAvailableHoney > 0 ? currentApiaryHoney / currentAvailableHoney : 0;
+            const apiaryCertifiedAmount = batchCertifiedAmount * apiaryProportion;
+            const newApiaryRemaining = Math.max(0, currentApiaryHoney - apiaryCertifiedAmount);
+
+            return {
+              ...apiary,
+              // Keep original collected amount separate
+              originalKilosCollected: apiary.originalKilosCollected || apiary.kilosCollected,
+              kilosCollected: newApiaryRemaining, // Available amount
+              honeyCertified: (apiary.honeyCertified || 0) + apiaryCertifiedAmount // Add to existing certified
+            };
+          }) : []
+        }
+      };
+    });
+
+    // STEP 2: Update token balance immediately (optimistic update)
+    const newTokenBalance = tokenBalance - tokensUsed;
+    setTokenBalance(newTokenBalance);
+    localStorage.setItem('tokenBalance', newTokenBalance.toString());
+
+    // STEP 3: Update batches state immediately (optimistic update)
+    const updatedBatches = batches.map(batch => {
+      const batchUpdate = batchUpdates.find(update => update.batchId === batch.id);
+      if (batchUpdate) {
+        return {
+          ...batch,
+          ...batchUpdate.updates
+        };
+      }
+      return batch;
+    });
+
+    // IMMEDIATELY update the batches state for instant UI refresh
+    setBatches(updatedBatches);
+
+    // STEP 4: Dispatch events for other components that might be listening
     window.dispatchEvent(new CustomEvent('tokensUpdated', {
       detail: {
         action: 'deduct',
         tokensDeducted: tokensUsed,
-        newBalance: newBalance,
+        newBalance: newTokenBalance,
         batchIds: selectedBatches,
         jarCount: tokensUsed
       }
     }));
 
-    // STEP 13: Process each batch (FIXED VERSION)
-    for (const batchId of selectedBatches) {
-      // Get the current batch data
+    // Dispatch batch update event for other components
+    window.dispatchEvent(new CustomEvent('batchesUpdated', {
+      detail: {
+        updatedBatches: updatedBatches,
+        completedBatchIds: selectedBatches,
+        totalCertified: totalCertifiedAmount
+      }
+    }));
+
+    // STEP 5: Now send updates to server (in background)
+    const serverUpdatePromises = selectedBatches.map(async (batchId) => {
+      const batchUpdate = batchUpdates.find(update => update.batchId === batchId);
       const currentBatch = batches.find(b => b.id === batchId);
-
-      // Get the current available honey (could be remaining from previous certifications)
-      const currentAvailableHoney = getRemainingHoneyForBatch(currentBatch);
-
-      // FIXED: Store original amount if not already stored - use the actual original amount
-      const originalHoneyCollected = currentBatch.originalHoneyCollected || 
-                                   currentBatch.totalHoneyCollected || 
-                                   (currentAvailableHoney + (currentBatch.honeyCertified || 0));
-
-      // For batch-based approach, all certified amount comes from this batch
-      const batchCertifiedAmount = totalCertifiedAmount;
-      const newHoneyRemaining = Math.max(0, currentAvailableHoney - batchCertifiedAmount);
-
-      // FIXED: Calculate cumulative certified amount properly
-      const previouslyCertified = currentBatch.totalHoneyCertified || currentBatch.honeyCertified || 0;
-      const totalCumulativeCertified = previouslyCertified + batchCertifiedAmount;
-
-      // Prepare batch-specific apiaries if they exist
+      
       const batchApiaries = formData.apiaries ? formData.apiaries.filter(apiary =>
         apiary.batchId === batchId || !apiary.batchId
       ) : [];
 
       const batchData = {
         batchId,
-        updatedFields: {
-          status: newHoneyRemaining > 0 ? 'partially_completed' : 'completed',
-          // FIXED: Keep totalHoneyCollected as the ORIGINAL amount, not remaining
-          totalHoneyCollected: originalHoneyCollected, // Always keep the original amount
-          totalKg: batchCertifiedAmount, // Amount being certified now
-          weightKg: batchCertifiedAmount, // Also update weightKg for compatibility
-          jarsProduced: totalJarsNeeded,
-          jarsUsed: totalJarsNeeded,
-          jarCertifications: jarCertifications,
-          certificationDate: new Date().toISOString().split('T')[0],
-          expiryDate: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          completedChecks: 4,
-          totalChecks: 4,
-          // Store the original amount before any certification for tracking
-          originalHoneyCollected: originalHoneyCollected,
-          // FIXED: Store the amounts properly
-          honeyCertified: batchCertifiedAmount, // Amount certified in this session only
-          honeyRemaining: newHoneyRemaining, // Amount remaining after this certification  
-          // FIXED: Track cumulative certified amount across all sessions
-          totalHoneyCertified: totalCumulativeCertified
-        },
+        updatedFields: batchUpdate.updates,
         apiaries: batchApiaries.map(apiary => {
           const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batchId}-${apiary.number}`] : undefined;
           const currentApiaryHoney = storedValue !== undefined ? storedValue : apiary.kilosCollected;
-
-          // For batch-based approach, distribute certified amount proportionally
+          
+          const currentAvailableHoney = getRemainingHoneyForBatch(currentBatch);
           const apiaryProportion = currentAvailableHoney > 0 ? currentApiaryHoney / currentAvailableHoney : 0;
-          const apiaryCertifiedAmount = batchCertifiedAmount * apiaryProportion;
+          const apiaryCertifiedAmount = totalCertifiedAmount * apiaryProportion;
           const newApiaryRemaining = Math.max(0, currentApiaryHoney - apiaryCertifiedAmount);
 
           return {
@@ -1278,8 +1432,9 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
             hiveCount: apiary.hiveCount,
             latitude: apiary.latitude !== 0 ? apiary.latitude : null,
             longitude: apiary.longitude !== 0 ? apiary.longitude : null,
+            originalKilosCollected: apiary.originalKilosCollected || apiary.kilosCollected,
             kilosCollected: newApiaryRemaining,
-            honeyCertified: apiaryCertifiedAmount
+            honeyCertified: (apiary.honeyCertified || 0) + apiaryCertifiedAmount
           };
         }),
         batchJars: batchJars,
@@ -1306,79 +1461,16 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error('Batch update failed response:', errorData);
-        throw new Error(errorData?.error || `Failed to update batch ${batchId}`);
+        throw new Error(`Failed to update batch ${batchId}`);
       }
-    }
 
-    // STEP 14: Update local state with the same values sent to database
-    const updatedBatches: Batch[] = batches.map(batch => {
-      if (selectedBatches.includes(batch.id)) {
-        // Get current available honey
-        const currentAvailableHoney = getRemainingHoneyForBatch(batch);
-
-        // FIXED: Store original amount properly - use the actual original amount
-        const originalHoneyCollected = batch.originalHoneyCollected || 
-                                     batch.totalHoneyCollected || 
-                                     (currentAvailableHoney + (batch.honeyCertified || 0));
-
-        const batchCertifiedAmount = totalCertifiedAmount;
-        const newHoneyRemaining = Math.max(0, currentAvailableHoney - batchCertifiedAmount);
-
-        // FIXED: Calculate cumulative certified amount properly
-        const previouslyCertified = batch.totalHoneyCertified || batch.honeyCertified || 0;
-        const totalCumulativeCertified = previouslyCertified + batchCertifiedAmount;
-
-        return {
-          ...batch,
-          status: newHoneyRemaining > 0 ? 'partially_completed' : 'completed',
-          // FIXED: Keep totalHoneyCollected as the ORIGINAL amount, not remaining
-          totalHoneyCollected: originalHoneyCollected, // Always the original amount
-          totalKg: batchCertifiedAmount, // Amount certified in this session
-          weightKg: batchCertifiedAmount, // For compatibility
-          jarsProduced: totalJarsNeeded,
-          jarsUsed: totalJarsNeeded,
-          jarCertifications: jarCertifications,
-          // FIXED: Store tracking amounts properly
-          originalHoneyCollected: originalHoneyCollected, // Original amount before any certification
-          honeyCertified: batchCertifiedAmount, // Amount certified in this session only
-          honeyRemaining: newHoneyRemaining, // Amount remaining after this certification
-          totalHoneyCertified: totalCumulativeCertified, // Cumulative certified across all sessions
-          // Update apiaries with new remaining honey amounts
-          apiaries: batch.apiaries ? batch.apiaries.map(apiary => {
-            const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batch.id}-${apiary.number}`] : undefined;
-            const currentApiaryHoney = storedValue !== undefined ? storedValue : apiary.kilosCollected;
-
-            // Distribute certified amount proportionally
-            const apiaryProportion = currentAvailableHoney > 0 ? currentApiaryHoney / currentAvailableHoney : 0;
-            const apiaryCertifiedAmount = batchCertifiedAmount * apiaryProportion;
-            const newApiaryRemaining = Math.max(0, currentApiaryHoney - apiaryCertifiedAmount);
-
-            return {
-              ...apiary,
-              kilosCollected: newApiaryRemaining,
-              honeyCertified: apiaryCertifiedAmount
-            };
-          }) : []
-        };
-      }
-      return batch;
+      return response.json();
     });
 
-    setBatches(updatedBatches);
+    // Wait for all server updates to complete
+    await Promise.all(serverUpdatePromises);
 
-    // STEP 15: Reset form state
-    setShowCompleteForm(false);
-    setSelectedBatches([]);
-    setFormData({
-      certificationType: '',
-      productionReport: null,
-      labReport: null,
-      apiaries: []
-    });
-
-    // STEP 16: Prepare certification data for QR code
+    // STEP 6: Generate certification data
     const certData = {
       batchIds: selectedBatches,
       certificationDate: new Date().toISOString().split('T')[0],
@@ -1397,17 +1489,40 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       totalJars: totalJarsNeeded
     };
 
+    // Store certification data
+    try {
+      await storeCertificationData(certData, {
+        id: userData.id,
+        companyName: userData.companyName,
+        name: userData.name,
+        location: userData.location
+      });
+    } catch (error) {
+      console.error('Error storing certification data:', error);
+    }
+
     setCertificationData(certData);
 
     // Generate QR code
     const qrDataUrl = await generateQRCode(certData);
     setQrCodeDataUrl(qrDataUrl);
 
-    // Show success popup
+    // STEP 7: Reset form state and show success
     setShowCompleteForm(false);
+    setSelectedBatches([]);
+    setBatchJars([]); // Clear batch jars
+    setJarCertifications({}); // Clear jar certifications
+    setFormData({
+      certificationType: '',
+      productionReport: null,
+      labReport: null,
+      apiaries: []
+    });
+
+    // Show success popup
     setShowSuccessPopup(true);
 
-    // STEP 17: Calculate token counts by certification type
+    // STEP 8: Update additional data if functions exist
     const originTokens = batchJars.reduce((total, jar) => {
       const cert = jarCertifications[jar.id];
       return total + (cert?.origin ? jar.quantity : 0);
@@ -1418,7 +1533,6 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       return total + (cert?.quality ? jar.quantity : 0);
     }, 0);
 
-    // STEP 18: Update additional data if functions exist
     if (setData && typeof setData === 'function') {
       const updatedTokenStats = {
         ...data.tokenStats,
@@ -1432,25 +1546,32 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       });
     }
 
-    if (setTokenBalance && typeof setTokenBalance === 'function') {
-      setTokenBalance(prev => prev - totalJarsNeeded);
-    }
+    // Force a re-render of any components that might be caching old data
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('dataRefresh'));
+    }, 100);
+
+    console.log('Batch completion successful - UI updated immediately with preserved original values');
 
   } catch (error: any) {
     console.error('Error completing batches:', error);
 
-    // RESTORE TOKEN BALANCE ON ERROR
-    const tokensUsedOnError = batchJars ? batchJars.reduce((sum, jar) => sum + jar.quantity, 0) : 0;
-    const originalBalance = parseInt(localStorage.getItem('tokenBalance') || '0') + tokensUsedOnError;
-    localStorage.setItem('tokenBalance', originalBalance.toString());
-    setTokenBalance(originalBalance);
+    // ROLLBACK: Restore original state on error
+    const originalBalance = tokenBalance; // We already updated this optimistically
+    const restoredBalance = originalBalance + tokensUsed;
+    
+    setTokenBalance(restoredBalance);
+    localStorage.setItem('tokenBalance', restoredBalance.toString());
 
-    // Dispatch restore event
+    // Rollback batches state
+    setBatches(batches); // Reset to original batches state
+
+    // Dispatch rollback events
     window.dispatchEvent(new CustomEvent('tokensUpdated', {
       detail: {
         action: 'restore',
-        tokensRestored: tokensUsedOnError,
-        newBalance: originalBalance
+        tokensRestored: tokensUsed,
+        newBalance: restoredBalance
       }
     }));
 
@@ -3829,13 +3950,15 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                       className="px-4 py-3 cursor-pointer"
                       onClick={() => toggleExpand(batch.id)}
                     >
-                      {typeof (batch.totalKg || batch.weightKg || batch.totalHoneyCollected) === 'number' ? (batch.totalKg || batch.weightKg || batch.totalHoneyCollected).toLocaleString() : '0'}
+                     {typeof (batch.totalHoneyCollected || batch.totalKg || batch.weightKg) === 'number' 
+                     ? (batch.totalHoneyCollected || batch.totalKg || batch.weightKg).toLocaleString() 
+                     : '0'}
                     </td>
                     <td 
                       className="px-4 py-3 cursor-pointer"
                       onClick={() => toggleExpand(batch.id)}
                     >
-                      {typeof (batch.jarsProduced || batch.jarsUsed) === 'number' ? (batch.jarsProduced || batch.jarsUsed).toLocaleString() : '0'}
+                      {typeof (batch.jarsProduced || batch.jarUsed) === 'number' ? (batch.jarsProduced || batch.jarUsed).toLocaleString() : '0'}
                     </td>
                     <td 
                       className="px-4 py-3 cursor-pointer"
@@ -3858,99 +3981,116 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
 
                   {/* Expanded batch details row */}
                   {expandedBatch === batch.id && (
-                    <tr>
-                      <td colSpan="9" className="px-4 py-4 bg-gray-50 border-b">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          
-                          {/* Enhanced Batch Details */}
-                          <div className="bg-white p-4 rounded-lg shadow">
-                            <h3 className="text-sm font-semibold mb-2">Batch Details</h3>
-                            <div className="space-y-2">
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Batch Number:</span>
-                                <span className="font-medium">{batch.batchNumber}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Created Date:</span>
-                                <span className="font-medium">{new Date(batch.createdAt).toLocaleDateString()}</span>
-                              </div>
-                              
-                              {/* Total Honey Information */}
-                              <div className="border-t pt-2 mt-3">
-                                <h4 className="text-xs font-semibold text-gray-700 mb-2">Honey Information</h4>
-                                
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Total Collected:</span>
-                                  <span className="font-medium text-blue-600">
-                                    {typeof (batch.totalHoneyCollected || batch.weightKg || batch.totalKg) === 'number' ? (batch.totalHoneyCollected || batch.weightKg || batch.totalKg).toFixed(2) : '0'} kg
-                                  </span>
-                                </div>
-                                
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Honey Certified:</span>
-                                  <span className="font-medium text-green-600">
-                                    {typeof (batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))) === 'number' ? (batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))).toFixed(2) : '0'} kg
-                                  </span>
-                                </div>
-                                
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Honey Remaining:</span>
-                                  <span className="font-medium text-orange-600">
-                                    {typeof (batch.honeyRemaining || batch.uncertified) === 'number' ? (batch.honeyRemaining || batch.uncertified).toFixed(2) : '0'} kg
-                                  </span>
-                                </div>
-                                
-                                {/* Certification Efficiency */}
-                                {(batch.totalHoneyCollected || batch.weightKg || batch.totalKg) > 0 && (
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">Certification Rate:</span>
-                                    <span className="font-medium text-purple-600">
-                                      {(((batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))) / (batch.totalHoneyCollected || batch.weightKg || batch.totalKg)) * 100).toFixed(1)}%
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
+  <tr>
+    <td colSpan="9" className="px-4 py-4 bg-gray-50 border-b">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        
+        {/* Enhanced Batch Details */}
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-sm font-semibold mb-2">Batch Details</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Batch Number:</span>
+              <span className="font-medium">{batch.batchNumber}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Created Date:</span>
+              <span className="font-medium">{new Date(batch.createdAt).toLocaleDateString()}</span>
+            </div>
+            
+            {/* Total Honey Information - Updated to show original values */}
+            <div className="border-t pt-2 mt-3">
+              <h4 className="text-xs font-semibold text-gray-700 mb-2">Honey Information</h4>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Original Collected:</span>
+                <span className="font-medium text-blue-600">
+                  {typeof (batch.originalHoneyCollected || batch.totalHoneyCollected || batch.totalKg || batch.weightKg) === 'number' 
+                    ? (batch.originalHoneyCollected || batch.totalHoneyCollected || batch.totalKg || batch.weightKg).toFixed(2) 
+                    : '0'} kg
+                </span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total Certified:</span>
+                <span className="font-medium text-green-600">
+                  {typeof (batch.totalHoneyCertified || batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))) === 'number' 
+                    ? (batch.totalHoneyCertified || batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))).toFixed(2) 
+                    : '0'} kg
+                </span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Honey Remaining:</span>
+                <span className="font-medium text-orange-600">
+                  {typeof (batch.honeyRemaining || batch.uncertified) === 'number' 
+                    ? (batch.honeyRemaining || batch.uncertified).toFixed(2) 
+                    : '0'} kg
+                </span>
+              </div>
+              
+              {/* Certification Efficiency - Based on original amount */}
+              {(batch.totalHoneyCollected || batch.totalKg || batch.weightKg) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Certification Rate:</span>
+                  <span className="font-medium text-purple-600">
+                    {(((batch.honeyCertified || ((batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0))) / ( batch.totalHoneyCollected || batch.totalKg || batch.weightKg)) * 100).toFixed(1)}%
+                  </span>
+                </div>
+              )}
+            </div>
 
-                              {/* Jar Information */}
-                              <div className="border-t pt-2 mt-3">
-                                <h4 className="text-xs font-semibold text-gray-700 mb-2">Production Information</h4>
-                                
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Jars Produced:</span>
-                                  <span className="font-medium">{typeof (batch.jarsUsed || batch.jarsProduced) === 'number' ? (batch.jarsUsed || batch.jarsProduced).toLocaleString() : '0'}</span>
-                                </div>
-                                
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Certified Weight:</span>
-                                  <span className="font-medium">{typeof (batch.weightKg || batch.totalHoneyCollected || batch.totalKg) === 'number' ? (batch.weightKg || batch.totalHoneyCollected || batch.totalKg).toFixed(2) : '0'} kg</span>
-                                </div>
-                              </div>
-                              
-                              {/* Status */}
-                              <div className="border-t pt-2 mt-3">
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">Status:</span>
-                                  <span className={`font-medium ${batch.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
-                                    {batch.status === 'completed' ? 'Completed' : 'Pending'}
-                                  </span>
-                                </div>
-                                
-                                {batch.certificationDate && (
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">Certified Date:</span>
-                                    <span className="font-medium">{new Date(batch.certificationDate).toLocaleDateString()}</span>
-                                  </div>
-                                )}
-                                
-                                {batch.expiryDate && (
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">Expires:</span>
-                                    <span className="font-medium">{new Date(batch.expiryDate).toLocaleDateString()}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+            {/* Jar Information - Updated to show cumulative values */}
+            <div className="border-t pt-2 mt-3">
+              <h4 className="text-xs font-semibold text-gray-700 mb-2">Production Information</h4>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total Jars Produced:</span>
+                <span className="font-medium">{typeof (batch.jarsProduced || batch.jarUsed) === 'number' ? (batch.jarsProduced || batch.jarUsed).toLocaleString() : '0'}</span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Current Cert. Weight:</span>
+                <span className="font-medium">{typeof (batch.honeyCertified) === 'number' ? (batch.honeyCertified).toFixed(2) : '0'} kg</span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total Cert. Weight:</span>
+                <span className="font-medium">{typeof (batch.honeyCertified) === 'number' ? (batch.honeyCertified).toFixed(2) : '0'} kg</span>
+              </div>
+            </div>
+            
+            {/* Status */}
+            <div className="border-t pt-2 mt-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Status:</span>
+                <span className={`font-medium ${
+                  batch.status === 'completed' ? 'text-green-600' : 
+                  batch.status === 'partially_completed' ? 'text-orange-600' : 
+                  'text-yellow-600'
+                }`}>
+                  {batch.status === 'completed' ? 'Completed' : 
+                   batch.status === 'partially_completed' ? 'Partially Completed' : 
+                   'Pending'}
+                </span>
+              </div>
+              
+              {batch.certificationDate && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Last Certified:</span>
+                  <span className="font-medium">{new Date(batch.certificationDate).toLocaleDateString()}</span>
+                </div>
+              )}
+              
+              {batch.expiryDate && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Expires:</span>
+                  <span className="font-medium">{new Date(batch.expiryDate).toLocaleDateString()}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
 
                           {/* Enhanced Certification Breakdown Chart */}
                           <div className="bg-white p-4 rounded-lg shadow">
@@ -3990,17 +4130,14 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                             {/* Certification Statistics */}
                             <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                               <div className="flex justify-between">
-                                <span className="text-blue-600">Origin Only:</span>
+                                <span className="text-blue-600">Origin:</span>
                                 <span className="font-medium">{(batch.originOnly || 0).toFixed(2)} kg</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-green-600">Quality Only:</span>
+                                <span className="text-green-600">Quality:</span>
                                 <span className="font-medium">{(batch.qualityOnly || 0).toFixed(2)} kg</span>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-purple-600">Both Certs:</span>
-                                <span className="font-medium">{(batch.bothCertifications || 0).toFixed(2)} kg</span>
-                              </div>
+                              
                               <div className="flex justify-between">
                                 <span className="text-gray-600">Uncertified:</span>
                                 <span className="font-medium">{(batch.uncertified || 0).toFixed(2)} kg</span>
@@ -4027,12 +4164,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
                                       <span className="text-gray-600">Hives:</span>
                                       <span className="font-medium">{apiary.hiveCount}</span>
                                     </div>
-                                    {apiary.kilosCollected && (
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-600">Honey collected:</span>
-                                        <span className="font-medium">{apiary.kilosCollected} kg</span>
-                                      </div>
-                                    )}
+                                    
                                     {apiary.latitude && apiary.longitude && (
                                       <div className="flex justify-between">
                                         <span className="text-gray-600">Location:</span>

@@ -34,6 +34,7 @@ model beeusers {
   accounts          Account[]
   sessions          Session[]
   Apiary            Apiary[]
+  certifications    Certification[]
 
   @@map("beeusers")
 }
@@ -142,4 +143,28 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Certification {
+  id                  String   @id @default(cuid())
+  verificationCode    String   @unique @map("verification_code")
+  batchIds            String   @map("batch_ids") // Stored as comma-separated string
+  certificationDate   DateTime @map("certification_date") @db.Date
+  totalCertified      Decimal  @map("total_certified") @db.Decimal(10, 2)
+  certificationType   String   @map("certification_type")
+  expiryDate          DateTime @map("expiry_date") @db.Date
+  totalJars           Int      @map("total_jars")
+  companyName         String?  @map("company_name")
+  beekeeperName       String?  @map("beekeeper_name")
+  location            String?
+  userId              Int      @map("user_id") // ✅ fixed here
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  // Relation to User (assuming you have a User model)
+  user beeusers @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([verificationCode])
+  @@index([userId])
+  @@index([expiryDate])
 }

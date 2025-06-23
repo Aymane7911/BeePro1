@@ -243,13 +243,27 @@ const removeJarSize = (size: number) => {
   });
   setApiaryJars(updatedApiaryJars);
 };
-const getMaxQuantity = (): number => {
+
+
+const getMaxQuantity = () => {
   if (!newJarSize) return 0;
+  
   const sizeInGrams = convertToGrams(newJarSize, newJarUnit);
-  if (sizeInGrams === 0) return 0;
-  return Math.floor(
-    (getTotalHoneyFromBatch() - getAllocatedHoneyFromJars()) * 1000 / sizeInGrams
-  );
+  const sizeInKg = sizeInGrams / 1000;
+  
+  // Calculate remaining honey available for allocation (not yet allocated to jars)
+  const remainingHoneyAvailable = getTotalRemainingHoneyFromBatch() - getAllocatedHoneyFromJars();
+  
+  if (remainingHoneyAvailable <= 0) return 0;
+  
+  // Maximum jars we can create with remaining honey
+  const maxByHoney = Math.floor(remainingHoneyAvailable / sizeInKg);
+  
+  // Maximum jars we can afford with current tokens
+  const currentJarCount = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
+  const maxByTokens = tokenBalance - currentJarCount;
+  
+  return Math.min(maxByHoney, Math.max(0, maxByTokens));
 };
 
   // Add these new state variables at the top of your component
@@ -325,81 +339,34 @@ const [jarSizeDistribution, setJarSizeDistribution] = useState({
   jar400g: 0,
   jar600g: 0
 });
+
+
 const isFormValid = () => {
-  console.log("Debug isFormValid:");
+  // Check if there are any jars defined
+  if (batchJars.length === 0) return false;
   
-  // Check if batches are selected
-  if (!selectedBatches || selectedBatches.length === 0) {
-    console.log("❌ No batches selected");
-    return false;
-  }
-  console.log("✅ Batches selected:", selectedBatches);
-
-  // Check if there's honey available from selected batches
-  const totalHoney = getTotalHoneyFromBatch();
-  if (totalHoney <= 0) {
-    console.log("❌ No honey available:", totalHoney);
-    return false;
-  }
-  console.log("✅ Honey available:", totalHoney);
-
-  // Check if we have jars defined for the batch
-  if (!batchJars || batchJars.length === 0) {
-    console.log("❌ No jars defined");
-    return false;
-  }
-  console.log("✅ Jars defined:", batchJars.length);
-
-  // Check if at least some honey is allocated to jars
-  const allocatedHoney = getAllocatedHoneyFromJars();
-  if (allocatedHoney <= 0) {
-    console.log("❌ No honey allocated to jars:", allocatedHoney);
-    return false;
-  }
-  console.log("✅ Honey allocated to jars:", allocatedHoney);
-
-  // Check if all jar types have certifications selected
+  // Check if all jars have certifications selected
   const allJarsHaveCertifications = batchJars.every(jar => {
-    const certifications = jarCertifications[jar.id];
-    const hasCertification = certifications && (certifications.origin || certifications.quality);
-    console.log(`Jar ${jar.id} certifications:`, certifications, "Has certification:", hasCertification);
-    return hasCertification;
+    const cert = jarCertifications[jar.id];
+    return cert && (cert.origin || cert.quality);
   });
   
-  if (!allJarsHaveCertifications) {
-    console.log("❌ Not all jars have certifications");
-    return false;
-  }
-  console.log("✅ All jars have certifications");
-
-  // Check token balance - calculate total jars needed
-  const totalJarsNeeded = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
-  if (tokenBalance < totalJarsNeeded) {
-    console.log("❌ Insufficient tokens. Need:", totalJarsNeeded, "Have:", tokenBalance);
-    return false;
-  }
-  console.log("✅ Sufficient tokens. Need:", totalJarsNeeded, "Have:", tokenBalance);
-
-  // Check required documents based on selected certifications
-  const needsProdReport = needsProductionReport();
-  const needsLabRep = needsLabReport();
+  if (!allJarsHaveCertifications) return false;
   
-  console.log("Needs production report:", needsProdReport);
-  console.log("Has production report:", !!formData.productionReport);
-  console.log("Needs lab report:", needsLabRep);
-  console.log("Has lab report:", !!formData.labReport);
-
-  if (needsProdReport && !formData.productionReport) {
-    console.log("❌ Production report required but not provided");
-    return false;
-  }
-
-  if (needsLabRep && !formData.labReport) {
-    console.log("❌ Lab report required but not provided");
-    return false;
-  }
-
-  console.log("✅ All validations passed - form is valid");
+  // Check if required documents are uploaded
+  if (needsProductionReport() && !formData.productionReport) return false;
+  if (needsLabReport() && !formData.labReport) return false;
+  
+  // Check if we have enough tokens
+  const totalJarsNeeded = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
+  if (tokenBalance < totalJarsNeeded) return false;
+  
+  // Check if jar allocation doesn't exceed remaining honey
+  const allocatedHoney = getAllocatedHoneyFromJars();
+  const remainingHoney = getTotalRemainingHoneyFromBatch();
+  
+  if (allocatedHoney > remainingHoney) return false;
+  
   return true;
 };
 
@@ -575,12 +542,13 @@ const createBatch = async () => {
 
 
 const isAllHoneyAllocated = () => {
-  const totalHoneyAvailable = getTotalHoneyFromBatch();
-  const totalHoneyInJars = Object.values(apiaryJars).flat().reduce((sum, jar) => 
-    sum + (jar.size * jar.quantity / 1000), 0
-  );
-  return Math.abs(totalHoneyAvailable - totalHoneyInJars) < 0.001; // Allow for small floating point differences
+  const remainingHoney = getTotalRemainingHoneyFromBatch();
+  const allocatedHoney = getAllocatedHoneyFromJars();
+  
+  // Consider fully allocated if difference is less than 0.01 kg (10g)
+  return Math.abs(remainingHoney - allocatedHoney) < 0.01;
 };
+
 
 // 2. Add helper function to check remaining honey for specific apiary
 const getRemainingHoneyForApiary = (apiaryIndex: number) => {
@@ -648,27 +616,51 @@ const calculateMaxJarsForSize = (totalHoneyToCertify, jarSize) => {
 };
   const [tokenBalance, setTokenBalance] = useState<number>(0);
   // Add jar to batch
-const addJarToBatch = () => {
-  if (!newJarSize || !newJarQuantity) return;
+const addJarToBatch = (sizeInGrams, quantity) => {
+  if (!sizeInGrams || !quantity) return;
   
-  const remainingHoney = getTotalHoneyFromBatch() - getAllocatedHoneyFromJars();
-  const jarHoneyNeeded = (newJarSize * newJarQuantity) / 1000;
+  const sizeInKg = sizeInGrams / 1000;
+  const totalWeightToAdd = sizeInKg * quantity;
   
-  if (jarHoneyNeeded > remainingHoney + 0.001) { // Small tolerance
-    alert(`Not enough honey remaining. You have ${remainingHoney.toFixed(2)} kg left, but need ${jarHoneyNeeded.toFixed(2)} kg for these jars.`);
+  // Check if this would exceed remaining honey
+  const currentAllocated = getAllocatedHoneyFromJars();
+  const remainingHoney = getTotalRemainingHoneyFromBatch();
+  
+  if (currentAllocated + totalWeightToAdd > remainingHoney) {
+    // Calculate maximum quantity we can actually add
+    const availableHoney = remainingHoney - currentAllocated;
+    const maxQuantity = Math.floor(availableHoney / sizeInKg);
+    
+    if (maxQuantity <= 0) {
+      alert(`Cannot add jars: No remaining honey available for certification.\nRemaining: ${availableHoney.toFixed(2)} kg`);
+      return;
+    }
+    
+    alert(`Cannot add ${quantity} jars of ${sizeInGrams}g each.\nThis would require ${totalWeightToAdd.toFixed(2)} kg, but only ${availableHoney.toFixed(2)} kg is available.\nMaximum jars you can add: ${maxQuantity}`);
     return;
   }
   
+  // Check token limit
+  const totalTokensNeeded = getTotalJarsAcrossApiaries() + quantity;
+  if (totalTokensNeeded > tokenBalance) {
+    alert(`Insufficient tokens. You need ${totalTokensNeeded} tokens but only have ${tokenBalance}.`);
+    return;
+  }
+  
+  // Add the jar
   const newJar = {
     id: Date.now() + Math.random(),
-    size: newJarSize,
-    quantity: newJarQuantity
+    size: sizeInGrams,
+    quantity: quantity
   };
   
   setBatchJars([...batchJars, newJar]);
+  
+  // Reset form
   setNewJarSize('');
   setNewJarQuantity(1);
 };
+
 
 // Remove jar from batch
 const removeJarFromBatch = (jarId) => {
@@ -812,24 +804,23 @@ const handleMapsLinkSubmit = async () => {
 
 // Updated function to get total remaining honey from all selected batches
 const getTotalRemainingHoneyFromBatch = () => {
-  if (!selectedBatches || selectedBatches.length === 0) return 0;
-  
-  return selectedBatches.reduce((total, batchId) => {
-    const batch = batches.find(b => b.id === batchId);
-    return total + getRemainingHoneyForBatch(batch);
-  }, 0);
-};
-
-const getTotalHoneyFromBatch = () => {
-  if (!selectedBatches || selectedBatches.length === 0) return 0;
-  
   return selectedBatches.reduce((total, batchId) => {
     const batch = batches.find(b => b.id === batchId);
     if (!batch) return total;
     
-    // Use remaining honey instead of original total to prevent allocation beyond available honey
+    // Get remaining honey for this batch (original - already certified)
     const remainingHoney = getRemainingHoneyForBatch(batch);
     return total + remainingHoney;
+  }, 0);
+};
+
+const getTotalHoneyFromBatch = () => {
+  return selectedBatches.reduce((total, batchId) => {
+    const batch = batches.find(b => b.id === batchId);
+    if (!batch) return total;
+    
+    const originalHoney = batch.weightKg || batch.totalHoneyCollected || 0;
+    return total + originalHoney;
   }, 0);
 };
 
@@ -839,7 +830,9 @@ const [newJarUnit, setNewJarUnit] = useState<string>('g');
 
 // Helper function to get total allocated honey from jars
 const getAllocatedHoneyFromJars = () => {
-  return batchJars.reduce((sum, jar) => sum + (jar.size * jar.quantity) / 1000, 0);
+  return batchJars.reduce((total, jar) => {
+    return total + (jar.size * jar.quantity) / 1000; // Convert grams to kg
+  }, 0);
 };
 // Helper function to convert jar size to grams
 const convertToGrams = (size: string, unit: string): number => {
@@ -1218,7 +1211,11 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
   });
 
   if (!allJarsHaveCertifications) {
-    alert('Please select a certification type for all jar types');
+    setNotification({
+      show: true,
+      message: 'Please select a certification type for all jar types',
+      type: 'error'
+    });
     return;
   }
 
@@ -1234,37 +1231,65 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
   });
 
   if (needsProductionReport && !formData.productionReport) {
-    alert('Please upload a production report for origin certifications');
+    setNotification({
+      show: true,
+      message: 'Please upload a production report for origin certifications',
+      type: 'error'
+    });
     return;
   }
 
   if (needsLabReport && !formData.labReport) {
-    alert('Please upload a lab report for quality certifications');
+    setNotification({
+      show: true,
+      message: 'Please upload a lab report for quality certifications',
+      type: 'error'
+    });
     return;
   }
 
   // Additional validation checks...
   if (!selectedBatches || selectedBatches.length === 0) {
-    alert('Please select at least one batch');
+    setNotification({
+      show: true,
+      message: 'Please select at least one batch',
+      type: 'error'
+    });
     return;
   }
 
   if (getTotalRemainingHoneyFromBatch() <= 0) {
-    alert('No honey available from selected batches');
+    setNotification({
+      show: true,
+      message: 'No honey available from selected batches',
+      type: 'error'
+    });
     return;
   }
 
   if (!batchJars || batchJars.length === 0) {
-    alert('Please define jar configurations for the batch');
+    setNotification({
+      show: true,
+      message: 'Please define jar configurations for the batch',
+      type: 'error'
+    });
     return;
   }
 
   const totalJarsNeeded = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
 
   if (tokenBalance < totalJarsNeeded) {
-    alert(`Insufficient tokens. Need ${totalJarsNeeded}, have ${tokenBalance}`);
+    setNotification({
+      show: true,
+      message: `Insufficient tokens. Need ${totalJarsNeeded}, have ${tokenBalance}`,
+      type: 'error'
+    });
     return;
   }
+
+  // Store original state for potential rollback
+  const originalTokenBalance = tokenBalance;
+  const originalBatches = [...batches];
 
   try {
     setIsLoading(true);
@@ -1278,7 +1303,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
                   sessionStorage.getItem('token');
 
     if (!token) {
-      throw new Error('No auth token found');
+      throw new Error('No authentication token found. Please log in again.');
     }
 
     // Fetch fresh user data
@@ -1287,7 +1312,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
     });
 
     if (!userResponse.ok) {
-      throw new Error('Failed to fetch user profile');
+      throw new Error('Failed to fetch user profile. Please try again.');
     }
 
     const userData = await userResponse.json();
@@ -1385,27 +1410,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
     // IMMEDIATELY update the batches state for instant UI refresh
     setBatches(updatedBatches);
 
-    // STEP 4: Dispatch events for other components that might be listening
-    window.dispatchEvent(new CustomEvent('tokensUpdated', {
-      detail: {
-        action: 'deduct',
-        tokensDeducted: tokensUsed,
-        newBalance: newTokenBalance,
-        batchIds: selectedBatches,
-        jarCount: tokensUsed
-      }
-    }));
-
-    // Dispatch batch update event for other components
-    window.dispatchEvent(new CustomEvent('batchesUpdated', {
-      detail: {
-        updatedBatches: updatedBatches,
-        completedBatchIds: selectedBatches,
-        totalCertified: totalCertifiedAmount
-      }
-    }));
-
-    // STEP 5: Now send updates to server (in background)
+    // STEP 4: Send updates to server (in background) - REMOVED MULTIPLE DISPATCHES
     const serverUpdatePromises = selectedBatches.map(async (batchId) => {
       const batchUpdate = batchUpdates.find(update => update.batchId === batchId);
       const currentBatch = batches.find(b => b.id === batchId);
@@ -1461,7 +1466,8 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to update batch ${batchId}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to update batch ${batchId}`);
       }
 
       return response.json();
@@ -1470,7 +1476,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
     // Wait for all server updates to complete
     await Promise.all(serverUpdatePromises);
 
-    // STEP 6: Generate certification data
+    // STEP 5: Generate certification data
     const certData = {
       batchIds: selectedBatches,
       certificationDate: new Date().toISOString().split('T')[0],
@@ -1499,6 +1505,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       });
     } catch (error) {
       console.error('Error storing certification data:', error);
+      // Don't throw here - this is not critical for the main flow
     }
 
     setCertificationData(certData);
@@ -1507,7 +1514,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
     const qrDataUrl = await generateQRCode(certData);
     setQrCodeDataUrl(qrDataUrl);
 
-    // STEP 7: Reset form state and show success
+    // STEP 6: Reset form state
     setShowCompleteForm(false);
     setSelectedBatches([]);
     setBatchJars([]); // Clear batch jars
@@ -1519,10 +1526,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       apiaries: []
     });
 
-    // Show success popup
-    setShowSuccessPopup(true);
-
-    // STEP 8: Update additional data if functions exist
+    // STEP 7: Update additional data if functions exist
     const originTokens = batchJars.reduce((total, jar) => {
       const cert = jarCertifications[jar.id];
       return total + (cert?.origin ? jar.quantity : 0);
@@ -1546,10 +1550,33 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
       });
     }
 
-    // Force a re-render of any components that might be caching old data
+    // CONSOLIDATED DISPATCH - Only dispatch once at the end
     setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('dataRefresh'));
+      // Single combined event dispatch
+      window.dispatchEvent(new CustomEvent('batchCompleted', {
+        detail: {
+          action: 'completed',
+          tokensUsed: tokensUsed,
+          newTokenBalance: newTokenBalance,
+          batchIds: selectedBatches,
+          jarCount: tokensUsed,
+          updatedBatches: updatedBatches,
+          completedBatchIds: selectedBatches,
+          totalCertified: totalCertifiedAmount,
+          certificationData: certData
+        }
+      }));
     }, 100);
+
+    // STEP 8: Show success popup ONLY ONCE
+    setShowSuccessPopup(true);
+
+    // SINGLE SUCCESS NOTIFICATION
+    setNotification({
+      show: true,
+      message: `Batch completed successfully! ${tokensUsed} tokens used, ${totalCertifiedAmount.toFixed(2)} kg certified.`,
+      type: 'success'
+    });
 
     console.log('Batch completion successful - UI updated immediately with preserved original values');
 
@@ -1557,27 +1584,26 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
     console.error('Error completing batches:', error);
 
     // ROLLBACK: Restore original state on error
-    const originalBalance = tokenBalance; // We already updated this optimistically
-    const restoredBalance = originalBalance + tokensUsed;
-    
-    setTokenBalance(restoredBalance);
-    localStorage.setItem('tokenBalance', restoredBalance.toString());
+    setTokenBalance(originalTokenBalance);
+    localStorage.setItem('tokenBalance', originalTokenBalance.toString());
 
     // Rollback batches state
-    setBatches(batches); // Reset to original batches state
+    setBatches(originalBatches);
 
-    // Dispatch rollback events
-    window.dispatchEvent(new CustomEvent('tokensUpdated', {
+    // Single rollback event dispatch
+    window.dispatchEvent(new CustomEvent('batchRollback', {
       detail: {
         action: 'restore',
         tokensRestored: tokensUsed,
-        newBalance: restoredBalance
+        newBalance: originalTokenBalance,
+        error: error.message
       }
     }));
 
+    // SINGLE ERROR NOTIFICATION - Only show this one
     setNotification({
       show: true,
-      message: error.message || 'An error occurred while completing the batch',
+      message: error.message || 'An error occurred while completing the batch. Please try again.',
       type: 'error'
     });
   } finally {
@@ -3764,11 +3790,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
   </div>
 )}
 
-      {notification.show && (
-        <div className="fixed bottom-4 right-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-lg max-w-md z-50">
-          {notification.message}
-        </div>
-      )}
+      
       {/* Filters and search */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
@@ -4040,25 +4062,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
               )}
             </div>
 
-            {/* Jar Information - Updated to show cumulative values */}
-            <div className="border-t pt-2 mt-3">
-              <h4 className="text-xs font-semibold text-gray-700 mb-2">Production Information</h4>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total Jars Produced:</span>
-                <span className="font-medium">{typeof (batch.jarsProduced || batch.jarUsed) === 'number' ? (batch.jarsProduced || batch.jarUsed).toLocaleString() : '0'}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Current Cert. Weight:</span>
-                <span className="font-medium">{typeof (batch.honeyCertified) === 'number' ? (batch.honeyCertified).toFixed(2) : '0'} kg</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total Cert. Weight:</span>
-                <span className="font-medium">{typeof (batch.honeyCertified) === 'number' ? (batch.honeyCertified).toFixed(2) : '0'} kg</span>
-              </div>
-            </div>
+            
             
             {/* Status */}
             <div className="border-t pt-2 mt-3">
@@ -4193,18 +4197,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
             </table>
           </div>
 
-          {/* Notification */}
-          {notification.show && (
-            <div className="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg">
-              {notification.message}
-              <button 
-                onClick={() => setNotification({ ...notification, show: false })}
-                className="ml-2 text-gray-300 hover:text-white"
-              >
-                ×
-              </button>
-            </div>
-          )}
+          
 
           {/* Empty state */}
           {filteredBatches.length === 0 && (
@@ -4223,61 +4216,123 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
         </div>
       )}
 
-      {/* Token statistics */}
-      <div className="bg-white p-4 rounded-lg shadow">
+     {/* Token statistics - synced with batch table data */}
+<div className="bg-white p-4 rounded-lg shadow">
   <h2 className="text-lg font-semibold mb-4">Certification Tokens</h2>
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div className="bg-gray-50 p-4 rounded-lg">
-      <h3 className="text-sm font-medium text-gray-600 mb-2">Token Status</h3>
-      <div className="space-y-2">
-        <div className="flex justify-between">
-          <span>Total tokens:</span>
-          <span className="font-medium">{tokenStats.totalTokens}</span>
+  
+  {(() => {
+    // Calculate data from selected batches - same as batch table
+    const selectedBatchData = selectedBatches.map(id => batches.find(b => b.id === id)).filter(Boolean);
+    
+    // Use same calculations as batch table
+    const totalOriginOnly = selectedBatchData.reduce((sum, batch) => sum + (batch.originOnly || 0), 0);
+    const totalQualityOnly = selectedBatchData.reduce((sum, batch) => sum + (batch.qualityOnly || 0), 0);
+    const totalBothCerts = selectedBatchData.reduce((sum, batch) => sum + (batch.bothCertifications || 0), 0);
+    const totalUncertified = selectedBatchData.reduce((sum, batch) => sum + (batch.uncertified || 0), 0);
+    
+    // Total tokens used/needed - same as progress bar calculations
+    const totalCertified = totalOriginOnly + totalQualityOnly + totalBothCerts;
+    const totalOriginalHoney = selectedBatchData.reduce((sum, batch) => 
+      sum + (batch.originalHoneyCollected || batch.totalHoneyCollected || batch.totalKg || batch.weightKg || 0), 0);
+    
+    // Token calculations
+    const tokensUsed = Math.round(totalCertified); // Assuming 1 token per kg certified
+    const tokensAvailable = Math.round(totalUncertified); // Available for certification
+    const totalTokensPossible = tokensUsed + tokensAvailable;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-600 mb-2">Token Status</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span>Total tokens used:</span>
+              <span className="font-medium">{tokensUsed}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Available for certification:</span>
+              <span className="font-medium">{tokensAvailable}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total possible:</span>
+              <span className="font-medium">{totalTokensPossible}</span>
+            </div>
+            {totalTokensPossible > 0 && (
+              <div className="relative pt-1">
+                <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
+                  <div
+                    style={{ width: `${(tokensUsed / totalTokensPossible) * 100}%` }}
+                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500"
+                  ></div>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>{((tokensUsed / totalTokensPossible) * 100).toFixed(1)}% certified</span>
+                  <span>{tokensUsed} / {totalTokensPossible}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="flex justify-between">
-          <span>Remaining tokens:</span>
-          <span className="font-medium">{tokenStats.remainingTokens}</span>
-        </div>
-        <div className="relative pt-1">
-          <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
-            <div
-              style={{ width: `${(tokenStats.remainingTokens / tokenStats.totalTokens) * 100}%` }}
-              className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-yellow-500"
-            ></div>
+        
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-600 mb-2">Token Distribution</h3>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={[
+                  { name: 'Origin', value: totalOriginOnly, color: '#3182CE' },
+                  { name: 'Quality', value: totalQualityOnly, color: '#38A169' },
+                  { name: 'Both', value: totalBothCerts, color: '#805AD5' },
+                ].filter(item => item.value > 0)}
+                margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                <YAxis />
+                <Tooltip formatter={(value) => [`${value.toFixed(2)} kg`, 'Certified']} />
+                <Bar dataKey="value" name="Tokens" fill="#FBBF24">
+                  {[
+                    { name: 'Origin Only', value: totalOriginOnly, color: '#3182CE' },
+                    { name: 'Quality Only', value: totalQualityOnly, color: '#38A169' },
+                    { name: 'Both', value: totalBothCerts, color: '#805AD5' },
+                  ].filter(item => item.value > 0).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          {/* Detailed breakdown */}
+          <div className="mt-2 space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-blue-600">Origin Only:</span>
+              <span className="font-medium">{totalOriginOnly.toFixed(2)} kg</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-green-600">Quality Only:</span>
+              <span className="font-medium">{totalQualityOnly.toFixed(2)} kg</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-purple-600">Both Certifications:</span>
+              <span className="font-medium">{totalBothCerts.toFixed(2)} kg</span>
+            </div>
+            <div className="flex justify-between border-t pt-1">
+              <span className="text-gray-600">Uncertified:</span>
+              <span className="font-medium">{totalUncertified.toFixed(2)} kg</span>
+            </div>
           </div>
         </div>
       </div>
+    );
+  })()}
+  
+  {/* Summary info */}
+  {selectedBatches.length === 0 && (
+    <div className="text-center py-4 text-gray-500 italic">
+      Select batches to view token statistics
     </div>
-    <div className="bg-gray-50 p-4 rounded-lg">
-      <h3 className="text-sm font-medium text-gray-600 mb-2">Token Distribution</h3>
-      <div className="h-48">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={[
-              { name: 'Origin Only', value: tokenStats.originOnly, color: '#3182CE' },
-              { name: 'Quality Only', value: tokenStats.qualityOnly, color: '#38A169' },
-              { name: 'Both', value: tokenStats.bothCertifications, color: '#805AD5' },
-            ]}
-            margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="value" name="Tokens" fill="#FBBF24">
-              {[
-                { name: 'Origin Only', value: tokenStats.originOnly, color: '#3182CE' },
-                { name: 'Quality Only', value: tokenStats.qualityOnly, color: '#38A169' },
-                { name: 'Both', value: tokenStats.bothCertifications, color: '#805AD5' },
-              ].map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  </div>
+  )}
 </div>
 
       {/* Print notification dialog */}

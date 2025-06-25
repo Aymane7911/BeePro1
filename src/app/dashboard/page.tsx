@@ -65,11 +65,6 @@ interface LocationCoordinates {
 }
 
 
-interface ClickPosition {
-  x: number;
-  y: number;
-}
-
 interface CertifiedHoneyWeight {
   originOnly: number;
   qualityOnly: number;
@@ -145,11 +140,6 @@ const initialData: AppData = {
     bothCertifications: 0
   }
 };
-
-// Token certification distribution data
-const tokenDistributionData = [];
-
-
 
 // A microservice dashboard for jar inventory management
 export default function JarManagementDashboard() {
@@ -850,19 +840,33 @@ useEffect(() => {
 
 // Define performLogout function
 const performLogout = async () => {
-  // Clear local storage
-  localStorage.removeItem('authToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('user');
+  // Clear the ACTUAL localStorage keys (based on your debug output)
+  const keysToRemove = [
+    'token',           // ← This is the main token
+    'authtoken',       // ← This is another token 
+    'authToken',       // Keep this in case it exists sometimes
+    'refreshToken',    // Keep this in case it exists sometimes
+    'user',
+    'tokenBalance',    // This might be auth-related
+    'isProfileComplete', // This might be user-related
+    'nextauth.message', // NextAuth related
+    'honeycertify_apiaries', // This might contain user data
+  ];
   
-  // Clear session storage
+  // Remove all auth keys
+  keysToRemove.forEach(key => {
+    localStorage.removeItem(key);
+    console.log(`Cleared localStorage key: ${key}`);
+  });
+  
+  // Clear session storage completely
   sessionStorage.clear();
   
-  // Make API call to backend logout endpoint if needed
+  // Make API call to backend logout endpoint
   try {
     await fetch('/api/auth/logout', { 
       method: 'POST',
-      credentials: 'include' // Include cookies
+      credentials: 'include'
     });
   } catch (error) {
     console.warn('Backend logout failed:', error);

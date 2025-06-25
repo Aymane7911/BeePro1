@@ -8,15 +8,15 @@ import { signOut } from 'next-auth/react';
 import Sidebar   from '@/components/Sidebar';
 import Backdrop from '@/components/Backdrop';
 import Header from '@/components/Header';
-import CreateBatchModal from '@/components/CreateBatchModal';
-import CreateApiaryModal from '@/components/CreateApiaryModal';
-import TokenWalletSection from '@/components/TokenWalletSection';
-import ApiaryMapSection from '@/components/ApiaryMapSection';
-import CertificationChart from '@/components/CertificationChart';
-import BatchStatusSection from '@/components/BatchStatusSection';
-import BuyTokensModal from '@/components/BuyTokensModal';
-import FloatingActionMenu from '@/components/FloatingActionMenu';
-import Notification from '@/components/Notification';
+import CreateBatchModal from '@/components/modals/CreateBatchModal';
+import CreateApiaryModal from '@/components/modals/CreateApiaryModal';
+import TokenWalletSection from '@/components/sections/TokenWalletSection';
+import ApiaryMapSection from '@/components/sections/ApiaryMapSection';
+import CertificationChart from '@/components/sections/CertificationChart';
+import BatchStatusSection from '@/components/sections/BatchStatusSection';
+import BuyTokensModal from '@/components/modals/BuyTokensModal';
+import FloatingActionMenu from '@/components/ui/FloatingActionMenu';
+import Notification from '@/components/ui/Notification';
 
 
 
@@ -151,18 +151,6 @@ const tokenDistributionData = [];
 
 
 
-
-
-
-
-
-
-
-
-
-// Honey certification status data
-const honeyStatusData = [];
-
 // A microservice dashboard for jar inventory management
 export default function JarManagementDashboard() {
   const [data, setData] = useState<AppData>(initialData);
@@ -193,8 +181,6 @@ export default function JarManagementDashboard() {
   const apiaryMarkers = useRef<google.maps.Marker[]>([]);
   const [selectedApiary, setSelectedApiary] = useState<Apiary | null>(null);
   const [selectedDropdownApiary, setSelectedDropdownApiary] = useState('');
-  const [showApiaryInfo, setShowApiaryInfo] = useState(false);
-  const [apiaryInfoPosition, setApiaryInfoPosition] = useState({ x: 0, y: 0 });
   const tempMarker = useRef<google.maps.Marker | null>(null);
   const [apiaryFormData, setApiaryFormData] = useState<ApiaryFormData>({
   name: '',
@@ -203,25 +189,11 @@ export default function JarManagementDashboard() {
   honeyCollected: 0,
   location: null
 });
-const [totalKg, setTotalKg] = useState(0);
 const [batchHoneyCollected, setBatchHoneyCollected] = useState(0);
 const [isLoggingOut, setIsLoggingOut] = useState(false);
 const [isOpen, setIsOpen] = useState(false);
   
-// Function to create authenticated API headers
-  const getAuthHeaders = (): Record<string, string> => {
-  const token = getAuthToken();
-  const headers: { [key: string]: string } = {
-  'Content-Type': 'application/json',
-};
 
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
-};
   // 1. Add clickPosition state to track where user clicked for bubble positioning
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
   const [batchFormData, setBatchFormData] = useState({

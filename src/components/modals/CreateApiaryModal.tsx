@@ -4,10 +4,6 @@ import { Layers, Database, Tag, Package, RefreshCw, Menu, X, Home, Settings, Use
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 
-
-
-
-
 interface ApiaryLocation {
   id: number;
   name: string;
@@ -18,24 +14,26 @@ interface ApiaryLocation {
   createdAt?: string;
 }
 
+interface ApiaryFormData {
+  name: string;
+  number: string;
+  hiveCount: number;
+  honeyCollected: number;
+  location: ApiaryLocation | null;
+}
+
 interface CreateApiaryModalProps {
   showApiaryModal: boolean;
   setShowApiaryModal: (show: boolean) => void;
-  apiaryFormData: {
-    name: string;
-    number: string;
-    hiveCount: number;
-    honeyCollected: number;
-    location: ApiaryLocation | null;
-  };
-  setApiaryFormData: (data: any) => void;
+  apiaryFormData: ApiaryFormData;
+  setApiaryFormData: (data: ApiaryFormData | ((prev: ApiaryFormData) => ApiaryFormData)) => void;
   savedApiaryLocations: ApiaryLocation[];
   mapsLinkInput: string;
   setMapsLinkInput: (value: string) => void;
   handleMapsLinkSubmit: () => void;
   miniMapRef: React.RefObject<HTMLDivElement>;
   miniGoogleMapRef: React.MutableRefObject<any>;
-  saveApiaryToDatabase: (apiary: any) => Promise<void>;
+  saveApiaryToDatabase: (apiary: ApiaryFormData) => Promise<void>;
   refreshApiariesFromDatabase: () => Promise<void>;
   isLoadingApiaries: boolean;
 }
@@ -54,8 +52,17 @@ const CreateApiaryModal = ({
   saveApiaryToDatabase,
   refreshApiariesFromDatabase,
   isLoadingApiaries
-}: CreateApiaryModalProps) => (
-  showApiaryModal && (
+}: CreateApiaryModalProps) => {
+  
+  const resetFormData = (): ApiaryFormData => ({
+    name: '',
+    number: '',
+    hiveCount: 0,
+    honeyCollected: 0,
+    location: null
+  });
+
+  return showApiaryModal ? (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Modal Header */}
@@ -73,13 +80,7 @@ const CreateApiaryModal = ({
             <button
               onClick={() => {
                 setShowApiaryModal(false);
-                setApiaryFormData({
-                  name: '',
-                  number: '',
-                  hiveCount: 0,
-                  honeyCollected: 0,
-                  location: null
-                });
+                setApiaryFormData(resetFormData());
               }}
               className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
             >
@@ -111,7 +112,7 @@ const CreateApiaryModal = ({
                     <input
                       type="text"
                       value={apiaryFormData.name}
-                      onChange={(e) => setApiaryFormData(prev => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => setApiaryFormData((prev: ApiaryFormData) => ({ ...prev, name: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
                       placeholder="e.g., Sunrise Meadow Apiary"
                       required
@@ -127,7 +128,7 @@ const CreateApiaryModal = ({
                     <input
                       type="text"
                       value={apiaryFormData.number}
-                      onChange={(e) => setApiaryFormData(prev => ({ ...prev, number: e.target.value }))}
+                      onChange={(e) => setApiaryFormData((prev: ApiaryFormData) => ({ ...prev, number: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
                       placeholder="e.g., APY-001"
                       required
@@ -144,7 +145,7 @@ const CreateApiaryModal = ({
                         type="number"
                         min="0"
                         value={apiaryFormData.hiveCount}
-                        onChange={(e) => setApiaryFormData(prev => ({ ...prev, hiveCount: parseInt(e.target.value) || 0 }))}
+                        onChange={(e) => setApiaryFormData((prev: ApiaryFormData) => ({ ...prev, hiveCount: parseInt(e.target.value) || 0 }))}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all"
                         placeholder="0"
                         required
@@ -182,7 +183,7 @@ const CreateApiaryModal = ({
                       </div>
                       <button
                         type="button"
-                        onClick={() => setApiaryFormData(prev => ({ ...prev, location: null }))}
+                        onClick={() => setApiaryFormData((prev: ApiaryFormData) => ({ ...prev, location: null }))}
                         className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition-colors"
                         title="Remove location"
                       >
@@ -221,7 +222,7 @@ const CreateApiaryModal = ({
                           if (locationId) {
                             const selectedLocation = savedApiaryLocations.find(loc => loc.id === parseInt(locationId));
                             if (selectedLocation) {
-                              setApiaryFormData(prev => ({
+                              setApiaryFormData((prev: ApiaryFormData) => ({
                                 ...prev,
                                 location: {
                                   ...selectedLocation,
@@ -369,13 +370,7 @@ const CreateApiaryModal = ({
               <button
                 onClick={() => {
                   setShowApiaryModal(false);
-                  setApiaryFormData({
-                    name: '',
-                    number: '',
-                    hiveCount: 0,
-                    honeyCollected: 0,
-                    location: null
-                  });
+                  setApiaryFormData(resetFormData());
                 }}
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors font-medium"
               >
@@ -387,13 +382,7 @@ const CreateApiaryModal = ({
                   try {
                     await saveApiaryToDatabase(apiaryFormData);
                     setShowApiaryModal(false);
-                    setApiaryFormData({
-                      name: '',
-                      number: '',
-                      hiveCount: 0,
-                      honeyCollected: 0,
-                      location: null
-                    });
+                    setApiaryFormData(resetFormData());
                     await refreshApiariesFromDatabase();
                   } catch (error) {
                     console.error('Error saving apiary:', error);
@@ -423,7 +412,7 @@ const CreateApiaryModal = ({
         </div>
       </div>
     </div>
-  )
-);
+  ) : null;
+};
 
-export default CreateApiaryModal; 
+export default CreateApiaryModal;

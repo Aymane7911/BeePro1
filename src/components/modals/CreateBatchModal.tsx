@@ -23,7 +23,7 @@ interface CreateBatchModalProps {
   batchHoneyCollected: number;
   setBatchHoneyCollected: (value: number) => void;
   selectedApiaries: Apiary[];
-  setSelectedApiaries: (apiaries: Apiary[]) => void;
+  setSelectedApiaries: (apiaries: Apiary[] | ((prev: Apiary[]) => Apiary[])) => void;
   availableApiaries: Apiary[];
   isLoadingApiaries: boolean;
   setShowApiaryModal: (show: boolean) => void;
@@ -49,8 +49,17 @@ const CreateBatchModal = ({
   createBatch,
   selectedDropdownApiary,
   setSelectedDropdownApiary
-}: CreateBatchModalProps) => (
-  showBatchModal && (
+}: CreateBatchModalProps) => {
+  
+  const resetBatchForm = () => {
+    setBatchNumber('');
+    setBatchName('');
+    setBatchHoneyCollected(0);
+    setSelectedApiaries([]);
+    setSelectedDropdownApiary('');
+  };
+
+  return showBatchModal ? (
     <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-30">
       <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-screen overflow-y-auto mx-4">
         <div className="flex justify-between items-center mb-4">
@@ -58,10 +67,7 @@ const CreateBatchModal = ({
           <button
             onClick={() => {
               setShowBatchModal(false);
-              setBatchNumber('');
-              setBatchName('');
-              setBatchHoneyCollected(0);
-              setSelectedApiaries([]);
+              resetBatchForm();
             }}
             className="text-gray-500 hover:text-gray-700"
           >
@@ -176,7 +182,7 @@ const CreateBatchModal = ({
                       );
                       
                       if (!isAlreadySelected) {
-                        setSelectedApiaries([...selectedApiaries, apiary]);
+                        setSelectedApiaries((prev: Apiary[]) => [...prev, apiary]);
                         setTimeout(() => setSelectedDropdownApiary(''), 100);
                       } else {
                         setSelectedDropdownApiary('');
@@ -262,7 +268,7 @@ const CreateBatchModal = ({
                     
                     <button
                       type="button"
-                      onClick={() => setSelectedApiaries(prev => 
+                      onClick={() => setSelectedApiaries((prev: Apiary[]) => 
                         prev.filter(a => String(a.id) !== String(apiary.id))
                       )}
                       className="text-red-500 hover:text-red-700 text-sm flex items-center ml-4 hover:bg-red-50 px-2 py-1 rounded"
@@ -282,11 +288,7 @@ const CreateBatchModal = ({
           <button
             onClick={() => {
               setShowBatchModal(false);
-              setBatchNumber('');
-              setBatchName('');
-              setBatchHoneyCollected(0);
-              setSelectedApiaries([]);
-              setSelectedDropdownApiary('');
+              resetBatchForm();
             }}
             className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
           >
@@ -314,7 +316,7 @@ const CreateBatchModal = ({
         </div>
       </div>
     </div>
-  )
-);
+  ) : null;
+};
 
 export default CreateBatchModal;

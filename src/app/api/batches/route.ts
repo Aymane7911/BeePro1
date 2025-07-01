@@ -287,17 +287,25 @@ export async function PUT(request: NextRequest) {
             }
           });
         } else {
-          // Create new apiary if it doesn't exist
+          // FIXED: Create new apiary with proper user and batch relationships
           await prisma.apiary.create({
             data: {
               name: apiaryData.name || '',
               number: apiaryData.number || '',
               hiveCount: apiaryData.hiveCount || 0,
-              latitude: apiaryData.latitude || null,
-              longitude: apiaryData.longitude || null,
+              latitude: apiaryData.latitude != null && apiaryData.latitude !== '' && !isNaN(parseFloat(apiaryData.latitude))
+                ? parseFloat(apiaryData.latitude)
+                : 0.0, // Default latitude if not provided
+              longitude: apiaryData.longitude != null && apiaryData.longitude !== '' && !isNaN(parseFloat(apiaryData.longitude))
+                ? parseFloat(apiaryData.longitude)
+                : 0.0, // Default longitude if not provided
               kilosCollected: apiaryData.kilosCollected || 0,
-              batchId: batchId,
-              userId: userId
+              batch: {
+                connect: { id: batchId } // Connect to batch using relation
+              },
+              user: {
+                connect: { id: userId }
+              }
             }
           });
         }

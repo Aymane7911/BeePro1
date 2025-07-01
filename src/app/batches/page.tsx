@@ -135,6 +135,13 @@ interface JarCertification {
   selectedType?: 'origin' | 'quality' | 'both';
 }
 
+interface JarDefinition {
+  id: string | number; // Make sure this matches your usage
+  size: number;
+  quantity: number;
+  unit?: string;
+}
+
 interface User {
   passportId?: string;
   passportFile?: string;
@@ -256,6 +263,88 @@ const addNewJarSize = () => {
   }
 };
 
+const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
+ const [qualityVerification, setQualityVerification] = useState<QualityReportVerification>({
+    isVerifying: false,
+    isVerified: false,
+    result: undefined,
+    error: undefined
+  });
+
+  // Quality Report Verification Function
+  const verifyQualityReport = async (file: File) => {
+    if (!file) return;
+
+    setQualityVerification({
+      isVerifying: true,
+      isVerified: false,
+      result: undefined,
+      error: undefined
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append('files', file);
+
+      const response = await fetch(`${VERIFICATION_API_URL}/verify_document`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      const result = data.results?.[0];
+
+      if (!result) {
+        throw new Error('No verification result received from API');
+      }
+
+      const isVerified = result.status === 'passed';
+
+      setQualityVerification({
+        isVerifying: false,
+        isVerified,
+        result,
+        error: isVerified ? undefined : (result.error || 'Document verification failed')
+      });
+
+    } catch (error) {
+      console.error('Quality verification error:', error);
+      setQualityVerification({
+        isVerifying: false,
+        isVerified: false,
+        result: undefined,
+        error: error instanceof Error ? error.message : 'Failed to verify quality report'
+      });
+    }
+  };
+
+  // Enhanced lab report file change handler
+  const handleLabReportChange = async (file: File | null) => {
+    setFormData({
+      ...formData, 
+      labReport: file
+    });
+
+    // Reset verification state when file changes
+    setQualityVerification({
+      isVerifying: false,
+      isVerified: false,
+      result: undefined,
+      error: undefined
+    });
+
+    // Auto-verify if quality certification is needed and file is uploaded
+    if (file && needsLabReport()) {
+      await verifyQualityReport(file);
+    }
+  };
+ 
+
+
 // Remove a jar size from predefined sizes
 const removeJarSize = (size: number) => {
   setPredefinedJarSizes(predefinedJarSizes.filter(s => s !== size));
@@ -366,6 +455,22 @@ const [jarSizeDistribution, setJarSizeDistribution] = useState({
 
 
 const isFormValid = () => {
+
+   const hasJars = batchJars.length > 0;
+    const hasCertifications = hasRequiredCertifications();
+    const hasValidTokens = tokenBalance >= batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
+    
+    // Document requirements
+    const needsProduction = needsProductionReport();
+    const needsLab = needsLabReport();
+    const hasProductionReport = !needsProduction || formData.productionReport;
+    const hasLabReport = !needsLab || formData.labReport;
+    
+    // Quality verification requirement
+    const qualityVerificationPassed = !needsLab || 
+      (formData.labReport && qualityVerification.isVerified && !qualityVerification.isVerifying);
+
+   
   // Check if there are any jars defined
   if (batchJars.length === 0) return false;
   
@@ -391,7 +496,8 @@ const isFormValid = () => {
   
   if (allocatedHoney > remainingHoney) return false;
   
-  return true;
+   return true;
+           
 };
 
 // Add this function to your component or create a separate utility file
@@ -848,9 +954,10 @@ const getTotalHoneyFromBatch = () => {
   }, 0);
 };
 
-const [batchJars, setBatchJars] = useState([]);
+const [batchJars, setBatchJars] = useState<JarDefinition[]>([]);
 const [newJarQuantity, setNewJarQuantity] = useState<number>(1);
 const [newJarUnit, setNewJarUnit] = useState<string>('g');
+
 
 // Helper function to get total allocated honey from jars
 const getAllocatedHoneyFromJars = () => {
@@ -1223,7 +1330,7 @@ const isProfileComplete = (user: User | null | undefined): boolean => {
 
   
 // Enhanced handleCompleteBatch with proper original value preservation
-const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>) => {
+const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
   e.preventDefault();
 
   const tokensUsed = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
@@ -2300,11 +2407,7 @@ useEffect(() => {
           console.log(`Mini map ref not found on attempt ${attempt}`);
           
           // Retry up to 5 times with increasing delays
-          if (attempt < 5) {
-            setTimeout(() => initMiniMap(attempt + 1), attempt * 500);
-          } else {
-            console.error('Failed to initialize mini map after 5 attempts');
-          }
+          
         }
       };
       
@@ -2649,6 +2752,73 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
     </div>
   );
 }
+  // Verification Status Component
+  const VerificationStatus = ({ verification }: { verification: QualityReportVerification }) => {
+    if (verification.isVerifying) {
+      return (
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <div className="flex items-center">
+            <Loader className="h-5 w-5 text-blue-600 mr-2 animate-spin" />
+            <span className="text-blue-800 font-medium">Verifying quality report...</span>
+          </div>
+          <p className="text-blue-600 text-sm mt-1">
+            Please wait while we analyze your document for quality standards compliance.
+          </p>
+        </div>
+      );
+    }
+
+    if (verification.isVerified && verification.result) {
+      return (
+        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+            <span className="text-green-800 font-medium">Quality report verified successfully!</span>
+          </div>
+          <p className="text-green-600 text-sm mt-1">
+            Document type: {verification.result.doc_type || 'Quality Report'}
+          </p>
+          {verification.result.certificate_generated && (
+            <div className="mt-2">
+              <a 
+                href={`${VERIFICATION_API_URL}/download_certificate/${verification.result.certificate_path?.split('/').pop()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-600 hover:text-green-800 underline text-sm"
+              >
+                📥 Download Verification Certificate
+              </a>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (verification.error || (verification.result && verification.result.status !== 'passed')) {
+      return (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+          <div className="flex items-center">
+            <XCircle className="h-5 w-5 text-red-600 mr-2" />
+            <span className="text-red-800 font-medium">Quality report verification failed</span>
+          </div>
+          <p className="text-red-600 text-sm mt-1">
+            {verification.error || verification.result?.error || 'Document does not meet quality standards'}
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => formData.labReport && verifyQualityReport(formData.labReport)}
+              className="text-red-600 hover:text-red-800 underline text-sm"
+            >
+              🔄 Retry Verification
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="flex flex-col space-y-6 p-6 min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">

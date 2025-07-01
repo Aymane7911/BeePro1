@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   X, Package, PlusCircle, MapPin, Trash2, AlertCircle, Check, 
-  Upload, Sparkles, FileText, Globe, Map, Plus, AlertTriangle, Wallet
+  Upload, Sparkles, FileText, Globe, Map, Plus, AlertTriangle, Wallet,Loader2, CheckCircle
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 
@@ -17,10 +17,7 @@ interface Apiary {
   honeyCollected: number;
 }
 
-interface FormApiary extends Apiary {
-  batchId: string;
-  batchNumber: string;
-}
+
 
 interface CertificationStatus {
   originOnly: number;
@@ -83,6 +80,25 @@ interface TokenStats {
   originOnly: number;
   qualityOnly: number;
   bothCertifications: number;
+}
+
+
+// Types for verification
+interface VerificationResult {
+  status: 'passed' | 'failed' | 'error';
+  document: string;
+  doc_type?: string;
+  error?: string;
+  certificate_generated?: boolean;
+  certificate_path?: string;
+  details?: any;
+}
+
+interface QualityReportVerification {
+  isVerifying: boolean;
+  isVerified: boolean;
+  result?: VerificationResult;
+  error?: string;
 }
 
 declare global {
@@ -177,19 +193,19 @@ interface CompleteBatchFormProps {
   selectedBatches: string[];
   batches: Batch[];
   batchJars: JarDefinition[];
-  setBatchJars: (jars: JarDefinition[]) => void;
+  setBatchJars: React.Dispatch<React.SetStateAction<JarDefinition[]>>;
   jarCertifications: Record<string, Certification>;
-  setJarCertifications: (certifications: Record<string, Certification>) => void;
+  setJarCertifications: React.Dispatch<React.SetStateAction<Record<string, Certification>>>;
   formData: FileData;
-  setFormData: (data: FileData) => void;
+  setFormData: React.Dispatch<React.SetStateAction<FileData>>;
   tokenBalance: number;
   predefinedJarSizes: number[];
   newJarSize: string;
-  setNewJarSize: (size: string) => void;
+  setNewJarSize: React.Dispatch<React.SetStateAction<string>>;
   newJarUnit: string;
-  setNewJarUnit: (unit: string) => void;
+  setNewJarUnit: React.Dispatch<React.SetStateAction<string>>;
   newJarQuantity: number;
-  setNewJarQuantity: (quantity: number) => void;
+  setNewJarQuantity: React.Dispatch<React.SetStateAction<number>>;
   getTotalHoneyFromBatch: () => number;
   getAllocatedHoneyFromJars: () => number;
   getMaxQuantity: () => number;
@@ -202,10 +218,11 @@ interface CompleteBatchFormProps {
   needsLabReport: () => boolean;
   hasRequiredCertifications: () => boolean;
   isFormValid: () => boolean;
-  handleCompleteBatch: (e: React.FormEvent) => void;
-  wouldExceedMaximum?: () => boolean;
+  handleCompleteBatch: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
   router: any;
 }
+
+
 
 const CompleteBatchForm: React.FC<CompleteBatchFormProps> = ({
   show,
@@ -239,6 +256,8 @@ const CompleteBatchForm: React.FC<CompleteBatchFormProps> = ({
   router
 }) => {
   if (!show) return null;
+   
+  
 
   // Helper functions
   const getTotalRemainingHoneyFromBatch = () => {
@@ -251,6 +270,205 @@ const CompleteBatchForm: React.FC<CompleteBatchFormProps> = ({
     return total + remainingHoney;
   }, 0);
 };
+
+const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
+
+// New state variables for document verification
+  const [verificationStatus, setVerificationStatus] = useState({
+    productionReport: null, // null, 'verifying', 'passed', 'failed', 'error'
+    labReport: null
+  });
+  
+  const [verificationResults, setVerificationResults] = useState({
+    productionReport: null,
+    labReport: null
+  });
+  
+  const [isVerifying, setIsVerifying] = useState(false);
+   // Document verification function
+  const verifyDocument = async (file, documentType) => {
+    if (!file) return;
+    
+    setIsVerifying(true);
+    setVerificationStatus(prev => ({
+      ...prev,
+      [documentType]: 'verifying'
+    }));
+
+    try {
+      const formData = new FormData();
+      formData.append('files', file);
+
+      const response = await fetch(`${VERIFICATION_API_URL}/verify_document`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Verification failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const result = data.results?.[0]; // Get the first result
+
+      if (result) {
+        setVerificationResults(prev => ({
+          ...prev,
+          [documentType]: result
+        }));
+
+        setVerificationStatus(prev => ({
+          ...prev,
+          [documentType]: result.status // 'passed', 'failed', or 'error'
+        }));
+
+        // Store certificate path in form data if available
+  if (result.status === 'passed' && result.certificate_path) {
+    setFormData(prev => ({
+      ...prev,
+      [`${documentType}CertificatePath`]: result.certificate_path
+    }));
+  }
+
+      } else {
+        throw new Error('No verification result received');
+      }
+    } catch (error) {
+      console.error('Document verification error:', error);
+      setVerificationStatus(prev => ({
+        ...prev,
+        [documentType]: 'error'
+      }));
+      setVerificationResults(prev => ({
+        ...prev,
+        [documentType]: { error: error.message }
+      }));
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Enhanced form validation that includes verification status
+  const isFormValidWithVerification = () => {
+    const basicValidation = isFormValid();
+    if (!basicValidation) return false;
+
+    // Check if quality certification requires lab report verification
+    const hasQualityCertification = Object.values(jarCertifications).some(cert => cert?.quality);
+    if (hasQualityCertification && formData.labReport) {
+      // Lab report must be verified and passed
+      if (verificationStatus.labReport !== 'passed') {
+        return false;
+      }
+    }
+
+    // Check if origin certification requires production report verification
+    const hasOriginCertification = Object.values(jarCertifications).some(cert => cert?.origin);
+    if (hasOriginCertification && formData.productionReport) {
+      // Production report verification is optional but if uploaded, should pass
+      if (verificationStatus.productionReport === 'failed') {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  type DocumentType = 'productionReport' | 'labReport';
+  // Get verification status display
+  const getVerificationStatusDisplay = (documentType : DocumentType) => {
+    const status = verificationStatus[documentType];
+    const result = verificationResults[documentType];
+
+    switch (status) {
+      case 'verifying':
+        return (
+          <div className="flex items-center mt-2 text-blue-600">
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <span className="text-sm">Verifying document...</span>
+          </div>
+        );
+      case 'passed':
+  return (
+    <div className="flex items-center mt-2 text-green-600">
+      <CheckCircle className="h-4 w-4 mr-2" />
+      <span className="text-sm font-medium">Document verified successfully</span>
+      <span className="ml-2 text-xs text-green-700">
+        Certificate will be available after payment
+      </span>
+    </div>
+  );
+
+      case 'failed':
+        return (
+          <div className="mt-2">
+            <div className="flex items-center text-red-600">
+              <X className="h-4 w-4 mr-2" />
+              <span className="text-sm font-medium">Document verification failed</span>
+            </div>
+            {result?.error && (
+              <p className="text-xs text-red-500 mt-1">{result.error}</p>
+            )}
+          </div>
+        );
+      case 'error':
+        return (
+          <div className="mt-2">
+            <div className="flex items-center text-orange-600">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              <span className="text-sm font-medium">Verification error</span>
+            </div>
+            {result?.error && (
+              <p className="text-xs text-orange-500 mt-1">{result.error}</p>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+  // Enhanced file upload handlers
+  const handleProductionReportUpload = async (e) => {
+    const file = e.target.files[0];
+    setFormData({
+      ...formData, 
+      productionReport: file
+    });
+    
+    // Reset verification status
+    setVerificationStatus(prev => ({
+      ...prev,
+      productionReport: null
+    }));
+    
+    // Auto-verify if file is selected (optional for production reports)
+    if (file) {
+      await verifyDocument(file, 'productionReport');
+    }
+  };
+
+  const handleLabReportUpload = async (e) => {
+    const file = e.target.files[0];
+    setFormData({
+      ...formData, 
+      labReport: file
+    });
+    
+    // Reset verification status
+    setVerificationStatus(prev => ({
+      ...prev,
+      labReport: null
+    }));
+    
+    // Auto-verify if file is selected (required for quality certification)
+    if (file) {
+      await verifyDocument(file, 'labReport');
+    }
+  };
+  
+
+
+
   const getAllocatedHoneyFromJars = () => {
   return batchJars.reduce((total, jar) => {
     return total + (jar.size * jar.quantity) / 1000; // Convert grams to kg
@@ -345,6 +563,10 @@ const addJarToBatch = (sizeInGrams: number, quantity: number) => {
   setNewJarQuantity(1);
 };
 
+
+
+
+
 const isAllHoneyAllocated = () => {
   const remainingHoney = getTotalRemainingHoneyFromBatch();
   const allocatedHoney = getAllocatedHoneyFromJars();
@@ -363,23 +585,10 @@ const isAllHoneyAllocated = () => {
     }
   };
 
-  const handleCertificationChange = (jarId: string, type: 'origin' | 'quality' | 'both') => {
-    setJarCertifications({
-      ...jarCertifications,
-      [jarId]: {
-        ...jarCertifications[jarId],
-        selectedType: type,
-        [type]: true,
-        // Reset other types
-        ...(type !== 'origin' && { origin: false }),
-        ...(type !== 'quality' && { quality: false }),
-        ...(type !== 'both' && { both: false })
-      }
-    });
-  };
+
 
   return (
-     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
     <div className="bg-white p-6 rounded-lg shadow-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-semibold">Complete Batch Information</h3>
@@ -393,7 +602,7 @@ const isAllHoneyAllocated = () => {
       <form onSubmit={handleCompleteBatch}>
         <div className="space-y-6">
           
-         {/* Enhanced Selected Batches Info - Updated to use weightKg */}
+          {/* Enhanced Selected Batches Info - Updated to use weightKg */}
           <div className="bg-gray-50 p-4 rounded-lg border">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-medium text-gray-800">
@@ -580,26 +789,7 @@ const isAllHoneyAllocated = () => {
     Select jar sizes and quantities based on the total honey collected from all selected batches.
   </p>
 
-  {/* Batch Summary */}
-  <div className="bg-blue-50 p-4 rounded-lg mb-6">
-    <h5 className="font-medium text-blue-800 mb-2">Batch Summary</h5>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-      <div>
-        <span className="text-gray-600">Selected Batches:</span>
-        <span className="ml-2 font-bold">{selectedBatches.length}</span>
-      </div>
-      <div>
-        <span className="text-gray-600">Total Honey Available:</span>
-        <span className="ml-2 font-bold text-blue-600">{getTotalHoneyFromBatch()} kg</span>
-      </div>
-      <div>
-        <span className="text-gray-600">Remaining for Jars:</span>
-        <span className="ml-2 font-bold text-green-600">
-          {(getTotalHoneyFromBatch() - getAllocatedHoneyFromJars()).toFixed(2)} kg
-        </span>
-      </div>
-    </div>
-  </div>
+  
 
   {/* Available Jar Sizes Display */}
   {predefinedJarSizes.length > 0 && (
@@ -955,7 +1145,7 @@ const isAllHoneyAllocated = () => {
     </p>
     
     <div className="space-y-4">
-      {batchJars.map((jar, index) => (
+      {batchJars.map((jar) => (
         <div key={jar.id} className="border rounded-md p-4 bg-gray-50">
           <div className="flex items-center justify-between mb-4">
             <h5 className="font-medium">
@@ -1090,29 +1280,34 @@ const isAllHoneyAllocated = () => {
 {/* File Upload Section - Updated for batch-based approach */}
 {batchJars.length > 0 && hasRequiredCertifications() && (
   <div className="border rounded-md p-4 mb-4">
-    <h4 className="font-medium mb-3">Required Documents</h4>
+    <h4 className="font-medium mb-3">Required Documents & Verification</h4>
     
-    {/* Production Report Upload - for Origin certification */}
-    {needsProductionReport() && (
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Production Report <span className="text-red-500">*</span>
-          <span className="text-xs text-gray-500 ml-2">(Required for Origin certification)</span>
-        </label>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors">
+    {/* Production Report Section - Fixed getVerificationStatusDisplay */}
+{needsProductionReport() && (
+  <div className="mb-6">
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      Production Report <span className="text-red-500">*</span>
+      <span className="text-xs text-gray-500 ml-2">(Required for Origin certification)</span>
+    </label>
+    
+    <div className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+      verificationStatus.productionReport === 'passed' 
+        ? 'border-green-400 bg-green-50' 
+        : verificationStatus.productionReport === 'failed'
+          ? 'border-red-400 bg-red-50'
+          : 'border-gray-300 hover:border-blue-400'
+    }`}>
           <input
             type="file"
             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            onChange={(e) => setFormData({
-              ...formData, 
-              productionReport: e.target.files[0]
-            })}
+            onChange={handleProductionReportUpload}
             className="hidden"
             id="production-report-upload"
+            disabled={isVerifying}
           />
           <label 
             htmlFor="production-report-upload" 
-            className="cursor-pointer flex flex-col items-center"
+            className={`cursor-pointer flex flex-col items-center ${isVerifying ? 'pointer-events-none' : ''}`}
           >
             <Upload className="h-8 w-8 text-gray-400 mb-2" />
             <p className="text-sm text-gray-600 text-center">
@@ -1123,30 +1318,64 @@ const isAllHoneyAllocated = () => {
             </p>
           </label>
         </div>
+        
+        {getVerificationStatusDisplay('productionReport')}
+        
+        {verificationStatus.productionReport === 'passed' && (
+      <div className="mt-2 text-green-600 text-sm flex items-center">
+        <Check className="h-4 w-4 mr-1" />
+        Document verified successfully
       </div>
     )}
+    {verificationStatus.productionReport === 'failed' && (
+      <div className="mt-2 text-red-600 text-sm flex items-center">
+        <X className="h-4 w-4 mr-1" />
+        Verification failed
+      </div>
+    )}
+    {verificationStatus.productionReport === 'verifying' && (
+      <div className="mt-2 text-blue-600 text-sm flex items-center">
+        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+        Verifying...
+      </div>
+    )}
+    
+    {verificationStatus.productionReport === 'failed' && (
+      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+        <p className="text-red-700 text-sm">
+          ⚠️ Production report verification failed. Please upload a valid document or contact support.
+        </p>
+      </div>
+    )}
+  </div>
+)}
 
     {/* Lab Report Upload - for Quality certification */}
     {needsLabReport() && (
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Lab Report <span className="text-red-500">*</span>
-          <span className="text-xs text-gray-500 ml-2">(Required for Quality certification)</span>
-        </label>
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-green-400 transition-colors">
+  <div className="mb-4">
+    <label className="block text-sm font-medium text-gray-700 mb-2">
+      Lab Report <span className="text-red-500">*</span>
+      <span className="text-xs text-gray-500 ml-2">(Required for Quality certification)</span>
+    </label>
+
+    <div className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+      verificationStatus.labReport === 'passed' 
+        ? 'border-green-400 bg-green-50' 
+        : verificationStatus.labReport === 'failed'
+          ? 'border-red-400 bg-red-50'
+          : 'border-gray-300 hover:border-green-400'
+    }`}>
           <input
             type="file"
             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            onChange={(e) => setFormData({
-              ...formData, 
-              labReport: e.target.files[0]
-            })}
+            onChange={handleLabReportUpload}
             className="hidden"
             id="lab-report-upload"
+            disabled={isVerifying}
           />
           <label 
             htmlFor="lab-report-upload" 
-            className="cursor-pointer flex flex-col items-center"
+            className={`cursor-pointer flex flex-col items-center ${isVerifying ? 'pointer-events-none' : ''}`}
           >
             <Upload className="h-8 w-8 text-gray-400 mb-2" />
             <p className="text-sm text-gray-600 text-center">
@@ -1157,39 +1386,100 @@ const isAllHoneyAllocated = () => {
             </p>
           </label>
         </div>
+        {getVerificationStatusDisplay('labReport')}
+        
+        {verificationStatus.labReport === 'failed' && (
+          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-700 text-sm font-medium">
+              ❌ Lab report verification failed. Quality certification cannot proceed.
+            </p>
+            <p className="text-red-600 text-xs mt-1">
+              Please upload a valid lab report that meets our quality standards.
+            </p>
+          </div>
+        )}
+      </div>
+    )}
+    
+    {/* Verification Summary */}
+    {(formData.labReport || formData.productionReport) && (
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <h5 className="font-medium mb-2">Document Verification Status</h5>
+        <div className="space-y-2 text-sm">
+          {formData.productionReport && (
+            <div className="flex items-center justify-between">
+              <span>Production Report:</span>
+              <span className={`font-medium ${
+                verificationStatus.productionReport === 'passed' ? 'text-green-600' :
+                verificationStatus.productionReport === 'failed' ? 'text-red-600' :
+                verificationStatus.productionReport === 'verifying' ? 'text-blue-600' :
+                'text-gray-500'
+              }`}>
+                {verificationStatus.productionReport === 'passed' ? '✅ Verified' :
+                 verificationStatus.productionReport === 'failed' ? '❌ Failed' :
+                 verificationStatus.productionReport === 'verifying' ? '🔄 Verifying...' :
+                 '⏳ Pending'}
+              </span>
+            </div>
+          )}
+          {formData.labReport && (
+            <div className="flex items-center justify-between">
+              <span>Lab Report:</span>
+              <span className={`font-medium ${
+                verificationStatus.labReport === 'passed' ? 'text-green-600' :
+                verificationStatus.labReport === 'failed' ? 'text-red-600' :
+                verificationStatus.labReport === 'verifying' ? 'text-blue-600' :
+                'text-gray-500'
+              }`}>
+                {verificationStatus.labReport === 'passed' ? '✅ Verified' :
+                 verificationStatus.labReport === 'failed' ? '❌ Failed' :
+                 verificationStatus.labReport === 'verifying' ? '🔄 Verifying...' :
+                 '⏳ Pending'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     )}
   </div>
 )}
 
-{/* Form Actions - Updated token calculation */}
-<div className="flex justify-end space-x-3">
-  <button
-    type="button"
-    onClick={() => setShow(false)}
-    className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-  >
-    Cancel
-  </button>
-  
-  <button
-    type="submit"
-    disabled={!isFormValid()}
-    className={`px-4 py-2 rounded-md flex items-center ${
-      isFormValid()
-        ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-    }`}
-  >
-    <Check className="h-4 w-4 mr-2" />
-    Complete & Pay {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} Tokens
-  </button>
-</div>
-        </div>
-      </form>
+{/* Enhanced Form Actions */}
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShow(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              
+              <button
+                type="submit"
+                disabled={!isFormValidWithVerification() || isVerifying}
+                className={`px-4 py-2 rounded-md flex items-center ${
+                  isFormValidWithVerification() && !isVerifying
+                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Verifying Documents...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Complete & Pay {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} Tokens
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
   );
-};
-
+}
 export default CompleteBatchForm;

@@ -17,7 +17,7 @@ import BatchStatusSection from '@/components/sections/BatchStatusSection';
 import BuyTokensModal from '@/components/modals/BuyTokensModal';
 import FloatingActionMenu from '@/components/ui/FloatingActionMenu';
 import Notification from '@/components/ui/Notification';
-
+import { useSession } from 'next-auth/react';
 
 
 
@@ -28,6 +28,7 @@ interface TokenStats {
   bothCertifications: number;
   remainingTokens: number;
   totalTokens: number;
+  usedTokens: number;
 }
 
 interface SelectedApiary extends Apiary {
@@ -141,6 +142,77 @@ const initialData: AppData = {
   }
 };
 
+interface Apiary {
+  batchId: string,
+  batchNumber: string,
+  name: string;
+  number: string;
+  hiveCount: number;
+  latitude: number;
+  longitude: number;
+  honeyCollected: number;
+}
+interface FormApiary extends Apiary {
+  batchId: string;
+  batchNumber: string;
+}
+
+interface CertificationStatus {
+  originOnly: number;
+  qualityOnly: number;
+  bothCertifications: number;
+  uncertified: number;
+}
+
+interface Batch {
+  id: string;
+  batchNumber: string;
+  batchName: string;
+  name: string;
+  createdAt: string;
+  status: string;
+  totalKg: number;
+  jarsProduced: number;
+  apiaries: Apiary[];
+  certificationStatus: CertificationStatus;
+  containerType: string;
+  labelType: string;
+  weightKg: number;
+  jarUsed: number;
+   // Certification data fields
+  originOnly: number;
+  qualityOnly: number;
+  bothCertifications: number;
+  uncertified: number;
+  // Percentage fields
+  originOnlyPercent: number;
+  qualityOnlyPercent: number;
+  bothCertificationsPercent: number;
+  uncertifiedPercent: number;
+   // Progress tracking
+  completedChecks: number;
+  totalChecks: number;
+  
+  // Optional dates
+  certificationDate?: string;
+  expiryDate?: string;
+  
+  // Optional file paths
+  productionReportPath?: string;
+  labReportPath?: string;
+  
+  // JSON field
+  jarCertifications?: any;
+  
+  // Honey data fields
+  honeyCertified?: number;
+  honeyRemaining?: number;
+  totalHoneyCollected?: number;
+   // Relations
+  userId: number;
+  
+}
+
 // A microservice dashboard for jar inventory management
 export default function JarManagementDashboard() {
   const [data, setData] = useState<AppData>(initialData);
@@ -167,6 +239,9 @@ export default function JarManagementDashboard() {
   const [isLoadingApiaries, setIsLoadingApiaries] = useState(false);
   const [selectedApiaries, setSelectedApiaries] = useState<SelectedApiary[]>([]); // Selected apiaries for current batch
   const [locations, setLocations] = useState<ApiaryLocation[]>([]);
+  const [userPremiumStatus, setUserPremiumStatus] = useState(false);
+  const { data: session } = useSession(); // if using NextAuth
+
   // Add these state variables to your component
   const apiaryMarkers = useRef<google.maps.Marker[]>([]);
   const [selectedApiary, setSelectedApiary] = useState<Apiary | null>(null);
@@ -179,9 +254,11 @@ export default function JarManagementDashboard() {
   honeyCollected: 0,
   location: null
 });
+const [isLoading, setIsLoading] = useState(true);
 const [batchHoneyCollected, setBatchHoneyCollected] = useState(0);
 const [isLoggingOut, setIsLoggingOut] = useState(false);
 const [isOpen, setIsOpen] = useState(false);
+const [batches, setBatches] = useState<Batch[]>([]);
   
 
   // 1. Add clickPosition state to track where user clicked for bubble positioning
@@ -792,51 +869,25 @@ useEffect(() => {
     setLoading(false);
   }
 };
- const LocationConfirmDialog = () => (
-  showLocationConfirm && (
-    <div 
-      className="fixed bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50"
-      style={{
-        left: `${clickPosition.x}px`,
-        top: `${clickPosition.y}px`,
-        transform: 'translate(-50%, -100%)',
-        marginTop: '-10px'
-      }}
-    >
-      <div className="text-sm font-medium text-gray-900 mb-2">
-        Save this location?
-      </div>
-      <div className="text-xs text-gray-600 mb-3">
-        Lat: {selectedLocation?.lat.toFixed(6)}<br/>
-        Lng: {selectedLocation?.lng.toFixed(6)}
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleLocationConfirm();
-          }}
-          disabled={isSaving}
-          className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-50"
-        >
-          {isSaving ? 'Saving...' : 'Save'}
-        </button>
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleLocationCancel();
-          }}
-          disabled={isSaving}
-          className="px-3 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  )
-);
+ // Fetch batches data
+  useEffect(() => {
+    const fetchBatches = async () => {
+      try {
+        setIsLoading(true);
+        // Replace with your actual API call
+        const response = await fetch('/api/batches');
+        const data = await response.json();
+        setBatches(data.batches || []);
+      } catch (error) {
+        console.error('Error fetching batches:', error);
+        setBatches([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBatches();
+  }, []);
 
 // Define performLogout function
 const performLogout = async () => {
@@ -1158,28 +1209,7 @@ const [tokenBalance, setTokenBalance] = useState(0); // Start with 0
       data.tokenStats = data.tokenStats || defaultData.tokenStats;
       data.certifiedHoneyWeight = data.certifiedHoneyWeight || defaultData.certifiedHoneyWeight;
 
-      const newTokenDistributionData = [
-        { 
-          name: 'Origin Certified', 
-          value: data.tokenStats.originOnly || 0, 
-          color: '#3B82F6' 
-        },
-        { 
-          name: 'Quality Certified', 
-          value: data.tokenStats.qualityOnly || 0, 
-          color: '#10B981' 
-        },
-        { 
-          name: 'Fully Certified', 
-          value: (data.tokenStats.bothCertifications || 0) * 2, 
-          color: '#8B5CF6' 
-        },
-        { 
-          name: 'Remaining', 
-          value: data.tokenStats.remainingTokens || 0, 
-          color: '#9CA3AF' 
-        },
-      ];
+      
 
       const totalHoney =
         (data.certifiedHoneyWeight.originOnly || 0) +
@@ -1231,8 +1261,7 @@ const [tokenBalance, setTokenBalance] = useState(0); // Start with 0
       ];
 
       setData(data);
-      setTokenDistributionData(newTokenDistributionData);
-      setHoneyStatusData(newHoneyStatusData);
+      
       setLastUpdated(new Date().toLocaleString());
     } catch (error) {
       console.error('Error in fetchData:', error);
@@ -1722,12 +1751,7 @@ useEffect(() => {
         } else {
           console.log(`Mini map ref not found on attempt ${attempt}`);
           
-          // Retry up to 5 times with increasing delays
-          if (attempt < 5) {
-            setTimeout(() => initMiniMap(attempt + 1), attempt * 500);
-          } else {
-            console.error('Failed to initialize mini map after 5 attempts');
-          }
+          
         }
       };
       
@@ -2091,7 +2115,12 @@ const handleSelectExistingLocation = (location: ApiaryLocation) => {
   setTimeout(() => setNotification({ show: false, message: '' }), 2000);
 };
 
-
+useEffect(() => {
+    if (session?.user) {
+      // Assuming premium status is stored in session
+      setUserPremiumStatus(session.user.isPremium || false);
+    }
+  }, [session]);
 
 
 
@@ -2105,7 +2134,8 @@ const handleLocationCancel = () => {
   <div className="flex flex-col space-y-6 p-6 min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">
     <Sidebar 
       sidebarOpen={sidebarOpen} 
-      toggleSidebar={toggleSidebar} 
+      toggleSidebar={toggleSidebar}
+      isPremium={userPremiumStatus}
     />
     
     <Backdrop 
@@ -2160,7 +2190,9 @@ const handleLocationCancel = () => {
     
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <TokenWalletSection 
-        tokenStats={data.tokenStats} 
+        tokenStats={[data.tokenStats]}
+        tokenBalance={tokenBalance}
+        batches={batches} 
       />
       
       <ApiaryMapSection 

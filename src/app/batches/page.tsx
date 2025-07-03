@@ -342,7 +342,7 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
       await verifyQualityReport(file);
     }
   };
- 
+  const [userPremiumStatus, setUserPremiumStatus] = useState(false);
 
 
 // Remove a jar size from predefined sizes
@@ -557,7 +557,6 @@ const storeCertificationData = async (certData: any, userData: any) => {
 
 
 const createBatch = async () => {
-  // Improved validation with proper array checking
   if (!batchNumber?.trim() || !Array.isArray(selectedApiaries) || selectedApiaries.length === 0) {
     setNotification({
       show: true,
@@ -567,11 +566,10 @@ const createBatch = async () => {
     return;
   }
 
-  // Check if any selected apiary doesn't have honey collection amount set
-  if (selectedApiaries.some(apiary => !apiary.kilosCollected || apiary.kilosCollected <= 0)) {
+  if (!batchHoneyCollected || batchHoneyCollected <= 0) {
     setNotification({
       show: true,
-      message: 'Please set honey collection amount for all selected apiaries',
+      message: 'Please enter the total honey collection amount',
     });
     setTimeout(() => setNotification({ show: false, message: '' }), 3000);
     return;
@@ -590,7 +588,7 @@ const createBatch = async () => {
       ? batchName.trim()
       : `${batchNumber}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`;
 
-    // Transform selected apiaries to match the expected format
+    // Transform selected apiaries
     const apiariesForBatch = selectedApiaries.map(apiary => ({
       id: apiary.id,
       name: apiary.name,
@@ -606,14 +604,9 @@ const createBatch = async () => {
       batchName: finalBatchName,
       apiaries: apiariesForBatch,
       totalHives: selectedApiaries.reduce((sum, apiary) => sum + (apiary.hiveCount || 0), 0),
-      totalHoney: selectedApiaries.reduce(
-  (sum, apiary) => sum + (apiary.kilosCollected ?? 0),
-  0
-),
-
+      totalKg: batchHoneyCollected,
+      honeyCollected: batchHoneyCollected,
     };
-
-    console.log('Creating batch with data:', formData); // Debug log
 
     const response = await fetch('/api/create-batch', {
       method: 'POST',
@@ -630,29 +623,19 @@ const createBatch = async () => {
       throw new Error(result.message || 'Failed to create batch');
     }
 
-    // Update data state with new batch (ensure data exists)
-    if (data && data.batches) {
-      setData({
-        ...data,
-        batches: [result.batch, ...data.batches],
-        tokenStats: data.tokenStats,
-      });
-    }
+    // UPDATE BATCHES STATE DIRECTLY
+    setBatches(prev => [result.batch, ...prev]);
 
     setNotification({
       show: true,
-      message: `Batch ${batchNumber} created successfully with ${selectedApiaries.length} apiaries!`,
+      message: `Batch ${batchNumber} created successfully!`,
     });
 
-    setTimeout(() => {
-      setNotification({ show: false, message: '' });
-    }, 5000);
-
-    // Reset form data and close modal
+    // Reset form
     setBatchNumber('');
     setBatchName('');
     setSelectedApiaries([]);
-    setSelectedDropdownApiary(''); // Reset dropdown state
+    setBatchHoneyCollected(0);
     setShowBatchModal(false);
 
   } catch (error) {
@@ -661,10 +644,6 @@ const createBatch = async () => {
       show: true,
       message: `Error: ${error.message}`,
     });
-
-    setTimeout(() => {
-      setNotification({ show: false, message: '' });
-    }, 5000);
   } finally {
     setLoading(false);
   }
@@ -1074,7 +1053,20 @@ useEffect(() => {
 }, []);
 
 
-
+useEffect(() => {
+  // Initialize premium status from localStorage
+  const storedPremium = localStorage.getItem('honeycertify_premium') === 'true';
+  setUserPremiumStatus(storedPremium);
+  
+  // Listen for premium status changes
+  const handlePremiumUpdate = () => {
+    const updatedPremium = localStorage.getItem('honeycertify_premium') === 'true';
+    setUserPremiumStatus(updatedPremium);
+  };
+  
+  window.addEventListener('storage', handlePremiumUpdate);
+  return () => window.removeEventListener('storage', handlePremiumUpdate);
+}, []);
 
   
 
@@ -2824,7 +2816,8 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
     <div className="flex flex-col space-y-6 p-6 min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">
       <Sidebar 
         sidebarOpen={sidebarOpen} 
-        toggleSidebar={toggleSidebar} 
+        toggleSidebar={toggleSidebar}
+        isPremium={userPremiumStatus} 
       />
       
       <Backdrop
@@ -2856,8 +2849,8 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
       />
       
       <CreateBatchModal 
-        show={showBatchModal}
-        setShow={setShowBatchModal}
+        showBatchModal={showBatchModal}
+        setShowBatchModal={setShowBatchModal}
         batchNumber={batchNumber}
         setBatchNumber={setBatchNumber}
         batchName={batchName}
@@ -2877,8 +2870,8 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
       />
       
       <CreateApiaryModal 
-        show={showApiaryModal}
-        setShow={setShowApiaryModal}
+        showApiaryModal={showApiaryModal}
+        setShowApiaryModal={setShowApiaryModal}
         apiaryFormData={apiaryFormData}
         setApiaryFormData={setApiaryFormData}
         mapsLinkInput={mapsLinkInput}

@@ -2115,13 +2115,21 @@ const handleSelectExistingLocation = (location: ApiaryLocation) => {
   setTimeout(() => setNotification({ show: false, message: '' }), 2000);
 };
 
-useEffect(() => {
-    if (session?.user) {
-      // Assuming premium status is stored in session
-      setUserPremiumStatus(session.user.isPremium || false);
-    }
-  }, [session]);
 
+useEffect(() => {
+  // Initialize premium status from localStorage
+  const storedPremium = localStorage.getItem('honeycertify_premium') === 'true';
+  setUserPremiumStatus(storedPremium);
+  
+  // Listen for premium status changes
+  const handlePremiumUpdate = () => {
+    const updatedPremium = localStorage.getItem('honeycertify_premium') === 'true';
+    setUserPremiumStatus(updatedPremium);
+  };
+  
+  window.addEventListener('storage', handlePremiumUpdate);
+  return () => window.removeEventListener('storage', handlePremiumUpdate);
+}, []);
 
 
 // Remove the unused saveApiaryLocation function

@@ -145,12 +145,12 @@ export async function PUT(request: NextRequest) {
 
     if (formData.get('productionReport')) {
       // Handle production report file upload
-      productionReportPath = "path/to/saved/production/report"; // Replace with actual saved path
+      productionReportPath = "public/uploads/production_report"; // Replace with actual saved path
     }
 
     if (formData.get('labReport')) {
       // Handle lab report file upload
-      labReportPath = "path/to/saved/lab/report"; // Replace with actual saved path
+      labReportPath = "public/uploads/lab_report"; // Replace with actual saved path
     }
 
     // FIXED: Get the original batch to understand current state

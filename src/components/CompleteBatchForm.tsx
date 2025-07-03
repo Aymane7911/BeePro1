@@ -447,24 +447,66 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
     }
   };
 
-  const handleLabReportUpload = async (e) => {
-    const file = e.target.files[0];
-    setFormData({
-      ...formData, 
-      labReport: file
+ const handleLabReportUpload = async (e) => {
+  const file = e.target.files[0];
+  
+  if (!file) return;
+  
+  // Update form data with file
+  setFormData({
+    ...formData,
+    labReport: file
+  });
+  
+  // Reset verification status
+  setVerificationStatus(prev => ({
+    ...prev,
+    labReport: null
+  }));
+  
+  try {
+    // Create FormData for file upload to server
+    const uploadFormData = new FormData();
+    uploadFormData.append('labReport', file); // Match what your API expects
+    uploadFormData.append('uploadType', 'lab_report');
+    
+    // Upload file to server
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: uploadFormData
     });
     
-    // Reset verification status
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('File uploaded successfully:', result.filePath);
+      
+      // Update form data with server file path
+      setFormData(prev => ({
+        ...prev,
+        labReport: file,
+        labReportPath: result.filePath, // Store server path
+        labReportUrl: result.filePath   // For accessing the file
+      }));
+      
+      // Auto-verify the uploaded file
+      await verifyDocument(file, 'labReport');
+    } else {
+      throw new Error(result.error || 'Upload failed');
+    }
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    
+    // Set verification status to failed on upload error
     setVerificationStatus(prev => ({
       ...prev,
-      labReport: null
+      labReport: 'failed'
     }));
     
-    // Auto-verify if file is selected (required for quality certification)
-    if (file) {
-      await verifyDocument(file, 'labReport');
-    }
-  };
+    // Show user-friendly error message
+    alert('File upload failed: ' + error.message);
+  }
+};
   
 
 
@@ -1299,7 +1341,7 @@ const isAllHoneyAllocated = () => {
     }`}>
           <input
             type="file"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+            accept=".pdf"
             onChange={handleProductionReportUpload}
             className="hidden"
             id="production-report-upload"
@@ -1313,7 +1355,7 @@ const isAllHoneyAllocated = () => {
             <p className="text-sm text-gray-600 text-center">
               {formData.productionReport 
                 ? `Selected: ${formData.productionReport.name}`
-                : 'Click to upload production report (PDF, DOC, DOCX, JPG, PNG)'
+                : 'Click to upload production report (PDF)'
               }
             </p>
           </label>
@@ -1365,26 +1407,33 @@ const isAllHoneyAllocated = () => {
           ? 'border-red-400 bg-red-50'
           : 'border-gray-300 hover:border-green-400'
     }`}>
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            onChange={handleLabReportUpload}
-            className="hidden"
-            id="lab-report-upload"
-            disabled={isVerifying}
-          />
-          <label 
-            htmlFor="lab-report-upload" 
-            className={`cursor-pointer flex flex-col items-center ${isVerifying ? 'pointer-events-none' : ''}`}
-          >
-            <Upload className="h-8 w-8 text-gray-400 mb-2" />
-            <p className="text-sm text-gray-600 text-center">
-              {formData.labReport 
-                ? `Selected: ${formData.labReport.name}`
-                : 'Click to upload lab report (PDF, DOC, DOCX, JPG, PNG)'
-              }
-            </p>
-          </label>
+           <input
+        type="file"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" // Fixed: Match your API's allowed types
+        onChange={handleLabReportUpload}
+        className="hidden"
+        id="lab-report-upload"
+        disabled={isVerifying}
+      />
+      
+      <label 
+        htmlFor="lab-report-upload"
+        className={`cursor-pointer flex flex-col items-center ${isVerifying ? 'pointer-events-none opacity-50' : ''}`}
+      >
+        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+        <p className="text-sm text-gray-600 text-center">
+          {formData.labReport
+            ? `Selected: ${formData.labReport.name}`
+            : 'Click to upload lab report (PDF, DOC, DOCX, JPG, PNG)'
+          }
+        </p>
+        {/* Show upload progress or status */}
+        {isVerifying && (
+          <p className="text-xs text-blue-600 mt-1">
+            Uploading and verifying...
+          </p>
+        )}
+      </label>
         </div>
         {getVerificationStatusDisplay('labReport')}
         

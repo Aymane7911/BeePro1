@@ -100,6 +100,7 @@ export default function Premium() {
       handlePaymentInputChange('expiryDate', formatted);
     }
   };
+  
 
   const handlePaymentSubmit = async (e) => {
   e.preventDefault();

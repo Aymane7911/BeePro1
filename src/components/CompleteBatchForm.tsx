@@ -429,23 +429,78 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
   };
   // Enhanced file upload handlers
   const handleProductionReportUpload = async (e) => {
-    const file = e.target.files[0];
-    setFormData({
-      ...formData, 
-      productionReport: file
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // Update form data with file
+  setFormData({
+    ...formData,
+    productionReport: file
+  });
+
+  // Reset IPFS status
+  setIpfsUploadStatus(prev => ({
+    ...prev,
+    productionReport: 'uploading'
+  }));
+
+  try {
+    // Create FormData for file upload to server
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
+    uploadFormData.append('uploadType', 'production_report');
+
+    // Upload file to server
+    const response = await fetch('/api/uploads', {
+      method: 'POST',
+      body: uploadFormData
     });
-    
-    // Reset verification status
-    setVerificationStatus(prev => ({
-      ...prev,
-      productionReport: null
-    }));
-    
-    // Auto-verify if file is selected (optional for production reports)
-    if (file) {
-      await verifyDocument(file, 'productionReport');
+
+    const result = await response.json();
+
+    if (result.success || result.IpfsHash) {
+      console.log('File uploaded successfully:', result.IpfsHash || result.filePath);
+
+      // Update IPFS status if hash is available
+      if (result.IpfsHash) {
+        setIpfsHashes(prev => ({
+          ...prev,
+          productionReport: result.IpfsHash
+        }));
+        setIpfsUploadStatus(prev => ({
+          ...prev,
+          productionReport: 'success'
+        }));
+      }
+
+      // Update form data with all available paths/hashes
+      setFormData(prev => ({
+        ...prev,
+        productionReport: file,
+        productionReportPath: result.filePath,
+        productionReportUrl: result.filePath,
+        ...(result.IpfsHash && { productionReportIpfsHash: result.IpfsHash })
+      }));
+
+      // NO VERIFICATION - This is the key difference from lab report
+      // Production reports upload to IPFS but don't get verified
+
+    } else {
+      throw new Error(result.error || 'Upload failed');
     }
-  };
+  } catch (error) {
+    console.error('Error uploading file:', error);
+
+    // Set IPFS upload status to error
+    setIpfsUploadStatus(prev => ({
+      ...prev,
+      productionReport: 'error'
+    }));
+
+    // Show user-friendly error message
+    alert('File upload failed: ' + error.message);
+  }
+};
 
  
   
@@ -1361,184 +1416,202 @@ const handleLabReportUpload = async (e) => {
   </div>
 )}
 
-{/* File Upload Section - Updated for batch-based approach */}
-{batchJars.length > 0 && hasRequiredCertifications() && (
+{/* File Upload Section - Updated for Quality certification only */}
+{batchJars.length > 0 && hasRequiredCertifications() && needsLabReport() && (
   <div className="border rounded-md p-4 mb-4">
-    <h4 className="font-medium mb-3">Required Documents & Verification</h4>
+    <h4 className="font-medium mb-3">Required Documents for Quality Certification</h4>
     
-    {/* Production Report Section - Fixed getVerificationStatusDisplay */}
-{needsProductionReport() && (
-  <div className="mb-6">
-    <label className="block text-sm font-medium text-gray-700 mb-2">
-      Production Report <span className="text-red-500">*</span>
-      <span className="text-xs text-gray-500 ml-2">(Required for Origin certification)</span>
-    </label>
-    
-    <div className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
-      verificationStatus.productionReport === 'passed' 
-        ? 'border-green-400 bg-green-50' 
-        : verificationStatus.productionReport === 'failed'
-          ? 'border-red-400 bg-red-50'
-          : 'border-gray-300 hover:border-blue-400'
-    }`}>
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={handleProductionReportUpload}
-            className="hidden"
-            id="production-report-upload"
-            disabled={isVerifying}
-          />
-          <label 
-            htmlFor="production-report-upload" 
-            className={`cursor-pointer flex flex-col items-center ${isVerifying ? 'pointer-events-none' : ''}`}
-          >
-            <Upload className="h-8 w-8 text-gray-400 mb-2" />
-            <p className="text-sm text-gray-600 text-center">
-              {formData.productionReport 
-                ? `Selected: ${formData.productionReport.name}`
-                : 'Click to upload production report (PDF)'
-              }
-            </p>
-          </label>
-        </div>
-        
-        {getVerificationStatusDisplay('productionReport')}
-        
-        {verificationStatus.productionReport === 'passed' && (
-      <div className="mt-2 text-green-600 text-sm flex items-center">
-        <Check className="h-4 w-4 mr-1" />
-        Document verified successfully
-      </div>
-    )}
-    {verificationStatus.productionReport === 'failed' && (
-      <div className="mt-2 text-red-600 text-sm flex items-center">
-        <X className="h-4 w-4 mr-1" />
-        Verification failed
-      </div>
-    )}
-    {verificationStatus.productionReport === 'verifying' && (
-      <div className="mt-2 text-blue-600 text-sm flex items-center">
-        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-        Verifying...
-      </div>
-    )}
-    
-    {verificationStatus.productionReport === 'failed' && (
-      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-        <p className="text-red-700 text-sm">
-          ⚠️ Production report verification failed. Please upload a valid document or contact support.
-        </p>
-      </div>
-    )}
-  </div>
-)}
-
-    {/* Lab Report Upload - for Quality certification */}
-    {needsLabReport() && (
-  <div className="mb-4">
-    <label className="block text-sm font-medium text-gray-700 mb-2">
-      Lab Report <span className="text-red-500">*</span>
-      <span className="text-xs text-gray-500 ml-2">(Required for Quality certification)</span>
-    </label>
-
-    <div className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
-      verificationStatus.labReport === 'passed' 
-        ? 'border-green-400 bg-green-50' 
-        : verificationStatus.labReport === 'failed'
-          ? 'border-red-400 bg-red-50'
-          : 'border-gray-300 hover:border-green-400'
-    }`}>
-           <input
-        type="file"
-        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" // Fixed: Match your API's allowed types
-        onChange={handleLabReportUpload}
-        className="hidden"
-        id="lab-report-upload"
-        disabled={isVerifying}
-      />
-      
-      <label 
-        htmlFor="lab-report-upload"
-        className={`cursor-pointer flex flex-col items-center ${isVerifying ? 'pointer-events-none opacity-50' : ''}`}
-      >
-        <Upload className="h-8 w-8 text-gray-400 mb-2" />
-        <p className="text-sm text-gray-600 text-center">
-          {formData.labReport
-            ? `Selected: ${formData.labReport.name}`
-            : 'Click to upload lab report (PDF, DOC, DOCX, JPG, PNG)'
-          }
-        </p>
-        {/* Show upload progress or status */}
-        {isVerifying && (
-          <p className="text-xs text-blue-600 mt-1">
-            Uploading and verifying...
-          </p>
-        )}
+    {/* Production Report Section - No verification, only IPFS upload */}
+    <div className="mb-6">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Production Report <span className="text-red-500">*</span>
+        <span className="text-xs text-gray-500 ml-2">(Required for Quality certification)</span>
       </label>
-        </div>
-        {getVerificationStatusDisplay('labReport')}
-        
-        {verificationStatus.labReport === 'failed' && (
-          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-red-700 text-sm font-medium">
-              ❌ Lab report verification failed. Quality certification cannot proceed.
+      
+      <div className="border-2 border-dashed rounded-lg p-4 transition-colors border-gray-300 hover:border-blue-400">
+        <input
+          type="file"
+          accept=".pdf"
+          onChange={handleProductionReportUpload}
+          className="hidden"
+          id="production-report-upload"
+          disabled={ipfsUploadStatus.productionReport === 'uploading'}
+        />
+        <label 
+          htmlFor="production-report-upload" 
+          className={`cursor-pointer flex flex-col items-center ${ipfsUploadStatus.productionReport === 'uploading' ? 'pointer-events-none opacity-50' : ''}`}
+        >
+          <Upload className="h-8 w-8 text-gray-400 mb-2" />
+          <p className="text-sm text-gray-600 text-center">
+            {formData.productionReport 
+              ? `Selected: ${formData.productionReport.name}`
+              : 'Click to upload production report (PDF)'
+            }
+          </p>
+          {ipfsUploadStatus.productionReport === 'uploading' && (
+            <p className="text-xs text-blue-600 mt-1">
+              Uploading to IPFS...
             </p>
-            <p className="text-red-600 text-xs mt-1">
-              Please upload a valid lab report that meets our quality standards.
-            </p>
-          </div>
-        )}
-        {ipfsUploadStatus.labReport === 'uploading' && (
-  <div className="flex items-center mt-2 text-blue-600">
-    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-    <span className="text-sm">Uploading to IPFS...</span>
-  </div>
-)}
-
-{ipfsUploadStatus.labReport === 'success' && ipfsHashes.labReport && (
-  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
-    <p className="text-green-700 text-sm">
-      ✓ Uploaded to IPFS: 
-      <a 
-        href={`https://gateway.pinata.cloud/ipfs/${ipfsHashes.labReport}`} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="ml-1 underline hover:no-underline"
-      >
-        View on IPFS
-      </a>
-    </p>
-  </div>
-)}
-
-{ipfsUploadStatus.labReport === 'error' && (
-  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-    <p className="text-red-700 text-sm">
-      ❌ IPFS upload failed. Please try again.
-    </p>
-  </div>
-)}
+          )}
+        </label>
       </div>
-    )}
+      
+      {/* IPFS Upload Status for Production Report */}
+      {ipfsUploadStatus.productionReport === 'uploading' && (
+        <div className="flex items-center mt-2 text-blue-600">
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          <span className="text-sm">Uploading to IPFS...</span>
+        </div>
+      )}
+
+      {ipfsUploadStatus.productionReport === 'success' && ipfsHashes.productionReport && (
+        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+          <p className="text-green-700 text-sm">
+            ✓ Uploaded to IPFS: 
+            <a 
+              href={`https://gateway.pinata.cloud/ipfs/${ipfsHashes.productionReport}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="ml-1 underline hover:no-underline"
+            >
+              View on IPFS
+            </a>
+          </p>
+        </div>
+      )}
+
+      {ipfsUploadStatus.productionReport === 'error' && (
+        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-red-700 text-sm">
+            ❌ IPFS upload failed. Please try again.
+          </p>
+        </div>
+      )}
+    </div>
+
+    {/* Lab Report Upload - with verification for Quality certification */}
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Lab Report <span className="text-red-500">*</span>
+        <span className="text-xs text-gray-500 ml-2">(Required for Quality certification)</span>
+      </label>
+
+      <div className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+        verificationStatus.labReport === 'passed' 
+          ? 'border-green-400 bg-green-50' 
+          : verificationStatus.labReport === 'failed'
+            ? 'border-red-400 bg-red-50'
+            : 'border-gray-300 hover:border-green-400'
+      }`}>
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+          onChange={handleLabReportUpload}
+          className="hidden"
+          id="lab-report-upload"
+          disabled={isVerifying}
+        />
+        
+        <label 
+          htmlFor="lab-report-upload"
+          className={`cursor-pointer flex flex-col items-center ${isVerifying ? 'pointer-events-none opacity-50' : ''}`}
+        >
+          <Upload className="h-8 w-8 text-gray-400 mb-2" />
+          <p className="text-sm text-gray-600 text-center">
+            {formData.labReport
+              ? `Selected: ${formData.labReport.name}`
+              : 'Click to upload lab report (PDF, DOC, DOCX, JPG, PNG)'
+            }
+          </p>
+          {isVerifying && (
+            <p className="text-xs text-blue-600 mt-1">
+              Uploading and verifying...
+            </p>
+          )}
+        </label>
+      </div>
+      
+      {/* Lab Report Verification Status */}
+      {verificationStatus.labReport === 'passed' && (
+        <div className="mt-2 text-green-600 text-sm flex items-center">
+          <Check className="h-4 w-4 mr-1" />
+          Document verified successfully
+        </div>
+      )}
+      {verificationStatus.labReport === 'failed' && (
+        <div className="mt-2 text-red-600 text-sm flex items-center">
+          <X className="h-4 w-4 mr-1" />
+          Verification failed
+        </div>
+      )}
+      {verificationStatus.labReport === 'verifying' && (
+        <div className="mt-2 text-blue-600 text-sm flex items-center">
+          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+          Verifying...
+        </div>
+      )}
+      
+      {verificationStatus.labReport === 'failed' && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-red-700 text-sm font-medium">
+            ❌ Lab report verification failed. Quality certification cannot proceed.
+          </p>
+          <p className="text-red-600 text-xs mt-1">
+            Please upload a valid lab report that meets our quality standards.
+          </p>
+        </div>
+      )}
+      
+      {/* IPFS Upload Status for Lab Report */}
+      {ipfsUploadStatus.labReport === 'uploading' && (
+        <div className="flex items-center mt-2 text-blue-600">
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          <span className="text-sm">Uploading to IPFS...</span>
+        </div>
+      )}
+
+      {ipfsUploadStatus.labReport === 'success' && ipfsHashes.labReport && (
+        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+          <p className="text-green-700 text-sm">
+            ✓ Uploaded to IPFS: 
+            <a 
+              href={`https://gateway.pinata.cloud/ipfs/${ipfsHashes.labReport}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="ml-1 underline hover:no-underline"
+            >
+              View on IPFS
+            </a>
+          </p>
+        </div>
+      )}
+
+      {ipfsUploadStatus.labReport === 'error' && (
+        <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+          <p className="text-red-700 text-sm">
+            ❌ IPFS upload failed. Please try again.
+          </p>
+        </div>
+      )}
+    </div>
     
-    {/* Verification Summary */}
+    {/* Document Upload Summary */}
     {(formData.labReport || formData.productionReport) && (
       <div className="bg-gray-50 p-4 rounded-lg">
-        <h5 className="font-medium mb-2">Document Verification Status</h5>
+        <h5 className="font-medium mb-2">Document Upload Status</h5>
         <div className="space-y-2 text-sm">
           {formData.productionReport && (
             <div className="flex items-center justify-between">
               <span>Production Report:</span>
               <span className={`font-medium ${
-                verificationStatus.productionReport === 'passed' ? 'text-green-600' :
-                verificationStatus.productionReport === 'failed' ? 'text-red-600' :
-                verificationStatus.productionReport === 'verifying' ? 'text-blue-600' :
+                (ipfsUploadStatus.productionReport === 'success' || ipfsHashes.productionReport) ? 'text-green-600' :
+                ipfsUploadStatus.productionReport === 'uploading' ? 'text-blue-600' :
+                ipfsUploadStatus.productionReport === 'error' ? 'text-red-600' :
                 'text-gray-500'
               }`}>
-                {verificationStatus.productionReport === 'passed' ? '✅ Verified' :
-                 verificationStatus.productionReport === 'failed' ? '❌ Failed' :
-                 verificationStatus.productionReport === 'verifying' ? '🔄 Verifying...' :
+                {(ipfsUploadStatus.productionReport === 'success' || ipfsHashes.productionReport) ? '✅ Uploaded to IPFS' :
+                 ipfsUploadStatus.productionReport === 'uploading' ? '🔄 Uploading...' :
+                 ipfsUploadStatus.productionReport === 'error' ? '❌ Upload Failed' :
                  '⏳ Pending'}
               </span>
             </div>
@@ -1552,8 +1625,8 @@ const handleLabReportUpload = async (e) => {
                 verificationStatus.labReport === 'verifying' ? 'text-blue-600' :
                 'text-gray-500'
               }`}>
-                {verificationStatus.labReport === 'passed' ? '✅ Verified' :
-                 verificationStatus.labReport === 'failed' ? '❌ Failed' :
+                {verificationStatus.labReport === 'passed' ? '✅ Verified & Uploaded' :
+                 verificationStatus.labReport === 'failed' ? '❌ Verification Failed' :
                  verificationStatus.labReport === 'verifying' ? '🔄 Verifying...' :
                  '⏳ Pending'}
               </span>
@@ -1566,37 +1639,37 @@ const handleLabReportUpload = async (e) => {
 )}
 
 {/* Enhanced Form Actions */}
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShow(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              
-              <button
-                type="submit"
-                disabled={!isFormValidWithVerification() || isVerifying}
-                className={`px-4 py-2 rounded-md flex items-center ${
-                  isFormValidWithVerification() && !isVerifying
-                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                {isVerifying ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Verifying Documents...
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Complete & Pay {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} Tokens
-                  </>
-                )}
-              </button>
-            </div>
+<div className="flex justify-end space-x-3">
+  <button
+    type="button"
+    onClick={() => setShow(false)}
+    className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+  >
+    Cancel
+  </button>
+  
+  <button
+    type="submit"
+    disabled={!isFormValidWithVerification() || isVerifying}
+    className={`px-4 py-2 rounded-md flex items-center ${
+      isFormValidWithVerification() && !isVerifying
+        ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+    }`}
+  >
+    {isVerifying ? (
+      <>
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        Verifying Documents...
+      </>
+    ) : (
+      <>
+        <Check className="h-4 w-4 mr-2" />
+        Complete & Pay {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} Tokens
+      </>
+    )}
+  </button>
+</div>
           </div>
         </form>
       </div>

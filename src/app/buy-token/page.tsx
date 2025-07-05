@@ -2,6 +2,9 @@
 
 import React, { useState } from 'react';
 import { CreditCard, ArrowLeft, Check, AlertCircle, Loader, Sparkles, Star, Zap } from 'lucide-react';
+import Web3 from "../../web3";
+import { contractAddress, contractABI } from "../../contractsinfo";
+
 
 const BuyTokensPage = () => {
   // Get initial token amount from URL params if redirected from modal
@@ -162,6 +165,8 @@ const BuyTokensPage = () => {
       </div>
     );
   }
+   
+   
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">

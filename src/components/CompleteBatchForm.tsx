@@ -447,66 +447,7 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
     }
   };
 
- const handleLabReportUpload = async (e) => {
-  const file = e.target.files[0];
-  
-  if (!file) return;
-  
-  // Update form data with file
-  setFormData({
-    ...formData,
-    labReport: file
-  });
-  
-  // Reset verification status
-  setVerificationStatus(prev => ({
-    ...prev,
-    labReport: null
-  }));
-  
-  try {
-    // Create FormData for file upload to server
-    const uploadFormData = new FormData();
-    uploadFormData.append('labReport', file); // Match what your API expects
-    uploadFormData.append('uploadType', 'lab_report');
-    
-    // Upload file to server
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: uploadFormData
-    });
-    
-    const result = await response.json();
-    
-    if (result.success) {
-      console.log('File uploaded successfully:', result.filePath);
-      
-      // Update form data with server file path
-      setFormData(prev => ({
-        ...prev,
-        labReport: file,
-        labReportPath: result.filePath, // Store server path
-        labReportUrl: result.filePath   // For accessing the file
-      }));
-      
-      // Auto-verify the uploaded file
-      await verifyDocument(file, 'labReport');
-    } else {
-      throw new Error(result.error || 'Upload failed');
-    }
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    
-    // Set verification status to failed on upload error
-    setVerificationStatus(prev => ({
-      ...prev,
-      labReport: 'failed'
-    }));
-    
-    // Show user-friendly error message
-    alert('File upload failed: ' + error.message);
-  }
-};
+ 
   
 
 
@@ -626,7 +567,108 @@ const isAllHoneyAllocated = () => {
       });
     }
   };
+  const [ipfsUploadStatus, setIpfsUploadStatus] = useState<{
+  labReport: 'uploading' | 'success' | 'error' | null;
+  productionReport: 'uploading' | 'success' | 'error' | null;
+}>({
+  labReport: null,
+  productionReport: null
+});
 
+const [ipfsHashes, setIpfsHashes] = useState<{
+  labReport: string | null;
+  productionReport: string | null;
+}>({
+  labReport: null,
+  productionReport: null
+});
+
+// Updated handleLabReportUpload function
+const handleLabReportUpload = async (e) => {
+  const file = e.target.files[0];
+  
+  if (!file) return;
+  
+  // Update form data with file
+  setFormData({
+    ...formData,
+    labReport: file
+  });
+  
+  // Reset verification status
+  setVerificationStatus(prev => ({
+    ...prev,
+    labReport: null
+  }));
+  
+  // Reset IPFS status
+  setIpfsUploadStatus(prev => ({ 
+    ...prev, 
+    labReport: 'uploading' 
+  }));
+  
+  try {
+    // Create FormData for file upload to server
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
+    uploadFormData.append('uploadType', 'lab_report');
+    
+    // Upload file to server
+    const response = await fetch('/api/uploads', {
+      method: 'POST',
+      body: uploadFormData
+    });
+    
+    const result = await response.json();
+    
+    if (result.success || result.IpfsHash) {
+      console.log('File uploaded successfully:', result.IpfsHash || result.filePath);
+      
+      // Update IPFS status if hash is available
+      if (result.IpfsHash) {
+        setIpfsHashes(prev => ({ 
+          ...prev, 
+          labReport: result.IpfsHash 
+        }));
+        setIpfsUploadStatus(prev => ({ 
+          ...prev, 
+          labReport: 'success' 
+        }));
+      }
+      
+      // Update form data with all available paths/hashes
+      setFormData(prev => ({
+        ...prev,
+        labReport: file,
+        labReportPath: result.filePath,
+        labReportUrl: result.filePath,
+        ...(result.IpfsHash && { labReportIpfsHash: result.IpfsHash })
+      }));
+      
+      // Auto-verify the uploaded file
+      await verifyDocument(file, 'labReport');
+    } else {
+      throw new Error(result.error || 'Upload failed');
+    }
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    
+    // Set IPFS upload status to error
+    setIpfsUploadStatus(prev => ({ 
+      ...prev, 
+      labReport: 'error' 
+    }));
+    
+    // Set verification status to failed on upload error
+    setVerificationStatus(prev => ({
+      ...prev,
+      labReport: 'failed'
+    }));
+    
+    // Show user-friendly error message
+    alert('File upload failed: ' + error.message);
+  }
+};
 
 
   return (
@@ -1447,6 +1489,36 @@ const isAllHoneyAllocated = () => {
             </p>
           </div>
         )}
+        {ipfsUploadStatus.labReport === 'uploading' && (
+  <div className="flex items-center mt-2 text-blue-600">
+    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+    <span className="text-sm">Uploading to IPFS...</span>
+  </div>
+)}
+
+{ipfsUploadStatus.labReport === 'success' && ipfsHashes.labReport && (
+  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+    <p className="text-green-700 text-sm">
+      ✓ Uploaded to IPFS: 
+      <a 
+        href={`https://gateway.pinata.cloud/ipfs/${ipfsHashes.labReport}`} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="ml-1 underline hover:no-underline"
+      >
+        View on IPFS
+      </a>
+    </p>
+  </div>
+)}
+
+{ipfsUploadStatus.labReport === 'error' && (
+  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+    <p className="text-red-700 text-sm">
+      ❌ IPFS upload failed. Please try again.
+    </p>
+  </div>
+)}
       </div>
     )}
     

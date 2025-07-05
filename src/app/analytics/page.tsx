@@ -1,8 +1,24 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, RefreshCw, Upload, Download, TrendingUp, X, Home, Settings, Users, Activity, HelpCircle, Wallet, Crown, Lock } from 'lucide-react';
+import { Menu, RefreshCw, Upload, Download, TrendingUp, X, Home, Settings, Users, Activity, HelpCircle, Wallet, Crown, Lock, MessageCircle } from 'lucide-react';
 import Sidebar   from '@/components/Sidebar'; // Importing the Sidebar component
+
+
+
+interface BackdropProps {
+  sidebarOpen: boolean;
+  toggleSidebar: () => void;
+}
+
+const Backdrop = ({ sidebarOpen, toggleSidebar }: BackdropProps) => (
+  sidebarOpen && (
+    <div 
+      className="fixed inset-0 backdrop-blur-md bg-black/30 z-10 transition-all duration-500"
+      onClick={toggleSidebar}
+    ></div>
+  )
+);
 
 const Analytics = () => {
   const [invoices, setInvoices] = useState([]);
@@ -93,7 +109,7 @@ const Analytics = () => {
       setLoading(false);
     }
   };
-
+  
   // Update invoice stats based on real data
   const updateInvoiceStats = (invoiceData) => {
     if (!invoiceData.length) return;
@@ -268,9 +284,14 @@ const Analytics = () => {
     };
     return colorMap[color][variant];
   };
-
+  
+const [chatbotOpen, setChatbotOpen] = useState(false);
+const toggleChatbot = () => setChatbotOpen(!chatbotOpen);
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-200 via-purple-100 to-yellow-100 text-black flex">
+
+       <Backdrop sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+       
       {/* Sidebar Component */}
       <Sidebar 
         sidebarOpen={sidebarOpen} 
@@ -326,7 +347,7 @@ const Analytics = () => {
           {/* Full Screen Dashboard Container */}
           <div className="flex-1 px-6 pb-6">
             <div className="h-full bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
-              <div className="h-600 p-8">
+              <div className="h-1000 p-8">
                 {loading ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center space-y-4">
@@ -399,6 +420,56 @@ const Analytics = () => {
           </div>
         </div>
       </div>
+      {/* Floating Chatbot */}
+<div className="fixed bottom-6 right-6 z-50">
+  {chatbotOpen && (
+    <div className="mb-4 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transform transition-all duration-300 animate-in slide-in-from-bottom-2">
+      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+            <MessageCircle className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-white font-semibold">HoneyCertify Assistant</h3>
+            <p className="text-blue-100 text-sm">Ask me anything about beekeeping!</p>
+          </div>
+        </div>
+        <button
+          onClick={toggleChatbot}
+          className="text-white hover:text-blue-200 transition-colors p-1 hover:bg-white/10 rounded-full"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+      <div className="h-96 w-80">
+        <iframe 
+          src="https://ibtissam19-beekeeperschatbot.hf.space/?__theme=light" 
+          title="HoneyCertify Chatbot" 
+          className="w-full h-130 border-0"
+          loading="lazy"
+        />
+      </div>
+    </div>
+  )}
+  
+  <button
+    onClick={toggleChatbot}
+    className={`group relative overflow-hidden p-4 rounded-full shadow-2xl transform transition-all duration-500 hover:scale-110 hover:shadow-xl active:scale-95 ${
+      chatbotOpen 
+        ? 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-400 hover:to-pink-500' 
+        : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500'
+    }`}
+  >
+    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></div>
+    <div className="absolute top-2 right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+    {chatbotOpen ? (
+      <X className="h-6 w-6 text-white relative z-10 transition-all duration-300 group-hover:rotate-180" />
+    ) : (
+      <MessageCircle className="h-6 w-6 text-white relative z-10 transition-all duration-300 group-hover:rotate-12 group-hover:scale-110" />
+    )}
+  </button>
+</div>
     </div>
   );
 };
@@ -587,7 +658,9 @@ const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
               />
             ))}
           </div>
+          
         </div>
+        
       </div>
     </header>
   );

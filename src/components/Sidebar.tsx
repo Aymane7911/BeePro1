@@ -42,9 +42,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isPremium }: SidebarProps) => {
                 { icon: Home, label: 'Dashboard', href: '/dashboard', locked: false },
                 { icon: Layers, label: 'Batches', href: '/batches', locked: false },
                 { icon: Activity, label: 'Analytics', href: '/analytics', locked: !isPremium },
-                { icon: Wallet, label: 'Token Wallet', href: '#', locked: false },
                 { icon: Users, label: 'Profile', href: '/profile', locked: false },
-                { icon: Settings, label: 'Settings', href: '#', locked: false },
                 { icon: HelpCircle, label: 'Help', href: '#', locked: false }
               ].map((item, index) => (
                 <li key={index}>

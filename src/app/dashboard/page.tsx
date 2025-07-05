@@ -1830,7 +1830,6 @@ const addApiaryMarkersToMap = (map: any) => {
               <div style="color: #6b7280; font-size: 14px; line-height: 1.4;">
                 <div><strong>ID:</strong> ${apiary.number}</div>
                 <div><strong>Hives:</strong> ${apiary.hiveCount}</div>
-                <div><strong>Honey:</strong> ${apiary.kilosCollected || apiary.honeyCollected || 0} kg</div>
               </div>
               <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb; color: #9ca3af; font-size: 12px;">
                 Click for more details

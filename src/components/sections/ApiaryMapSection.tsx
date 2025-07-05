@@ -60,10 +60,7 @@ const ApiaryDetailsModal = ({ apiary, onClose }: ApiaryDetailsModalProps) => (
             <span className="font-semibold text-gray-800">{apiary.hiveCount}</span>
           </div>
 
-          <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-            <span className="text-sm font-medium text-gray-600">Honey Collected:</span>
-            <span className="font-semibold text-gray-800">{apiary.honeyCollected} kg</span>
-          </div>
+          
 
           <div className="p-3 bg-gray-50 rounded-lg">
             <span className="text-sm font-medium text-gray-600 block mb-2">Location:</span>

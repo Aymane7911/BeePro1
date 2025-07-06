@@ -96,16 +96,7 @@ export default async function CertificationPage({
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 p-4">
       <div className="max-w-4xl mx-auto">
-        {/* Debug Information - Remove in production */}
-        <div className="mb-4 p-4 bg-blue-100 border border-blue-300 rounded">
-          <h3 className="font-bold text-blue-800">Debug Info (Remove in production):</h3>
-          <p>Verification Code: {verification}</p>
-          <p>Data Found: {certificationData ? 'Yes' : 'No'}</p>
-          <p>Batch IDs: {certificationData?.batchIds}</p>
-          <p>Beekeeper Name: {certificationData?.beekeeperName}</p>
-          <p>Total Certified: {certificationData?.totalCertified}</p>
-          <p>Certification Type: {certificationData?.certificationType}</p>
-        </div>
+        
 
         {/* Certificate Header */}
         <div className="text-center mb-8">
@@ -117,7 +108,6 @@ export default async function CertificationPage({
             </div>
             <h1 className="text-3xl font-bold text-gray-800">Honey Certification</h1>
           </div>
-          <p className="text-gray-600">Verified Premium Quality Honey</p>
         </div>
 
         {/* Main Certificate */}
@@ -164,11 +154,11 @@ export default async function CertificationPage({
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-gray-600">Batch Count:</span>
-                        <div className="font-semibold">{batchIds.length}</div>
+                        <div className="text-black">{batchIds.length}</div>
                       </div>
                       <div>
                         <span className="text-gray-600">Batch IDs:</span>
-                        <div className="font-mono text-xs">{batchIds.join(', ')}</div>
+                        <div className="text-black">{batchIds.join(', ')}</div>
                       </div>
                     </div>
                   </div>
@@ -185,7 +175,7 @@ export default async function CertificationPage({
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Type:</span>
-                        <span className="font-semibold capitalize">{certificationData.certificationType}</span>
+                        <span className="text-black">{certificationData.certificationType}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Total Weight:</span>
@@ -193,7 +183,7 @@ export default async function CertificationPage({
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Total Jars:</span>
-                        <span className="font-semibold text-blue-600">{certificationData.totalJars}</span>
+                        <span className="font-semibold text-green-600">{certificationData.totalJars}</span>
                       </div>
                     </div>
                   </div>
@@ -243,7 +233,7 @@ export default async function CertificationPage({
                         {certificationData.beekeeperName && (
                           <div className="flex justify-between">
                             <span className="text-gray-600">Beekeeper:</span>
-                            <span className="font-semibold">{certificationData.beekeeperName}</span>
+                            <span className="text-black">{certificationData.beekeeperName}</span>
                           </div>
                         )}
                         {certificationData.companyName && (

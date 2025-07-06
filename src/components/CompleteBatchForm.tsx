@@ -349,30 +349,27 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
   };
 
   // Enhanced form validation that includes verification status
-  const isFormValidWithVerification = () => {
-    const basicValidation = isFormValid();
-    if (!basicValidation) return false;
+ const isFormValidWithVerification = () => {
+  // 1. Check basic form validation (jar definitions, certifications, etc.)
+  if (!isFormValid()) return false;
+  
+  // 2. Ensure every jar has at least one certification
+  const allJarsHaveCertification = batchJars.every(jar => {
+    const cert = jarCertifications[jar.id];
+    return cert && (cert.origin || cert.quality);
+  });
+  if (!allJarsHaveCertification) return false;
 
-    // Check if quality certification requires lab report verification
-    const hasQualityCertification = Object.values(jarCertifications).some(cert => cert?.quality);
-    if (hasQualityCertification && formData.labReport) {
-      // Lab report must be verified and passed
-      if (verificationStatus.labReport !== 'passed') {
-        return false;
-      }
+  // 3. Only require lab report verification for Quality certification
+  const hasQualityCertification = Object.values(jarCertifications).some(cert => cert?.quality);
+  if (hasQualityCertification) {
+    if (verificationStatus.labReport !== 'passed') {
+      return false;
     }
+  }
 
-    // Check if origin certification requires production report verification
-    const hasOriginCertification = Object.values(jarCertifications).some(cert => cert?.origin);
-    if (hasOriginCertification && formData.productionReport) {
-      // Production report verification is optional but if uploaded, should pass
-      if (verificationStatus.productionReport === 'failed') {
-        return false;
-      }
-    }
-
-    return true;
-  };
+  return true;
+};
 
   type DocumentType = 'productionReport' | 'labReport';
   // Get verification status display
@@ -1417,7 +1414,7 @@ const handleLabReportUpload = async (e) => {
 )}
 
 {/* File Upload Section - Updated for Quality certification only */}
-{batchJars.length > 0 && hasRequiredCertifications() && needsLabReport() && (
+{batchJars.length > 0 && needsLabReport() && (
   <div className="border rounded-md p-4 mb-4">
     <h4 className="font-medium mb-3">Required Documents for Quality Certification</h4>
     

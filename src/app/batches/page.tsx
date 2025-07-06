@@ -401,7 +401,7 @@ const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
     
     // Create the certification verification URL
     // Replace 'your-domain.com' with your actual domain
-   const certificationUrl = `https://localhost:3000/cert/${data.verification}`;
+   const certificationUrl = `http://localhost:3000/cert/${data.verification}`;
     
     // Alternative shorter URL approach using verification code only:
     // const certificationUrl = `https://your-domain.com/cert/${data.verification}`;
@@ -1345,7 +1345,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
   // Check required documents based on selected certifications
   const needsProductionReport = batchJars.some(jar => {
     const cert = jarCertifications[jar.id];
-    return cert?.origin;
+    return cert?.quality;
   });
 
   const needsLabReport = batchJars.some(jar => {
@@ -1356,7 +1356,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
   if (needsProductionReport && !formData.productionReport) {
     setNotification({
       show: true,
-      message: 'Please upload a production report for origin certifications',
+      message: 'Please upload a production report for quality certifications',
       type: 'error'
     });
     return;
@@ -2254,14 +2254,12 @@ const hasRequiredCertifications = () => {
 
 const needsProductionReport = () => {
   return Object.values(jarCertifications).some(cert => 
-    cert?.selectedType === 'origin' || cert?.selectedType === 'both'
+    cert?.selectedType === 'quality'
   );
 };
 
 const needsLabReport = () => {
-  return Object.values(jarCertifications).some(cert => 
-    cert?.selectedType === 'quality' || cert?.selectedType === 'both'
-  );
+  return Object.values(jarCertifications).some(cert => cert?.quality);
 };
 const tokenCalculation = useMemo(() => {
   const allJars = Object.values(apiaryJars).flat();
@@ -2963,7 +2961,6 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
           getSelectedType={getSelectedType}
           needsProductionReport={needsProductionReport}
           needsLabReport={needsLabReport}
-          hasRequiredCertifications={hasRequiredCertifications}
           isFormValid={isFormValid}
           handleCompleteBatch={handleCompleteBatch}
           router={router}

@@ -86,41 +86,7 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
       }
       
       if (batch.status === 'completed' || batch.status === 'partially_completed') {
-        // Parse jar certifications if it exists
-        let jarCertifications: any = {};
-        
-        if (batch.jarCertifications) {
-          try {
-            jarCertifications = typeof batch.jarCertifications === 'string' 
-              ? JSON.parse(batch.jarCertifications) 
-              : batch.jarCertifications;
-          } catch (e) {
-            console.warn('Failed to parse jarCertifications for batch', batch.id);
-          }
-        }
-        
-        // Count tokens based on jar certifications
-        // Each jar uses 1 token regardless of certification type
-        if (jarCertifications && typeof jarCertifications === 'object') {
-          Object.keys(jarCertifications).forEach(jarId => {
-            const certification = jarCertifications[jarId];
-            if (certification) {
-              // Find the jar quantity (this would need to be stored in the batch data)
-              // For now, we'll assume 1 token per jar certification entry
-              // You might need to adjust this based on how jar quantities are stored
-              
-              if (certification.origin && certification.quality) {
-                bothCertificationsTokens += 1; // or += jarQuantity if available
-              } else if (certification.origin && !certification.quality) {
-                originOnlyTokens += 1; // or += jarQuantity if available
-              } else if (certification.quality && !certification.origin) {
-                qualityOnlyTokens += 1; // or += jarQuantity if available
-              }
-            }
-          });
-        }
-        
-        // Alternative: if you have direct counts in the batch data
+        // Use direct counts from batch data
         if (batch.originOnly && typeof batch.originOnly === 'number') {
           originOnlyTokens += batch.originOnly;
         }
@@ -130,10 +96,6 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
         if (batch.bothCertifications && typeof batch.bothCertifications === 'number') {
           bothCertificationsTokens += batch.bothCertifications;
         }
-        
-        // Or if you have jarUsed field that represents total tokens used for this batch
-        // This would be the most straightforward approach if available
-        // totalUsedTokens += batch.jarUsed || 0;
       }
     });
     
@@ -151,38 +113,32 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
   };
 
   const tokenStats = calculateTokenStats();
-  
-  // Prepare data for pie chart
-  const tokenDistributionData = [
-    {
-      name: 'Origin Only',
-      value: tokenStats.originOnly,
-      color: '#3B82F6', // blue-500
-    },
-    {
-      name: 'Quality Only', 
-      value: tokenStats.qualityOnly,
-      color: '#10B981', // green-500
-    },
-    {
-      name: 'Both Certifications',
-      value: tokenStats.bothCertifications,
-      color: '#8B5CF6', // purple-500
-    },
-    {
-      name: 'Available',
-      value: tokenStats.remainingTokens,
-      color: '#6B7280', // gray-500
+
+  // NEW: Calculate pending tokens from form
+ const pendingTokens = batches.reduce((pending, batch) => {
+    if (batch.status === 'processing' && batch.jarCertifications) {
+      Object.values(batch.jarCertifications).forEach((cert: any) => {
+        if (cert.origin && cert.quality) {
+          pending.bothCertifications += 1;
+        } else if (cert.origin) {
+          pending.originOnly += 1;
+        } else if (cert.quality) {
+          pending.qualityOnly += 1;
+        }
+      });
     }
-  ].filter(item => item.value > 0); // Only show segments with values > 0
+    return pending;
+  }, { originOnly: 0, qualityOnly: 0, bothCertifications: 0 });
+   // Calculate total used including pending
+  const totalUsedIncludingPending = tokenStats.usedTokens + 
+    pendingTokens.originOnly + pendingTokens.qualityOnly + pendingTokens.bothCertifications;
+  const availableTokens = Math.max(0, tokenBalance - totalUsedIncludingPending);
 
   return (
     <div className="bg-white p-4 rounded-lg shadow text-black">
       <h2 className="text-lg font-semibold mb-4">Token Wallet Overview</h2>
       <div className="space-y-6">
         
-       
-
         {/* Token Usage Breakdown */}
         <div className="border rounded-lg p-4 bg-gray-50">
           <h3 className="text-md font-semibold mb-3">Token Usage Distribution</h3>
@@ -192,7 +148,7 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
                 <div className="h-3 w-3 rounded-full bg-blue-500 mr-2"></div>
                 <p className="text-sm font-medium">Origin Only</p>
               </div>
-              <p className="text-xl font-bold">{tokenStats.originOnly}</p>
+              <p className="text-xl font-bold">{tokenStats.originOnly + pendingTokens.originOnly}</p>
               <p className="text-xs text-gray-500">tokens used</p>
             </div>
             
@@ -201,7 +157,7 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
                 <div className="h-3 w-3 rounded-full bg-green-500 mr-2"></div>
                 <p className="text-sm font-medium">Quality Only</p>
               </div>
-              <p className="text-xl font-bold">{tokenStats.qualityOnly}</p>
+              <p className="text-xl font-bold">{tokenStats.qualityOnly + pendingTokens.qualityOnly}</p>
               <p className="text-xs text-gray-500">tokens used</p>
             </div>
             
@@ -210,7 +166,7 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
                 <div className="h-3 w-3 rounded-full bg-purple-500 mr-2"></div>
                 <p className="text-sm font-medium">Both Certifications</p>
               </div>
-              <p className="text-xl font-bold">{tokenStats.bothCertifications}</p>
+              <p className="text-xl font-bold">{tokenStats.bothCertifications + pendingTokens.bothCertifications}</p>
               <p className="text-xs text-gray-500">tokens used</p>
             </div>
             
@@ -219,7 +175,7 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
                 <div className="h-3 w-3 rounded-full bg-gray-400 mr-2"></div>
                 <p className="text-sm font-medium">Available</p>
               </div>
-              <p className="text-xl font-bold">{tokenStats.remainingTokens}</p>
+              <p className="text-xl font-bold">{availableTokens}</p>
               <p className="text-xs text-gray-500">tokens remaining</p>
             </div>
           </div>
@@ -228,21 +184,16 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
           <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-yellow-800">Total Tokens Used:</span>
-              <span className="text-lg font-bold text-yellow-900">{tokenStats.usedTokens}</span>
+              <span className="text-lg font-bold text-yellow-900">{totalUsedIncludingPending}</span>
             </div>
             <div className="flex justify-between items-center mt-1">
               <span className="text-sm text-yellow-700">Usage Rate:</span>
               <span className="text-sm font-medium text-yellow-900">
-                {tokenStats.totalTokens > 0 ? ((tokenStats.usedTokens / tokenStats.totalTokens) * 100).toFixed(1) : 0}%
+                {tokenBalance > 0 ? ((totalUsedIncludingPending / tokenBalance) * 100).toFixed(1) : 0}%
               </span>
             </div>
           </div>
         </div>
-
-       
-
-       
-        
       </div>
     </div>
   );

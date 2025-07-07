@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ... existing imports ...
 export async function PUT(request: NextRequest) {
   try {
     // Authentication - get userId and convert to number
@@ -137,7 +138,7 @@ export async function PUT(request: NextRequest) {
     
     const formData = await request.formData();
     const data = JSON.parse(formData.get('data') as string);
-    const { batchId, updatedFields, apiaries, batchJars, jarCertifications } = data;
+    const { batchId, updatedFields, apiaries, batchJars, jarCertifications, tokenStats } = data;
 
     // Handle file uploads (production report and lab report)
     let productionReportPath = null;
@@ -310,6 +311,32 @@ export async function PUT(request: NextRequest) {
           });
         }
       }
+    }
+
+    // Update Token Stats after batch update is successful
+    try {
+      const tokenStatsResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/token-stats/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${request.headers.get('Authorization')}`
+        },
+        body: JSON.stringify({
+          originOnly,
+          qualityOnly,
+          bothCertifications,
+          tokensUsed: originOnly + qualityOnly + bothCertifications
+        })
+      });
+      
+      if (!tokenStatsResponse.ok) {
+        console.error('Token stats update failed:', await tokenStatsResponse.text());
+      } else {
+        console.log('Token stats updated successfully');
+      }
+    } catch (tokenError) {
+      console.error('Error updating token stats:', tokenError);
+      // Don't fail the entire request - just log the error
     }
 
     console.log('Batch completion summary:', {

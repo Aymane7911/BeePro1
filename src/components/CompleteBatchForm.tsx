@@ -1412,7 +1412,47 @@ const handleLabReportUpload = async (e) => {
     </div>
   </div>
 )}
-
+{/* ADD THE NEW TOKEN USAGE SUMMARY SECTION RIGHT HERE */}
+{batchJars.length > 0 && (
+  <div className="bg-blue-50 p-4 rounded-lg mt-4">
+    <h5 className="font-medium mb-2">Token Usage Summary</h5>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="text-center p-2 bg-blue-100 rounded">
+        <div className="text-blue-900 font-semibold">
+          {batchJars.reduce((sum, jar) => {
+            const cert = jarCertifications[jar.id];
+            return cert?.origin && !cert?.quality ? sum + jar.quantity : sum;
+          }, 0)}
+        </div>
+        <div className="text-blue-600 text-xs">Origin Only Tokens</div>
+      </div>
+      <div className="text-center p-2 bg-green-100 rounded">
+        <div className="text-green-900 font-semibold">
+          {batchJars.reduce((sum, jar) => {
+            const cert = jarCertifications[jar.id];
+            return cert?.quality && !cert?.origin ? sum + jar.quantity : sum;
+          }, 0)}
+        </div>
+        <div className="text-green-600 text-xs">Quality Only Tokens</div>
+      </div>
+      <div className="text-center p-2 bg-purple-100 rounded">
+        <div className="text-purple-900 font-semibold">
+          {batchJars.reduce((sum, jar) => {
+            const cert = jarCertifications[jar.id];
+            return cert?.origin && cert?.quality ? sum + jar.quantity : sum;
+          }, 0)}
+        </div>
+        <div className="text-purple-600 text-xs">Both Certifications</div>
+      </div>
+      <div className="text-center p-2 bg-yellow-100 rounded">
+        <div className="text-yellow-900 font-semibold">
+          {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)}
+        </div>
+        <div className="text-yellow-700 text-xs">Total Tokens Needed</div>
+      </div>
+    </div>
+  </div>
+)}
 {/* File Upload Section - Updated for Quality certification only */}
 {batchJars.length > 0 && needsLabReport() && (
   <div className="border rounded-md p-4 mb-4">
@@ -1634,7 +1674,46 @@ const handleLabReportUpload = async (e) => {
     )}
   </div>
 )}
-
+{batchJars.length > 0 && (
+  <div className="bg-yellow-50 p-4 rounded-lg mt-4">
+    <h5 className="font-medium mb-2">Token Usage Summary</h5>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+      <div className="text-center p-2 bg-blue-50 rounded">
+        <div className="text-blue-900 font-semibold">
+          {batchJars.reduce((sum, jar) => {
+            const cert = jarCertifications[jar.id];
+            return cert?.origin && !cert?.quality ? sum + jar.quantity : sum;
+          }, 0)}
+        </div>
+        <div className="text-blue-600 text-xs">Origin Only Tokens</div>
+      </div>
+      <div className="text-center p-2 bg-green-50 rounded">
+        <div className="text-green-900 font-semibold">
+          {batchJars.reduce((sum, jar) => {
+            const cert = jarCertifications[jar.id];
+            return cert?.quality && !cert?.origin ? sum + jar.quantity : sum;
+          }, 0)}
+        </div>
+        <div className="text-green-600 text-xs">Quality Only Tokens</div>
+      </div>
+      <div className="text-center p-2 bg-purple-50 rounded">
+        <div className="text-purple-900 font-semibold">
+          {batchJars.reduce((sum, jar) => {
+            const cert = jarCertifications[jar.id];
+            return cert?.origin && cert?.quality ? sum + jar.quantity : sum;
+          }, 0)}
+        </div>
+        <div className="text-purple-600 text-xs">Both Certifications</div>
+      </div>
+      <div className="text-center p-2 bg-yellow-100 rounded">
+        <div className="text-yellow-900 font-semibold">
+          {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)}
+        </div>
+        <div className="text-yellow-700 text-xs">Total Tokens Needed</div>
+      </div>
+    </div>
+  </div>
+)}
 {/* Enhanced Form Actions */}
 <div className="flex justify-end space-x-3">
   <button

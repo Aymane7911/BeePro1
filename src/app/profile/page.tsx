@@ -30,8 +30,78 @@ import {
   Map,
   Package,
   Calendar,
-  BarChart3
+  BarChart3,
+  Sparkles,
+  RefreshCw,
+  Printer
 } from 'lucide-react';
+
+// Header component
+interface HeaderProps {
+  toggleSidebar: () => void;
+  refreshData: () => void;
+  handleDelete: () => void;
+  handlePrint: () => void;
+  selectedBatches: string[];
+  lastUpdated: string;
+}
+
+const Header: React.FC<HeaderProps> = ({
+  toggleSidebar,
+  refreshData,
+  handleDelete,
+  handlePrint,
+  selectedBatches,
+  lastUpdated
+}) => {
+  return (
+    <header className="bg-white/80 backdrop-blur-xl p-4 rounded-3xl shadow-lg border border-white/20 text-black mb-6">
+      <div className="flex justify-between items-center">
+        <div className="flex items-center">
+          <button 
+            onClick={toggleSidebar}
+            className="mr-4 p-2 rounded-xl hover:bg-yellow-100/50 transition-colors"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <div className="flex items-center">
+            <div className="mr-3 bg-gradient-to-br from-yellow-500 to-amber-500 p-2 rounded-xl shadow">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM6 14C5.45 14 5 13.55 5 13C5 12.45 5.45 12 6 12C6.55 12 7 12.45 7 13C7 13.55 6.55 14 6 14ZM9 9C8.45 9 8 8.55 8 8C8 7.45 8.45 7 9 7C9.55 7 10 7.45 10 8C10 8.55 9.55 9 9 9ZM15 9C14.45 9 14 8.55 14 8C14 7.45 14.45 7 15 7C15.55 7 16 7.45 16 8C16 8.55 15.55 9 15 9ZM18 14C17.45 14 17 13.55 17 13C17 12.45 17.45 12 18 12C18.55 12 19 12.45 19 13C19 13.55 18.55 14 18 14Z" fill="white"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Profile Management</h1>
+              <p className="text-xs text-gray-500">Last updated: {lastUpdated}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={refreshData}
+            className="group relative overflow-hidden p-2 
+                       bg-gradient-to-r from-blue-600 to-indigo-500 
+                       text-white rounded-lg shadow-lg
+                       transform transition-all duration-300 
+                       hover:from-blue-500 hover:to-indigo-400"
+          >
+            <RefreshCw className="h-5 w-5" />
+          </button>
+          
+          <button
+            onClick={handlePrint}
+            className={`group relative overflow-hidden p-2 rounded-lg font-semibold shadow-lg
+                       transform transition-all duration-300
+                       bg-gradient-to-r from-emerald-600 to-green-500 text-white`}
+          >
+            <Printer className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+};
 
 // 5. Update Apiary interface to match Prisma:
 interface Apiary {
@@ -98,12 +168,11 @@ interface UserProfile {
   get fullName(): string;
 }
 
-
-
 const ProfilePage = () => {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<string>(new Date().toLocaleString());
 
   // JWT Token Management
   const getJWTToken = (): string | null => {
@@ -242,7 +311,6 @@ const ProfilePage = () => {
   lastname: '',
   email: '',
   phonenumber: '',
-  address: '',
   passportId: '', // Add this line
   profileImage: null,
   passportScan: null,
@@ -280,7 +348,6 @@ const ProfilePage = () => {
       email: userData.email || '',
       phonenumber: userData.phonenumber || '',
       passportId: userData.passportId || '', // Add this line
-      address: prev.address || '',
       passportNumber: prev.passportNumber || '',
       profileImage: userData.profileImage || null,
       passportScan: userData.passportScan || null,
@@ -310,6 +377,7 @@ const ProfilePage = () => {
       const batchData = await fetchBatches();
       setBatches(batchData);
       setBatchesLoading(false);
+      setLastUpdated(new Date().toLocaleString());
     };
 
     loadBatches();
@@ -364,6 +432,48 @@ const ProfilePage = () => {
   );
   const totalHoneyCollected = batches.reduce((total, batch) => total + (batch.weightKg || 0), 0);
 
+  // Header functions
+  const refreshData = async () => {
+    setBatchesLoading(true);
+    try {
+      const userData = await fetchUserProfile();
+      if (userData) {
+        setUserProfile(prev => ({
+          ...prev,
+          firstname: userData.firstname || '',
+          lastname: userData.lastname || '',
+          email: userData.email || '',
+          phonenumber: userData.phonenumber || '',
+          passportId: userData.passportId || '',
+          profileImage: userData.profileImage || null,
+          passportScan: userData.passportScan || null,
+          faceScan: userData.faceScan || null,
+          verificationStatus: {
+            email: userData.isConfirmed || false,
+            phone: userData.phoneConfirmed || false,
+            identity: userData.identityVerified || false,
+            face: userData.faceVerified || false
+          }
+        }));
+      }
+
+      const batchData = await fetchBatches();
+      setBatches(batchData);
+      setLastUpdated(new Date().toLocaleString());
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setBatchesLoading(false);
+    }
+  };
+
+  const handleDelete = () => {
+    alert('Delete functionality is not available on the profile page.');
+  };
+
+  const handlePrint = () => {
+    alert('Print functionality is not available on the profile page.');
+  };
 
   return (
     <div className="flex flex-col space-y-6 p-6 min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">
@@ -383,7 +493,7 @@ const ProfilePage = () => {
               {[
                 { icon: Home, label: 'Dashboard', href: '/dashboard' },
                 { icon: Layers, label: 'Batches', href: '/batches' },
-                { icon: Activity, label: 'Analytics', href: '#' },
+                { icon: Activity, label: 'Analytics', href: '/analytics' },
                 { icon: Wallet, label: 'Token Wallet', href: '#' },
                 { icon: Users, label: 'Profile', href: '/profile' },
                 { icon: Settings, label: 'Settings', href: '#' },
@@ -401,34 +511,25 @@ const ProfilePage = () => {
         </div>
       </div>
 
-{/* Enhanced Backdrop */}
+      {/* Enhanced Backdrop */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 backdrop-blur-md bg-black/30 z-10 transition-all duration-500"
           onClick={toggleSidebar}
         ></div>
       )}
+      
       {/* Main Content */}
       <div className="p-6">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg mb-8 border border-white/20">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              <button onClick={toggleSidebar} className="mr-6 p-2 rounded-xl hover:bg-gray-100 transition-colors">
-                <Menu className="h-6 w-6" />
-              </button>
-              <div className="flex items-center">
-                <div className="mr-4 bg-gradient-to-r from-yellow-400 to-amber-500 p-3 rounded-xl shadow-lg">
-                  <Package className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-800">HoneyCertify</h1>
-                  <p className="text-gray-600">Manage your account and view your beekeeping data</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        {/* New Header */}
+        <Header
+          toggleSidebar={toggleSidebar}
+          refreshData={refreshData}
+          handleDelete={handleDelete}
+          handlePrint={handlePrint}
+          selectedBatches={[]}
+          lastUpdated={lastUpdated}
+        />
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -624,7 +725,7 @@ const ProfilePage = () => {
           </div>
         </div>
                 
-                {loading ? (
+                {batchesLoading ? (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
         <p className="text-gray-600">Loading batches...</p>
@@ -638,13 +739,7 @@ const ProfilePage = () => {
         <h4 className="text-xl font-bold text-gray-800 mb-1">{batch.batchName}</h4> {/* Changed from batch.batchName */}
         <p className="text-gray-600 mb-2">Batch Number: <span className="font-medium">{batch.batchNumber}</span></p>
         <div className="flex items-center space-x-4">
-          <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${
-            batch.status === 'completed' 
-              ? 'bg-green-100 text-green-800' 
-              : batch.status === 'active'
-              ? 'bg-yellow-100 text-yellow-800'
-              : 'bg-gray-100 text-gray-800'
-          }`}>
+          <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${batch.status === 'completed' ? 'bg-green-100 text-green-800' : batch.status === 'active' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
             {batch.status === 'completed' ? 'Completed' : batch.status === 'active' ? 'Active' : 'Pending'}
           </span>
           <span className="flex items-center text-sm text-gray-500">
@@ -825,17 +920,11 @@ const ProfilePage = () => {
                       { key: 'face', label: 'Face Verification', icon: userProfile.verificationStatus.face ? CheckCircle : AlertCircle }
                     ].map(({ key, label, icon: Icon }) => (
                       <div key={key} className="text-center">
-                        <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${
-                          userProfile.verificationStatus[key] ? 'bg-green-100' : 'bg-orange-100'
-                        }`}>
-                          <Icon className={`h-6 w-6 ${
-                            userProfile.verificationStatus[key] ? 'text-green-600' : 'text-orange-500'
-                          }`} />
+                        <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${userProfile.verificationStatus[key] ? 'bg-green-100' : 'bg-orange-100'}`}>
+                          <Icon className={`h-6 w-6 ${userProfile.verificationStatus[key] ? 'text-green-600' : 'text-orange-500'}`} />
                         </div>
                         <p className="text-sm font-medium text-gray-700">{label}</p>
-                        <p className={`text-xs mt-1 ${
-                          userProfile.verificationStatus[key] ? 'text-green-600' : 'text-orange-500'
-                        }`}>
+                        <p className={`text-xs mt-1 ${userProfile.verificationStatus[key] ? 'text-green-600' : 'text-orange-500'}`}>
                           {userProfile.verificationStatus[key] ? 'Completed' : 'Pending'}
                         </p>
                       </div>
@@ -943,13 +1032,7 @@ const ProfilePage = () => {
             {new Date(batch.createdAt).toLocaleDateString()} • {batch.apiaries?.length || 0} apiaries
           </p>
         </div>
-        <div className={`px-2 py-1 text-xs rounded-full ${
-          batch.status === 'completed' 
-            ? 'bg-green-100 text-green-800' 
-            : batch.status === 'active'
-            ? 'bg-yellow-100 text-yellow-800'
-            : 'bg-gray-100 text-gray-800'
-        }`}>
+        <div className={`px-2 py-1 text-xs rounded-full ${batch.status === 'completed' ? 'bg-green-100 text-green-800' : batch.status === 'active' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
           {batch.status === 'completed' ? 'Completed' : batch.status === 'active' ? 'Active' : 'Pending'}
         </div>
       </div>

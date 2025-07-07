@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 
 interface TokenStats {
@@ -50,16 +50,53 @@ interface Batch {
 }
 
 interface TokenWalletOverviewProps {
-  batches?: Batch[]; // Made optional with ?
-  tokenBalance: number; // Changed from userTokenBalance to tokenBalance to match Header prop
+  batches?: Batch[];
+  tokenBalance: number;
   tokenStats: TokenStats[];
 }
 
 const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({ 
-  batches = [], // Default to empty array
-  tokenBalance = 0 // Changed from userTokenBalance to tokenBalance
+  batches = [],
+  tokenBalance = 0
 }) => {
   
+  // State to track real-time token usage
+  const [realTimeTokenStats, setRealTimeTokenStats] = useState<TokenStats | null>(null);
+  
+  // Listen for batch completion events
+  useEffect(() => {
+    const handleBatchCompleted = (event: CustomEvent) => {
+      const { detail } = event;
+      console.log('TokenWalletOverview received batch completion event:', detail);
+      
+      // Force recalculation of token stats
+      const newStats = calculateTokenStats();
+      setRealTimeTokenStats(newStats);
+      
+      // Optional: You can also trigger a re-render by updating a local state
+      setTimeout(() => {
+        setRealTimeTokenStats(calculateTokenStats());
+      }, 500);
+    };
+
+    const handleBatchRollback = (event: CustomEvent) => {
+      console.log('TokenWalletOverview received batch rollback event:', event.detail);
+      // Recalculate stats after rollback
+      const newStats = calculateTokenStats();
+      setRealTimeTokenStats(newStats);
+    };
+
+    // Add event listeners
+    window.addEventListener('batchCompleted', handleBatchCompleted as EventListener);
+    window.addEventListener('batchRollback', handleBatchRollback as EventListener);
+
+    return () => {
+      // Cleanup event listeners
+      window.removeEventListener('batchCompleted', handleBatchCompleted as EventListener);
+      window.removeEventListener('batchRollback', handleBatchRollback as EventListener);
+    };
+  }, [batches, tokenBalance]);
+
   // Calculate token usage from completed batches
   const calculateTokenStats = (): TokenStats => {
     let originOnlyTokens = 0;
@@ -69,8 +106,8 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
     // Early return if no batches
     if (!batches || !Array.isArray(batches)) {
       return {
-        totalTokens: tokenBalance, // Updated to use tokenBalance
-        remainingTokens: tokenBalance, // Updated to use tokenBalance
+        totalTokens: tokenBalance,
+        remainingTokens: tokenBalance,
         originOnly: 0,
         qualityOnly: 0,
         bothCertifications: 0,
@@ -86,7 +123,24 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
       }
       
       if (batch.status === 'completed' || batch.status === 'partially_completed') {
-        // Use direct counts from batch data
+        // Check if batch has jarCertifications data
+        if (batch.jarCertifications && typeof batch.jarCertifications === 'object') {
+          // Count tokens from jar certifications
+          Object.values(batch.jarCertifications).forEach((cert: any) => {
+            if (cert && typeof cert === 'object') {
+              // Count based on certification type
+              if (cert.origin && cert.quality) {
+                bothCertificationsTokens += 1;
+              } else if (cert.origin) {
+                originOnlyTokens += 1;
+              } else if (cert.quality) {
+                qualityOnlyTokens += 1;
+              }
+            }
+          });
+        }
+        
+        // Fallback to direct counts from batch data if available
         if (batch.originOnly && typeof batch.originOnly === 'number') {
           originOnlyTokens += batch.originOnly;
         }
@@ -100,10 +154,10 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
     });
     
     const usedTokens = originOnlyTokens + qualityOnlyTokens + bothCertificationsTokens;
-    const remainingTokens = Math.max(0, tokenBalance - usedTokens); // Updated to use tokenBalance
+    const remainingTokens = Math.max(0, tokenBalance - usedTokens);
     
     return {
-      totalTokens: tokenBalance, // Updated to use tokenBalance
+      totalTokens: tokenBalance,
       remainingTokens,
       originOnly: originOnlyTokens,
       qualityOnly: qualityOnlyTokens,
@@ -112,10 +166,11 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
     };
   };
 
-  const tokenStats = calculateTokenStats();
+  // Use real-time stats if available, otherwise calculate from batches
+  const tokenStats = realTimeTokenStats || calculateTokenStats();
 
-  // NEW: Calculate pending tokens from form
- const pendingTokens = batches.reduce((pending, batch) => {
+  // Calculate pending tokens from processing batches
+  const pendingTokens = batches.reduce((pending, batch) => {
     if (batch.status === 'processing' && batch.jarCertifications) {
       Object.values(batch.jarCertifications).forEach((cert: any) => {
         if (cert.origin && cert.quality) {
@@ -129,7 +184,8 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
     }
     return pending;
   }, { originOnly: 0, qualityOnly: 0, bothCertifications: 0 });
-   // Calculate total used including pending
+
+  // Calculate total used including pending
   const totalUsedIncludingPending = tokenStats.usedTokens + 
     pendingTokens.originOnly + pendingTokens.qualityOnly + pendingTokens.bothCertifications;
   const availableTokens = Math.max(0, tokenBalance - totalUsedIncludingPending);
@@ -150,6 +206,9 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
               </div>
               <p className="text-xl font-bold">{tokenStats.originOnly + pendingTokens.originOnly}</p>
               <p className="text-xs text-gray-500">tokens used</p>
+              {pendingTokens.originOnly > 0 && (
+                <p className="text-xs text-blue-500">+{pendingTokens.originOnly} pending</p>
+              )}
             </div>
             
             <div className="p-3 bg-white rounded-lg shadow">
@@ -159,6 +218,9 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
               </div>
               <p className="text-xl font-bold">{tokenStats.qualityOnly + pendingTokens.qualityOnly}</p>
               <p className="text-xs text-gray-500">tokens used</p>
+              {pendingTokens.qualityOnly > 0 && (
+                <p className="text-xs text-green-500">+{pendingTokens.qualityOnly} pending</p>
+              )}
             </div>
             
             <div className="p-3 bg-white rounded-lg shadow">
@@ -168,6 +230,9 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
               </div>
               <p className="text-xl font-bold">{tokenStats.bothCertifications + pendingTokens.bothCertifications}</p>
               <p className="text-xs text-gray-500">tokens used</p>
+              {pendingTokens.bothCertifications > 0 && (
+                <p className="text-xs text-purple-500">+{pendingTokens.bothCertifications} pending</p>
+              )}
             </div>
             
             <div className="p-3 bg-white rounded-lg shadow">
@@ -192,6 +257,11 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
                 {tokenBalance > 0 ? ((totalUsedIncludingPending / tokenBalance) * 100).toFixed(1) : 0}%
               </span>
             </div>
+            {realTimeTokenStats && (
+              <div className="mt-2 text-xs text-green-600">
+                ✓ Updated in real-time
+              </div>
+            )}
           </div>
         </div>
       </div>

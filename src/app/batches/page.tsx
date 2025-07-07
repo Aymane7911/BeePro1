@@ -1325,7 +1325,40 @@ const isProfileComplete = (user: User | null | undefined): boolean => {
 const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
   e.preventDefault();
 
-  const tokensUsed = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
+  // Calculate token usage breakdown ONCE at the beginning
+  const calculateTokenUsage = () => {
+    const breakdown = {
+      originOnly: 0,
+      qualityOnly: 0,
+      bothCertifications: 0,
+      total: 0
+    };
+
+   batchJars.forEach(jar => {
+    const cert = jarCertifications[jar.id];
+    if (cert?.origin && cert?.quality) {
+      breakdown.bothCertifications += jar.quantity;
+    } else if (cert?.origin) {
+      breakdown.originOnly += jar.quantity;
+    } else if (cert?.quality) {
+      breakdown.qualityOnly += jar.quantity;
+    }
+    breakdown.total += jar.quantity;
+  });
+
+  return breakdown;
+};
+
+  // Calculate token usage breakdown once
+  const tokenUsage = calculateTokenUsage();
+  const tokensUsed = tokenUsage.total;
+
+  // Use tokenUsage breakdown instead of recalculating
+  const certificationBreakdown = {
+    originOnly: tokenUsage.originOnly,
+    qualityOnly: tokenUsage.qualityOnly,
+    bothCertifications: tokenUsage.bothCertifications
+  };
 
   // Validation checks (keeping existing validation logic)
   const allJarsHaveCertifications = batchJars.every(jar => {
@@ -1399,12 +1432,10 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
     return;
   }
 
-  const totalJarsNeeded = batchJars.reduce((sum, jar) => sum + jar.quantity, 0);
-
-  if (tokenBalance < totalJarsNeeded) {
+  if (tokenBalance < tokensUsed) {
     setNotification({
       show: true,
-      message: `Insufficient tokens. Need ${totalJarsNeeded}, have ${tokenBalance}`,
+      message: `Insufficient tokens. Need ${tokensUsed}, have ${tokenBalance}`,
       type: 'error'
     });
     return;
@@ -1478,8 +1509,8 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
           totalKg: originalHoneyCollected, // Keep original - this should always show original collected amount
           weightKg: originalHoneyCollected, // Keep original
           // CERTIFICATION TRACKING
-          jarsProduced: (currentBatch.jarsProduced || 0) + totalJarsNeeded, // Add to existing
-          jarsUsed: (currentBatch.jarsUsed || 0) + totalJarsNeeded, // Add to existing
+          jarsProduced: (currentBatch.jarsProduced || 0) + tokensUsed, // Use tokensUsed instead of totalJarsNeeded
+          jarsUsed: (currentBatch.jarsUsed || 0) + tokensUsed, // Use tokensUsed instead of totalJarsNeeded
           jarCertifications: {
             ...currentBatch.jarCertifications,
             ...jarCertifications
@@ -1492,6 +1523,11 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
           honeyCertified: batchCertifiedAmount, // Current certification amount
           honeyRemaining: newHoneyRemaining, // Remaining uncertified
           totalHoneyCertified: totalCumulativeCertified, // Cumulative certified
+          // Update certification breakdown in batch using calculated values
+          originOnly: (currentBatch.originOnly || 0) + certificationBreakdown.originOnly,
+          qualityOnly: (currentBatch.qualityOnly || 0) + certificationBreakdown.qualityOnly,
+          bothCertifications: (currentBatch.bothCertifications || 0) + certificationBreakdown.bothCertifications,
+          uncertified: Math.max(0, (currentBatch.uncertified || 0) - tokensUsed),
           // Update apiaries
           apiaries: currentBatch.apiaries ? currentBatch.apiaries.map(apiary => {
             const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batchId}-${apiary.number}`] : undefined;
@@ -1533,7 +1569,35 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
     // IMMEDIATELY update the batches state for instant UI refresh
     setBatches(updatedBatches);
 
-    // STEP 4: Send updates to server (in background) - REMOVED MULTIPLE DISPATCHES
+    // STEP 4: Update Token Statistics in Database
+    try {
+      const tokenStatsResponse = await fetch('/api/token-stats/update', {
+  method: 'POST',
+  headers: { 
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify({
+    userId: userData.id,
+    originOnly: tokenUsage.originOnly,      // Individual breakdown
+    qualityOnly: tokenUsage.qualityOnly,    // Individual breakdown  
+    bothCertifications: tokenUsage.bothCertifications, // Individual breakdown
+    tokensUsed: tokensUsed, // Total tokens used (for remaining tokens calculation)
+    totalCertified: totalCertifiedAmount
+  })
+});
+
+      if (!tokenStatsResponse.ok) {
+        console.error('Failed to update token statistics:', await tokenStatsResponse.text());
+      } else {
+        console.log('Token statistics updated successfully');
+      }
+    } catch (error) {
+      console.error('Error updating token statistics:', error);
+      // Don't throw here - this is not critical for the main flow
+    }
+
+    // STEP 5: Send updates to server (in background)
     const serverUpdatePromises = selectedBatches.map(async (batchId) => {
       const batchUpdate = batchUpdates.find(update => update.batchId === batchId);
       const currentBatch = batches.find(b => b.id === batchId);
@@ -1544,6 +1608,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
 
       const batchData = {
         batchId,
+        tokenUsage, // Use the calculated tokenUsage object
         updatedFields: batchUpdate.updates,
         apiaries: batchApiaries.map(apiary => {
           const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batchId}-${apiary.number}`] : undefined;
@@ -1566,11 +1631,19 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
           };
         }),
         batchJars: batchJars,
-        jarCertifications: jarCertifications
+        jarCertifications: jarCertifications,
+        // Include token statistics in batch update
+        tokenStats: {
+          originOnly: certificationBreakdown.originOnly,
+          qualityOnly: certificationBreakdown.qualityOnly,
+          bothCertifications: certificationBreakdown.bothCertifications,
+          tokensUsed: tokensUsed
+        }
       };
 
       const batchFormData = new FormData();
       batchFormData.append('data', JSON.stringify(batchData));
+      batchFormData.append('tokenUsage', JSON.stringify(tokenUsage));
 
       if (formData.productionReport) {
         batchFormData.append('productionReport', formData.productionReport);
@@ -1599,7 +1672,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
     // Wait for all server updates to complete
     await Promise.all(serverUpdatePromises);
 
-    // STEP 5: Generate certification data
+    // STEP 6: Generate certification data
     const certData = {
       batchIds: selectedBatches,
       certificationDate: new Date().toISOString().split('T')[0],
@@ -1615,7 +1688,8 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
         .join(', '),
       expiryDate: new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       verification: `CERT-${Date.now()}`,
-      totalJars: totalJarsNeeded
+      totalJars: tokensUsed, // Use tokensUsed instead of totalJarsNeeded
+      tokenBreakdown: certificationBreakdown
     };
 
     // Store certification data
@@ -1637,7 +1711,24 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
     const qrDataUrl = await generateQRCode(certData);
     setQrCodeDataUrl(qrDataUrl);
 
-    // STEP 6: Reset form state
+    // STEP 7: Update local state with token statistics
+    if (setData && typeof setData === 'function') {
+      const updatedTokenStats = {
+        ...data.tokenStats,
+        originOnly: (data?.tokenStats?.originOnly || 0) + certificationBreakdown.originOnly,
+        qualityOnly: (data?.tokenStats?.qualityOnly || 0) + certificationBreakdown.qualityOnly,
+        bothCertifications: (data?.tokenStats?.bothCertifications || 0) + certificationBreakdown.bothCertifications,
+        totalUsed: (data?.tokenStats?.totalUsed || 0) + tokensUsed,
+        uncertified: Math.max(0, (data?.tokenStats?.uncertified || 0) - tokensUsed)
+      };
+
+      setData({
+        ...data,
+        tokenStats: updatedTokenStats
+      });
+    }
+
+    // STEP 8: Reset form state
     setShowCompleteForm(false);
     setSelectedBatches([]);
     setBatchJars([]); // Clear batch jars
@@ -1649,31 +1740,7 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
       apiaries: []
     });
 
-    // STEP 7: Update additional data if functions exist
-    const originTokens = batchJars.reduce((total, jar) => {
-      const cert = jarCertifications[jar.id];
-      return total + (cert?.origin ? jar.quantity : 0);
-    }, 0);
-
-    const qualityTokens = batchJars.reduce((total, jar) => {
-      const cert = jarCertifications[jar.id];
-      return total + (cert?.quality ? jar.quantity : 0);
-    }, 0);
-
-    if (setData && typeof setData === 'function') {
-      const updatedTokenStats = {
-        ...data.tokenStats,
-        originOnly: (data?.tokenStats?.originOnly || 0) + originTokens,
-        qualityOnly: (data?.tokenStats?.qualityOnly || 0) + qualityTokens
-      };
-
-      setData({
-        ...data,
-        tokenStats: updatedTokenStats
-      });
-    }
-
-    // CONSOLIDATED DISPATCH - Only dispatch once at the end
+    // STEP 9: CONSOLIDATED DISPATCH - Only dispatch once at the end
     setTimeout(() => {
       // Single combined event dispatch
       window.dispatchEvent(new CustomEvent('batchCompleted', {
@@ -1686,22 +1753,33 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
           updatedBatches: updatedBatches,
           completedBatchIds: selectedBatches,
           totalCertified: totalCertifiedAmount,
-          certificationData: certData
+          certificationData: certData,
+          certificationBreakdown: certificationBreakdown,
+          // Add individual counts for easy access
+          originOnlyTokens: certificationBreakdown.originOnly,
+          qualityOnlyTokens: certificationBreakdown.qualityOnly,
+          bothCertificationsTokens: certificationBreakdown.bothCertifications,
+          // Token statistics update
+          tokenStatsUpdated: true
         }
       }));
     }, 100);
 
-    // STEP 8: Show success popup ONLY ONCE
+    // STEP 10: Show success popup ONLY ONCE
     setShowSuccessPopup(true);
 
     // SINGLE SUCCESS NOTIFICATION
     setNotification({
       show: true,
-      message: `Batch completed successfully! ${tokensUsed} tokens used, ${totalCertifiedAmount.toFixed(2)} kg certified.`,
+      message: `Batch completed successfully! ${tokensUsed} tokens used (${certificationBreakdown.originOnly} origin, ${certificationBreakdown.qualityOnly} quality, ${certificationBreakdown.bothCertifications} both), ${totalCertifiedAmount.toFixed(2)} kg certified.`,
       type: 'success'
     });
 
-    console.log('Batch completion successful - UI updated immediately with preserved original values');
+    console.log('Batch completion successful - UI updated immediately with token statistics:', {
+      tokensUsed,
+      certificationBreakdown,
+      totalCertifiedAmount
+    });
 
   } catch (error: any) {
     console.error('Error completing batches:', error);
@@ -1719,7 +1797,8 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
         action: 'restore',
         tokensRestored: tokensUsed,
         newBalance: originalTokenBalance,
-        error: error.message
+        error: error.message,
+        certificationBreakdown: certificationBreakdown
       }
     }));
 

@@ -83,9 +83,9 @@ model TokenStats {
   userId             Int    @unique
   totalTokens        Int    @default(0)
   remainingTokens    Int    @default(0)
-  originOnly         Float  @default(0)
-  qualityOnly        Float  @default(0)
-  bothCertifications Float  @default(0)
+  originOnly         Int  @default(0)
+  qualityOnly        Int  @default(0)
+  bothCertifications Int  @default(0)
 
   beeusers beeusers @relation(fields: [userId], references: [id])
 }

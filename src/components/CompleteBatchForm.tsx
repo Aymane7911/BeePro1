@@ -723,6 +723,22 @@ const handleLabReportUpload = async (e) => {
 };
 
 
+   const getTokensNeededForJar = (jar) => {
+  const cert = jarCertifications[jar.id];
+  if (!cert) return 0;
+  
+  let tokensPerJar = 0;
+  if (cert.origin) tokensPerJar += 1;
+  if (cert.quality) tokensPerJar += 1;
+  
+  return tokensPerJar * jar.quantity;
+};
+
+// Add this helper function to get total tokens needed
+const getTotalTokensNeeded = () => {
+  return batchJars.reduce((sum, jar) => sum + getTokensNeededForJar(jar), 0);
+};
+
   return (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
     <div className="bg-white p-6 rounded-lg shadow-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
@@ -870,11 +886,11 @@ const handleLabReportUpload = async (e) => {
                   <h4 className="font-medium text-yellow-800">Your Token Balance</h4>
                   <div className="flex items-center space-x-2">
                     <p className="text-2xl font-bold text-yellow-900">{tokenBalance}</p>
-                    {getTotalJarsAcrossApiaries() > 0 && (
+                    {getTotalTokensNeeded() > 0 && (
                       <>
                         <span className="text-gray-400">→</span>
                         <p className="text-2xl font-bold text-green-600">
-                          {Math.max(0, tokenBalance - getTotalJarsAcrossApiaries())}
+                          {Math.max(0, tokenBalance - getTotalTokensNeeded())}
                         </p>
                         <span className="text-sm text-gray-500">(after completion)</span>
                       </>
@@ -883,9 +899,9 @@ const handleLabReportUpload = async (e) => {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm text-yellow-700">Tokens Needed: {getTotalJarsAcrossApiaries()}</p>
-                <p className={`font-bold ${tokenBalance - getTotalJarsAcrossApiaries() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  Remaining: {tokenBalance - getTotalJarsAcrossApiaries()} tokens
+                <p className="text-sm text-yellow-700">Tokens Needed: {getTotalTokensNeeded()}</p>
+                <p className={`font-bold ${tokenBalance - getTotalTokensNeeded() >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  Remaining: {tokenBalance - getTotalTokensNeeded()} tokens
                 </p>
               </div>
             </div>
@@ -902,10 +918,10 @@ const handleLabReportUpload = async (e) => {
                 Buy Tokens
               </button>
             </div>
-            {tokenBalance - getTotalJarsAcrossApiaries() < 0 && (
+            {tokenBalance - getTotalTokensNeeded() < 0 && (
               <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded-md">
                 <p className="text-red-700 text-sm">
-                  ⚠️ Insufficient tokens! You need {Math.abs(tokenBalance - getTotalJarsAcrossApiaries())} more tokens.
+                  ⚠️ Insufficient tokens! You need {Math.abs(tokenBalance - getTotalTokensNeeded())} more tokens.
                   <button
                     type="button"
                     onClick={() => router.push('/buy-token')}
@@ -1232,44 +1248,44 @@ const handleLabReportUpload = async (e) => {
     </div>
   )}
 
-  {/* Overall Summary */}
-  {batchJars.length > 0 && (
-    <div className={`mt-4 p-4 rounded-lg ${isAllHoneyAllocated() ? 'bg-green-50 border border-green-200' : 'bg-yellow-50'}`}>
-      <div className="flex items-center justify-between mb-2">
-        <h5 className="font-medium">Overall Summary</h5>
-        {isAllHoneyAllocated() && (
-          <span className="flex items-center text-green-600 text-sm font-medium">
-            <Check className="h-4 w-4 mr-1" />
-            Complete Allocation
-          </span>
-        )}
+ {/* Overall Summary */}
+{batchJars.length > 0 && (
+  <div className={`mt-4 p-4 rounded-lg ${isAllHoneyAllocated() ? 'bg-green-50 border border-green-200' : 'bg-yellow-50'}`}>
+    <div className="flex items-center justify-between mb-2">
+      <h5 className="font-medium">Overall Summary</h5>
+      {isAllHoneyAllocated() && (
+        <span className="flex items-center text-green-600 text-sm font-medium">
+          <Check className="h-4 w-4 mr-1" />
+          Complete Allocation
+        </span>
+      )}
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+      <div>
+        <span className="text-gray-600">Total Jars:</span>
+        <span className="ml-2 font-bold">{batchJars.reduce((sum, jar) => sum + jar.quantity, 0)}</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-        <div>
-          <span className="text-gray-600">Total Jars:</span>
-          <span className="ml-2 font-bold">{batchJars.reduce((sum, jar) => sum + jar.quantity, 0)}</span>
-        </div>
-        <div>
-          <span className="text-gray-600">Total Weight:</span>
-          <span className="ml-2 font-bold">
-            {batchJars.reduce((sum, jar) => sum + (jar.size * jar.quantity / 1000), 0).toFixed(2)} kg
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-600">Total Available:</span>
-          <span className="ml-2 font-bold text-blue-600">
-            {getTotalHoneyFromBatch()} kg
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-600">Tokens Needed:</span>
-          <span className="ml-2 font-bold text-yellow-600">
-            {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} tokens
-          </span>
-        </div>
+      <div>
+        <span className="text-gray-600">Total Weight:</span>
+        <span className="ml-2 font-bold">
+          {batchJars.reduce((sum, jar) => sum + (jar.size * jar.quantity / 1000), 0).toFixed(2)} kg
+        </span>
+      </div>
+      <div>
+        <span className="text-gray-600">Total Available:</span>
+        <span className="ml-2 font-bold text-blue-600">
+          {getTotalHoneyFromBatch()} kg
+        </span>
+      </div>
+      <div>
+        <span className="text-gray-600">Tokens Needed:</span>
+        <span className="ml-2 font-bold text-yellow-600">
+          {getTotalTokensNeeded()} tokens
+        </span>
       </div>
     </div>
-  )}
+  </div>
+)}
 </div>
 
 {/* Certification Selection for Jars - BATCH BASED (Updated) */}
@@ -1382,77 +1398,47 @@ const handleLabReportUpload = async (e) => {
 
     {/* Certification Summary - Updated for batch jars */}
     <div className="bg-yellow-50 p-4 rounded-lg mt-4">
-      <h5 className="font-medium mb-2">Certification Summary</h5>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-        <div>
-          <span className="text-gray-600">Origin Only:</span>
-          <span className="ml-2 font-bold text-blue-600">
-            {batchJars.filter(jar => jarCertifications[jar.id]?.origin && !jarCertifications[jar.id]?.quality).length} jar types
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-600">Quality Only:</span>
-          <span className="ml-2 font-bold text-green-600">
-            {batchJars.filter(jar => jarCertifications[jar.id]?.quality && !jarCertifications[jar.id]?.origin).length} jar types
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-600">Both Selected:</span>
-          <span className="ml-2 font-bold text-purple-600">
-            {batchJars.filter(jar => jarCertifications[jar.id]?.origin && jarCertifications[jar.id]?.quality).length} jar types
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-600">Total Tokens:</span>
-          <span className="ml-2 font-bold text-yellow-600">
-            {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} tokens
-          </span>
-        </div>
-      </div>
+  <h5 className="font-medium mb-2">Certification Summary</h5>
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+    <div>
+      <span className="text-gray-600">Origin Only:</span>
+      <span className="ml-2 font-bold text-blue-600">
+        {batchJars.reduce((sum, jar) => {
+          const cert = jarCertifications[jar.id];
+          return cert?.origin && !cert?.quality ? sum + jar.quantity : sum;
+        }, 0)} tokens
+      </span>
+    </div>
+    <div>
+      <span className="text-gray-600">Quality Only:</span>
+      <span className="ml-2 font-bold text-green-600">
+        {batchJars.reduce((sum, jar) => {
+          const cert = jarCertifications[jar.id];
+          return cert?.quality && !cert?.origin ? sum + jar.quantity : sum;
+        }, 0)} tokens
+      </span>
+    </div>
+    <div>
+      <span className="text-gray-600">Both (Origin + Quality):</span>
+      <span className="ml-2 font-bold text-purple-600">
+        {batchJars.reduce((sum, jar) => {
+          const cert = jarCertifications[jar.id];
+          return cert?.origin && cert?.quality ? sum + (jar.quantity * 2) : sum;
+        }, 0)} tokens
+      </span>
+    </div>
+    <div>
+      <span className="text-gray-600">Total Tokens:</span>
+      <span className="ml-2 font-bold text-yellow-600">
+        {getTotalTokensNeeded()} tokens
+      </span>
     </div>
   </div>
-)}
-{/* ADD THE NEW TOKEN USAGE SUMMARY SECTION RIGHT HERE */}
-{batchJars.length > 0 && (
-  <div className="bg-blue-50 p-4 rounded-lg mt-4">
-    <h5 className="font-medium mb-2">Token Usage Summary</h5>
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div className="text-center p-2 bg-blue-100 rounded">
-        <div className="text-blue-900 font-semibold">
-          {batchJars.reduce((sum, jar) => {
-            const cert = jarCertifications[jar.id];
-            return cert?.origin && !cert?.quality ? sum + jar.quantity : sum;
-          }, 0)}
-        </div>
-        <div className="text-blue-600 text-xs">Origin Only Tokens</div>
-      </div>
-      <div className="text-center p-2 bg-green-100 rounded">
-        <div className="text-green-900 font-semibold">
-          {batchJars.reduce((sum, jar) => {
-            const cert = jarCertifications[jar.id];
-            return cert?.quality && !cert?.origin ? sum + jar.quantity : sum;
-          }, 0)}
-        </div>
-        <div className="text-green-600 text-xs">Quality Only Tokens</div>
-      </div>
-      <div className="text-center p-2 bg-purple-100 rounded">
-        <div className="text-purple-900 font-semibold">
-          {batchJars.reduce((sum, jar) => {
-            const cert = jarCertifications[jar.id];
-            return cert?.origin && cert?.quality ? sum + jar.quantity : sum;
-          }, 0)}
-        </div>
-        <div className="text-purple-600 text-xs">Both Certifications</div>
-      </div>
-      <div className="text-center p-2 bg-yellow-100 rounded">
-        <div className="text-yellow-900 font-semibold">
-          {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)}
-        </div>
-        <div className="text-yellow-700 text-xs">Total Tokens Needed</div>
-      </div>
-    </div>
+</div>
+
   </div>
 )}
+
 {/* File Upload Section - Updated for Quality certification only */}
 {batchJars.length > 0 && needsLabReport() && (
   <div className="border rounded-md p-4 mb-4">
@@ -1700,14 +1686,14 @@ const handleLabReportUpload = async (e) => {
         <div className="text-purple-900 font-semibold">
           {batchJars.reduce((sum, jar) => {
             const cert = jarCertifications[jar.id];
-            return cert?.origin && cert?.quality ? sum + jar.quantity : sum;
+            return cert?.origin && cert?.quality ? sum + (jar.quantity * 2) : sum;
           }, 0)}
         </div>
         <div className="text-purple-600 text-xs">Both Certifications</div>
       </div>
       <div className="text-center p-2 bg-yellow-100 rounded">
         <div className="text-yellow-900 font-semibold">
-          {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)}
+          {getTotalTokensNeeded()}
         </div>
         <div className="text-yellow-700 text-xs">Total Tokens Needed</div>
       </div>
@@ -1725,26 +1711,26 @@ const handleLabReportUpload = async (e) => {
   </button>
   
   <button
-    type="submit"
-    disabled={!isFormValidWithVerification() || isVerifying}
-    className={`px-4 py-2 rounded-md flex items-center ${
-      isFormValidWithVerification() && !isVerifying
-        ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-    }`}
-  >
-    {isVerifying ? (
-      <>
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-        Verifying Documents...
-      </>
-    ) : (
-      <>
-        <Check className="h-4 w-4 mr-2" />
-        Complete & Pay {batchJars.reduce((sum, jar) => sum + jar.quantity, 0)} Tokens
-      </>
-    )}
-  </button>
+  type="submit"
+  disabled={!isFormValidWithVerification() || isVerifying}
+  className={`px-4 py-2 rounded-md flex items-center ${
+    isFormValidWithVerification() && !isVerifying
+      ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+  }`}
+>
+  {isVerifying ? (
+    <>
+      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+      Verifying Documents...
+    </>
+  ) : (
+    <>
+      <Check className="h-4 w-4 mr-2" />
+      Complete & Pay {getTotalTokensNeeded()} Tokens
+    </>
+  )}
+</button>
 </div>
           </div>
         </form>

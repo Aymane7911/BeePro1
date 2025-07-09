@@ -2151,14 +2151,16 @@ const handleLocationCancel = () => {
     />
     
     <Header 
-      toggleSidebar={toggleSidebar}
-      tokenBalance={tokenBalance}
-      router={router}
-      setShowBatchModal={setShowBatchModal}
-      handleLogout={handleLogout}
-      isLoggingOut={isLoggingOut}
-      lastUpdated={lastUpdated}
-    />
+  toggleSidebar={toggleSidebar}
+  tokenBalance={tokenBalance || 0}
+  router={router}
+  setShowBatchModal={setShowBatchModal}
+  handleLogout={handleLogout}
+  isLoggingOut={isLoggingOut}
+  lastUpdated={lastUpdated}
+  batches={batches}           // Add this - array of batch data
+  tokenStats={data.tokenStats}     // Add this - token statistics from database
+/>
     
     <CreateBatchModal
       showBatchModal={showBatchModal}

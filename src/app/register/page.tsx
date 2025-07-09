@@ -2,6 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ethers } from 'ethers';
+import { contractAddress, contractABI } from "../../contractsinfo";
+
+
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -13,6 +17,7 @@ export default function RegisterPage() {
     confirmPassword: '',
     useEmail: true,
   });
+  const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_HARDHAT_RPC_URL);
 
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +38,31 @@ export default function RegisterPage() {
     // Example: redirect to Google OAuth endpoint
     // window.location.href = '/api/auth/google';
   };
+ const registerBeekeeperOnChain = async (beekeeperId: number) => {
+  // ✅ Using local Hardhat RPC directly
+  const provider = new ethers.JsonRpcProvider(
+    process.env.NEXT_PUBLIC_HARDHAT_RPC_URL
+  );
+
+  // ⚠️ For Hardhat local dev, use a test wallet private key
+  const signer = new ethers.Wallet(
+    process.env.NEXT_PUBLIC_HARDHAT_PRIVATE_KEY!,
+    provider
+  );
+
+  const contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+  try {
+    const tx = await contract.registerBeekeeper(12);
+    console.log('Transaction sent:', tx.hash);
+    await tx.wait();
+    console.log('Transaction mined:', tx);
+  } catch (err) {
+    console.error('On-chain registration failed:', err);
+    setError('Blockchain registration failed. Please try again.');
+  }
+};
+
 
   const handleSubmit = async () => {
     setError('');
@@ -58,6 +88,7 @@ export default function RegisterPage() {
 
       if (res.ok && data.success) {
         console.log('Registration successful:', data);
+        await registerBeekeeperOnChain(data.beekeeperId);
         router.push('/confirm-pending');
       } else {
         setError(data?.error || data?.message || 'Registration failed. Try again.');

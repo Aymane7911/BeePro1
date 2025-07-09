@@ -1,80 +1,36 @@
 import React, { useEffect, useState } from 'react';
-import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 
-interface CertificationStatus {
+interface TokenStats {
   originOnly: number;
   qualityOnly: number;
   bothCertifications: number;
-  uncertified: number;
+  remainingTokens: number;
+  totalTokens: number;
+  usedTokens?: number;
 }
 
-interface Apiary {
-  batchId: string;
-  batchNumber: string;
-  name: string;
-  number: string;
-  hiveCount: number;
-  latitude: number;
-  longitude: number;
-  honeyCollected: number;
-}
+const getTokenFromStorage = (): string | null => {
+  if (typeof window === 'undefined') return null; // SSR safe
+  return (
+    localStorage.getItem('authtoken') ||
+    localStorage.getItem('auth_token') ||
+    localStorage.getItem('token') ||
+    sessionStorage.getItem('authtoken') ||
+    sessionStorage.getItem('auth_token') ||
+    sessionStorage.getItem('token')
+  );
+};
 
-interface Batch {
-  id: string;
-  batchNumber: string;
-  batchName: string;
-  name: string;
-  createdAt: string;
-  status: string;
-  totalKg: number;
-  jarsProduced: number;
-  apiaries: Apiary[];
-  certificationStatus: CertificationStatus;
-  containerType: string;
-  labelType: string;
-  weightKg: number;
-  jarUsed: number;
-  // Certification data fields
-  originOnly: number;
-  qualityOnly: number;
-  bothCertifications: number;
-  uncertified: number;
-  // Percentage fields
-  originOnlyPercent: number;
-  qualityOnlyPercent: number;
-  bothCertificationsPercent: number;
-  uncertifiedPercent: number;
-  // Progress tracking
-  completedChecks: number;
-  totalChecks: number;
-  
-  // Optional dates
-  certificationDate?: string;
-  expiryDate?: string;
-  
-  // Optional file paths
-  productionReportPath?: string;
-  labReportPath?: string;
-  
-  // JSON field
-  jarCertifications?: any;
-  
-  // Honey data fields
-  honeyCertified?: number;
-  honeyRemaining?: number;
-  totalHoneyCollected?: number;
-  // Relations
-  userId: number;
-}
 
-interface TokenStatisticsProps {
-  selectedBatches: string[];
-  batches: Batch[];
-  onStatsUpdate?: (stats: any) => void;
-}
-
-const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batches, onStatsUpdate }) => {
-  // State for live token statistics
+const TokenStatistics: React.FC = () => {
+  
+  // State for API data
+  const [apiTokenStats, setApiTokenStats] = useState<TokenStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // State for live updates
   const [liveTokenStats, setLiveTokenStats] = useState({
     originOnly: 0,
     qualityOnly: 0,
@@ -82,46 +38,150 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
     totalUsed: 0,
     uncertified: 0
   });
-
-  // State for animation and recent activity
+  
+  const [hasReceivedValidData, setHasReceivedValidData] = useState(false);
   const [recentActivity, setRecentActivity] = useState<{
     type: 'completed' | 'rollback';
     tokensUsed: number;
     certificationBreakdown: any;
     timestamp: number;
   } | null>(null);
-
-  // State for progress tracking
+  
   const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Auth state with localStorage support
+   const [authToken, setAuthToken] = useState<string | null>(getTokenFromStorage);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!getTokenFromStorage());
 
-  // Calculate token statistics from selected batches
-  const calculateTokenStatistics = () => {
-    const selectedBatchData = selectedBatches.map(id => batches.find(b => b.id === id)).filter(Boolean);
-    const totalOriginOnly = Math.floor(selectedBatchData.reduce((sum, batch) => sum + (batch.originOnly || 0), 0));
-    const totalQualityOnly = Math.floor(selectedBatchData.reduce((sum, batch) => sum + (batch.qualityOnly || 0), 0));
-    const totalBothCerts = Math.floor(selectedBatchData.reduce((sum, batch) => sum + (batch.bothCertifications || 0), 0));
-    const totalUncertified = Math.floor(selectedBatchData.reduce((sum, batch) => sum + (batch.uncertified || 0), 0));
+  // Default stats
+  const defaultStats: TokenStats = {
+    originOnly: 0,
+    qualityOnly: 0,
+    bothCertifications: 0,
+    remainingTokens: 0,
+    totalTokens: 0
+  };
+
+  const getAuthHeaders = () => {
+    // Try to get token from state first, then localStorage as fallback
+    const token = authToken || localStorage.getItem('authToken');
+    if (token) {
+      return {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+    }
     
-    const totalCertified = totalOriginOnly + totalQualityOnly + totalBothCerts;
-    const tokensUsed = totalCertified;
-    const tokensAvailable = totalUncertified;
-    const totalTokensPossible = tokensUsed + tokensAvailable;
-
+    // Option 2: If using session cookies
+    // return {
+    //   'Content-Type': 'application/json',
+    //   'credentials': 'include'
+    // };
+    
+    // Fallback to basic headers
     return {
-      totalOriginOnly,
-      totalQualityOnly,
-      totalBothCerts,
-      totalUncertified,
-      totalCertified,
-      tokensUsed,
-      tokensAvailable,
-      totalTokensPossible
+      'Content-Type': 'application/json',
     };
   };
 
-  const tokenStats = calculateTokenStatistics();
+  // Fetch token stats from API
+  const fetchTokenStats = async () => {
+    try {
+      setLoading(true);
+      
+      const headers = getAuthHeaders();
+      const fetchOptions: RequestInit = {
+        method: 'GET',
+        headers: headers,
+        credentials: 'include', // Include cookies for authentication
+      };
 
-  // Listen for batch completion events to update live statistics
+      const response = await fetch('/api/token-stats/update', fetchOptions);
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          setIsAuthenticated(false);
+          throw new Error('Authentication required. Please log in.');
+        }
+        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Validate response structure
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response format from server');
+      }
+      
+      // Map API response to our structure with defaults
+      const stats: TokenStats = {
+        originOnly: data.originOnly || 0,
+        qualityOnly: data.qualityOnly || 0,
+        bothCertifications: data.bothCertifications || 0,
+        remainingTokens: data.remainingTokens || 0,
+        totalTokens: data.totalTokens || 0,
+        usedTokens: data.usedTokens || 0
+      };
+      
+      setApiTokenStats(stats);
+      setError(null);
+      setIsAuthenticated(true);
+      
+      // Calculate initial live stats
+      const totalUsed = stats.totalTokens - stats.remainingTokens;
+      const hasValidData = stats.totalTokens > 0 || totalUsed > 0 || 
+                          stats.originOnly > 0 || stats.qualityOnly > 0 || 
+                          stats.bothCertifications > 0;
+      
+      if (hasValidData || !hasReceivedValidData) {
+        setLiveTokenStats({
+          originOnly: stats.originOnly,
+          qualityOnly: stats.qualityOnly,
+          bothCertifications: stats.bothCertifications,
+          totalUsed,
+          uncertified: stats.remainingTokens
+        });
+        
+        if (hasValidData) setHasReceivedValidData(true);
+      }
+      
+    } catch (err) {
+      console.error('Error fetching token stats:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load token statistics';
+      setError(errorMessage);
+      
+      // Set demo data if API fails
+      if (!hasReceivedValidData) {
+        const demoStats = {
+          originOnly: 150,
+          qualityOnly: 200,
+          bothCertifications: 75,
+          totalUsed: 425,
+          uncertified: 575
+        };
+        setLiveTokenStats(demoStats);
+        setApiTokenStats({
+          ...defaultStats,
+          totalTokens: 1000,
+          remainingTokens: 575,
+          originOnly: 150,
+          qualityOnly: 200,
+          bothCertifications: 75
+        });
+        setHasReceivedValidData(true);
+        console.log('Using demo data due to API failure');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchTokenStats();
+  }, []);
+
+  // Handle batch completion events
   useEffect(() => {
     const handleBatchCompleted = (event: CustomEvent) => {
       const { 
@@ -129,22 +189,12 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
         tokensUsed, 
         originOnlyTokens, 
         qualityOnlyTokens, 
-        bothCertificationsTokens,
-        totalCertified,
-        newTokenBalance
-      } = event.detail;
-      
-      console.log('TokenStatistics: Batch completed event received', {
-        certificationBreakdown,
-        tokensUsed,
-        originOnlyTokens,
-        qualityOnlyTokens,
         bothCertificationsTokens
-      });
-
+      } = event.detail || {};
+      
       setIsUpdating(true);
+      setHasReceivedValidData(true);
 
-      // Update live token statistics
       setLiveTokenStats(prev => {
         const newStats = {
           originOnly: prev.originOnly + Math.floor(originOnlyTokens || certificationBreakdown?.originOnly || 0),
@@ -153,12 +203,10 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
           totalUsed: prev.totalUsed + Math.floor(tokensUsed || 0),
           uncertified: Math.max(0, prev.uncertified - Math.floor(tokensUsed || 0))
         };
-
-        console.log('TokenStatistics: Updated live stats', { prev, newStats });
+        
         return newStats;
       });
 
-      // Set recent activity for animation
       setRecentActivity({
         type: 'completed',
         tokensUsed: Math.floor(tokensUsed || 0),
@@ -170,41 +218,18 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
         timestamp: Date.now()
       });
 
-      // Notify parent component of stats update
-      if (onStatsUpdate) {
-        onStatsUpdate({
-          originOnly: Math.floor(originOnlyTokens || certificationBreakdown?.originOnly || 0),
-          qualityOnly: Math.floor(qualityOnlyTokens || certificationBreakdown?.qualityOnly || 0),
-          bothCertifications: Math.floor(bothCertificationsTokens || certificationBreakdown?.bothCertifications || 0),
-          tokensUsed: Math.floor(tokensUsed || 0),
-          totalCertified: totalCertified,
-          newTokenBalance: newTokenBalance
-        });
-      }
-
-      // Reset updating state after animation
-      setTimeout(() => {
-        setIsUpdating(false);
-      }, 1000);
-
-      // Clear recent activity after 3 seconds
-      setTimeout(() => {
-        setRecentActivity(null);
-      }, 3000);
+      setTimeout(() => setIsUpdating(false), 1000);
+      setTimeout(() => setRecentActivity(null), 3000);
+      
+      // Refresh data from API after delay to ensure consistency
+      setTimeout(fetchTokenStats, 2000);
     };
 
     const handleBatchRollback = (event: CustomEvent) => {
-      const { certificationBreakdown, tokensRestored, error } = event.detail;
+      const { certificationBreakdown, tokensRestored } = event.detail || {};
       
-      console.log('TokenStatistics: Batch rollback event received', {
-        certificationBreakdown,
-        tokensRestored,
-        error
-      });
-
       setIsUpdating(true);
 
-      // Rollback live token statistics
       setLiveTokenStats(prev => {
         const newStats = {
           originOnly: Math.max(0, prev.originOnly - Math.floor(certificationBreakdown?.originOnly || 0)),
@@ -213,12 +238,10 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
           totalUsed: Math.max(0, prev.totalUsed - Math.floor(tokensRestored || 0)),
           uncertified: prev.uncertified + Math.floor(tokensRestored || 0)
         };
-
-        console.log('TokenStatistics: Rolled back stats', { prev, newStats });
+        
         return newStats;
       });
 
-      // Set recent activity for rollback indication
       setRecentActivity({
         type: 'rollback',
         tokensUsed: Math.floor(tokensRestored || 0),
@@ -226,42 +249,24 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
         timestamp: Date.now()
       });
 
-      // Reset updating state after animation
-      setTimeout(() => {
-        setIsUpdating(false);
-      }, 1000);
-
-      // Clear recent activity after 3 seconds
-      setTimeout(() => {
-        setRecentActivity(null);
-      }, 3000);
+      setTimeout(() => setIsUpdating(false), 1000);
+      setTimeout(() => setRecentActivity(null), 3000);
+      
+      // Refresh data from API
+      setTimeout(fetchTokenStats, 2000);
     };
 
-    // Add event listeners
     window.addEventListener('batchCompleted', handleBatchCompleted as EventListener);
     window.addEventListener('batchRollback', handleBatchRollback as EventListener);
 
-    // Cleanup
     return () => {
       window.removeEventListener('batchCompleted', handleBatchCompleted as EventListener);
       window.removeEventListener('batchRollback', handleBatchRollback as EventListener);
     };
-  }, [onStatsUpdate]);
+  }, []);
 
-  // Initialize live stats from batches on component mount
-  useEffect(() => {
-    const allBatches = batches || [];
-    const initialStats = {
-      originOnly: Math.floor(allBatches.reduce((sum, batch) => sum + (batch.originOnly || 0), 0)),
-      qualityOnly: Math.floor(allBatches.reduce((sum, batch) => sum + (batch.qualityOnly || 0), 0)),
-      bothCertifications: Math.floor(allBatches.reduce((sum, batch) => sum + (batch.bothCertifications || 0), 0)),
-      totalUsed: Math.floor(allBatches.reduce((sum, batch) => sum + (batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0), 0)),
-      uncertified: Math.floor(allBatches.reduce((sum, batch) => sum + (batch.uncertified || 0), 0))
-    };
-    
-    console.log('TokenStatistics: Initialized with stats', initialStats);
-    setLiveTokenStats(initialStats);
-  }, [batches]);
+  // Use API stats if available, otherwise defaults
+  const stats = apiTokenStats || defaultStats;
 
   // Prepare data for charts
   const pieData = [
@@ -271,20 +276,15 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
     { name: 'Uncertified', value: liveTokenStats.uncertified, color: '#E2E8F0' }
   ].filter(item => item.value > 0);
 
-  const barData = [
-    { name: 'Origin', value: tokenStats.totalOriginOnly, color: '#3182CE' },
-    { name: 'Quality', value: tokenStats.totalQualityOnly, color: '#38A169' },
-    { name: 'Both', value: tokenStats.totalBothCerts, color: '#805AD5' },
-  ].filter(item => item.value > 0);
-
   // Custom tooltip for charts
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+      const total = Math.max(stats.totalTokens, liveTokenStats.totalUsed + liveTokenStats.uncertified, 1);
       return (
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-medium">{`${label}: ${payload[0].value}`}</p>
+          <p className="font-medium">{`${payload[0].name}: ${payload[0].value}`}</p>
           <p className="text-sm text-gray-600">
-            {`${((payload[0].value / liveTokenStats.totalUsed) * 100).toFixed(1)}% of total`}
+            {`${((payload[0].value / total) * 100).toFixed(1)}% of total`}
           </p>
         </div>
       );
@@ -292,25 +292,120 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
     return null;
   };
 
+  // Login function with localStorage persistence
+  const handleLogin = async () => {
+    try {
+      // In a real app, this would make an API call to authenticate
+      // const response = await fetch('/api/auth/login', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ username, password })
+      // });
+      // const data = await response.json();
+      // const token = data.token;
+      
+      // For demo purposes, simulate a successful login
+      const token = 'demo-token-123';
+      
+      // Store token in localStorage
+      localStorage.setItem('authToken', token);
+      setAuthToken(token);
+      setIsAuthenticated(true);
+      setError(null);
+      
+      await fetchTokenStats();
+    } catch (err) {
+      console.error('Login failed:', err);
+      setError('Login failed. Please try again.');
+    }
+  };
+
+  // Logout function
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setAuthToken(null);
+    setIsAuthenticated(false);
+    setApiTokenStats(null);
+    setLiveTokenStats({
+      originOnly: 0,
+      qualityOnly: 0,
+      bothCertifications: 0,
+      totalUsed: 0,
+      uncertified: 0
+    });
+    setHasReceivedValidData(false);
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="bg-white p-4 rounded-lg shadow flex justify-center items-center h-64">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="mt-4 text-gray-600">Loading token statistics...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state with auth check
+  if (error) {
+    return (
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h2 className="text-lg font-semibold text-red-600">Error</h2>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <div className="flex gap-2">
+          <button 
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            onClick={fetchTokenStats}
+          >
+            Retry
+          </button>
+          {!isAuthenticated && (
+            <button 
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+              onClick={handleLogin}
+            >
+              Login (Demo)
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white p-4 rounded-lg shadow">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Certification Tokens</h2>
-        {isUpdating && (
-          <div className="flex items-center space-x-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
-            <span className="text-sm text-blue-600">Updating...</span>
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          {isAuthenticated && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-green-600">● Connected</span>
+              <button 
+                onClick={handleLogout}
+                className="text-sm text-red-600 hover:text-red-800 underline"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+          {isUpdating && (
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+              <span className="text-sm text-blue-600">Updating...</span>
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Recent Activity Banner */}
       {recentActivity && (
-        <div className={`mb-4 p-3 rounded-lg border-l-4 ${
+        <div className={`mb-4 p-3 rounded-lg border-l-4 transition-all duration-300 ${
           recentActivity.type === 'completed' 
             ? 'bg-green-50 border-green-400' 
             : 'bg-red-50 border-red-400'
-        } transition-all duration-500 ease-in-out`}>
+        }`}>
           <div className="flex items-center justify-between">
             <div>
               <p className={`text-sm font-medium ${
@@ -321,13 +416,6 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
               <p className="text-xs text-gray-600">
                 {recentActivity.type === 'completed' ? 'Tokens Used: ' : 'Tokens Restored: '}
                 {recentActivity.tokensUsed}
-                {recentActivity.certificationBreakdown && (
-                  <span className="ml-2">
-                    (Origin: {recentActivity.certificationBreakdown.originOnly || 0}, 
-                    Quality: {recentActivity.certificationBreakdown.qualityOnly || 0}, 
-                    Both: {recentActivity.certificationBreakdown.bothCertifications || 0})
-                  </span>
-                )}
               </p>
             </div>
             <div className={`text-2xl ${
@@ -339,46 +427,36 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
         </div>
       )}
       
-      {/* Live Token Statistics Summary */}
+      {/* Token Summary Section */}
       <div className="mb-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
-        <h3 className="text-sm font-medium text-blue-800 mb-2">Live Token Statistics (All Batches)</h3>
+        <h3 className="text-sm font-medium text-blue-800 mb-2">Token Statistics</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
           <div className="text-center">
-            <div className={`text-2xl font-bold text-blue-600 transition-all duration-300 ${
-              isUpdating ? 'scale-110' : ''
-            }`}>
+            <div className={`text-2xl font-bold text-blue-600 transition-transform duration-200 ${isUpdating ? 'scale-110' : ''}`}>
               {liveTokenStats.originOnly}
             </div>
             <div className="text-xs text-gray-600">Origin Only</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold text-green-600 transition-all duration-300 ${
-              isUpdating ? 'scale-110' : ''
-            }`}>
+            <div className={`text-2xl font-bold text-green-600 transition-transform duration-200 ${isUpdating ? 'scale-110' : ''}`}>
               {liveTokenStats.qualityOnly}
             </div>
             <div className="text-xs text-gray-600">Quality Only</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold text-purple-600 transition-all duration-300 ${
-              isUpdating ? 'scale-110' : ''
-            }`}>
+            <div className={`text-2xl font-bold text-purple-600 transition-transform duration-200 ${isUpdating ? 'scale-110' : ''}`}>
               {liveTokenStats.bothCertifications}
             </div>
             <div className="text-xs text-gray-600">Both Certs</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold text-yellow-600 transition-all duration-300 ${
-              isUpdating ? 'scale-110' : ''
-            }`}>
+            <div className={`text-2xl font-bold text-yellow-600 transition-transform duration-200 ${isUpdating ? 'scale-110' : ''}`}>
               {liveTokenStats.totalUsed}
             </div>
             <div className="text-xs text-gray-600">Total Used</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold text-gray-600 transition-all duration-300 ${
-              isUpdating ? 'scale-110' : ''
-            }`}>
+            <div className={`text-2xl font-bold text-gray-600 transition-transform duration-200 ${isUpdating ? 'scale-110' : ''}`}>
               {liveTokenStats.uncertified}
             </div>
             <div className="text-xs text-gray-600">Uncertified</div>
@@ -389,83 +467,62 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
       {/* Charts Section */}
       {pieData.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">Token Distribution (All Batches)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Pie Chart */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="text-xs font-medium text-gray-600 mb-2">Distribution</h4>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Bar Chart */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="text-xs font-medium text-gray-600 mb-2">Selected Batches</h4>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={barData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#8884d8">
-                    {barData.map((entry, index) => (
-                      <Cell key={`bar-cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Token Distribution</h3>
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={2}
+                  dataKey="value"
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
       
-      {/* Selected Batches Token Status */}
+      {/* Global Token Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-gray-50 p-4 rounded-lg">
-          <h3 className="text-sm font-medium text-gray-600 mb-2">Selected Batches Token Status</h3>
+          <h3 className="text-sm font-medium text-gray-600 mb-2">Global Token Status</h3>
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span>Total tokens used:</span>
-              <span className="font-medium">{tokenStats.tokensUsed}</span>
+              <span>Total tokens:</span>
+              <span className="font-medium">{stats.totalTokens}</span>
             </div>
             <div className="flex justify-between">
-              <span>Available for certification:</span>
-              <span className="font-medium">{tokenStats.tokensAvailable}</span>
+              <span>Tokens used:</span>
+              <span className="font-medium">{liveTokenStats.totalUsed}</span>
             </div>
             <div className="flex justify-between">
-              <span>Total possible:</span>
-              <span className="font-medium">{tokenStats.totalTokensPossible}</span>
+              <span>Available:</span>
+              <span className="font-medium">{liveTokenStats.uncertified}</span>
             </div>
-            {tokenStats.totalTokensPossible > 0 && (
-              <div className="relative pt-1">
-                <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
-                  <div
-                    style={{ width: `${(tokenStats.tokensUsed / tokenStats.totalTokensPossible) * 100}%` }}
-                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500 transition-all duration-500"
-                  ></div>
-                </div>
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>{((tokenStats.tokensUsed / tokenStats.totalTokensPossible) * 100).toFixed(1)}% used</span>
-                  <span>{tokenStats.totalTokensPossible} total</span>
-                </div>
+            <div className="relative pt-1">
+              <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
+                <div
+                  style={{ width: `${stats.totalTokens > 0 ? (liveTokenStats.totalUsed / stats.totalTokens) * 100 : 0}%` }}
+                  className="bg-green-500 transition-all duration-500"
+                ></div>
               </div>
-            )}
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>
+                  {stats.totalTokens > 0 ? ((liveTokenStats.totalUsed / stats.totalTokens) * 100).toFixed(1) : 0}% used
+                </span>
+                <span>{stats.totalTokens} total</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -478,55 +535,52 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ selectedBatches, batc
                 <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
                 Origin Only:
               </span>
-              <span className="font-medium">{tokenStats.totalOriginOnly}</span>
+              <span className="font-medium">{liveTokenStats.originOnly}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="flex items-center">
                 <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
                 Quality Only:
               </span>
-              <span className="font-medium">{tokenStats.totalQualityOnly}</span>
+              <span className="font-medium">{liveTokenStats.qualityOnly}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="flex items-center">
                 <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
                 Both Certifications:
               </span>
-              <span className="font-medium">{tokenStats.totalBothCerts}</span>
+              <span className="font-medium">{liveTokenStats.bothCertifications}</span>
             </div>
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between font-medium">
-                <span>Total Selected:</span>
-                <span>{tokenStats.tokensUsed}</span>
+                <span>Total Used:</span>
+                <span>{liveTokenStats.totalUsed}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Usage Efficiency Metrics */}
+      {/* Usage Efficiency */}
       {liveTokenStats.totalUsed > 0 && (
         <div className="mt-4 bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border">
           <h3 className="text-sm font-medium text-gray-700 mb-2">Usage Efficiency</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="text-center">
               <div className="text-lg font-bold text-blue-600">
-                {liveTokenStats.totalUsed > 0 ? 
-                  ((liveTokenStats.originOnly / liveTokenStats.totalUsed) * 100).toFixed(1) : 0}%
+                {liveTokenStats.totalUsed > 0 ? ((liveTokenStats.originOnly / liveTokenStats.totalUsed) * 100).toFixed(1) : 0}%
               </div>
               <div className="text-xs text-gray-600">Origin Certified</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-green-600">
-                {liveTokenStats.totalUsed > 0 ? 
-                  ((liveTokenStats.qualityOnly / liveTokenStats.totalUsed) * 100).toFixed(1) : 0}%
+                {liveTokenStats.totalUsed > 0 ? ((liveTokenStats.qualityOnly / liveTokenStats.totalUsed) * 100).toFixed(1) : 0}%
               </div>
               <div className="text-xs text-gray-600">Quality Certified</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-purple-600">
-                {liveTokenStats.totalUsed > 0 ? 
-                  ((liveTokenStats.bothCertifications / liveTokenStats.totalUsed) * 100).toFixed(1) : 0}%
+                {liveTokenStats.totalUsed > 0 ? ((liveTokenStats.bothCertifications / liveTokenStats.totalUsed) * 100).toFixed(1) : 0}%
               </div>
               <div className="text-xs text-gray-600">Dual Certified</div>
             </div>

@@ -123,7 +123,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ... existing imports ...
 export async function PUT(request: NextRequest) {
   try {
     // Authentication - get userId and convert to number
@@ -138,7 +137,7 @@ export async function PUT(request: NextRequest) {
     
     const formData = await request.formData();
     const data = JSON.parse(formData.get('data') as string);
-    const { batchId, updatedFields, apiaries, batchJars, jarCertifications, tokenStats } = data;
+    const { batchId, updatedFields, apiaries, batchJars, jarCertifications } = data;
 
     // Handle file uploads (production report and lab report)
     let productionReportPath = null;
@@ -154,7 +153,7 @@ export async function PUT(request: NextRequest) {
       labReportPath = "public/uploads/lab_report"; // Replace with actual saved path
     }
 
-    // FIXED: Get the original batch to understand current state
+    // Get the original batch to understand current state
     const originalBatch = await prisma.batch.findUnique({
       where: { id: batchId },
       select: { 
@@ -172,7 +171,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // FIXED: Calculate honey amounts correctly using weightKg as the source of truth
+    // Calculate honey amounts correctly using weightKg as the source of truth
     let totalHoneyCertifiedInThisSession = 0;
     let totalJarsUsed = 0;
 
@@ -184,14 +183,14 @@ export async function PUT(request: NextRequest) {
       totalJarsUsed = batchJars.reduce((sum: number, jar: any) => sum + jar.quantity, 0);
     }
 
-    // FIXED: Use weightKg as the definitive source for total honey collected
+    // Use weightKg as the definitive source for total honey collected
     const totalHoneyCollected = originalBatch.weightKg || originalBatch.totalHoneyCollected || 0;
 
-    // FIXED: Calculate cumulative certified amount
+    // Calculate cumulative certified amount
     const previousTotalCertified = originalBatch.honeyCertified || 0;
     const newTotalCertified = previousTotalCertified + totalHoneyCertifiedInThisSession;
 
-    // FIXED: Calculate remaining honey after this certification
+    // Calculate remaining honey after this certification
     const newHoneyRemaining = Math.max(0, totalHoneyCollected - newTotalCertified);
 
     // Calculate certification breakdowns from batchJars
@@ -222,7 +221,7 @@ export async function PUT(request: NextRequest) {
     const bothCertificationsPercent = totalHoneyCollected > 0 ? Math.round((bothCertifications / totalHoneyCollected) * 100) : 0;
     const uncertifiedPercent = totalHoneyCollected > 0 ? Math.round((newHoneyRemaining / totalHoneyCollected) * 100) : 0;
 
-    // FIXED: Update the batch with correct values
+    // Update the batch with correct values
     const updatedBatch = await prisma.batch.update({
       where: { id: batchId },
       data: {
@@ -233,10 +232,10 @@ export async function PUT(request: NextRequest) {
         completedChecks: updatedFields.completedChecks,
         totalChecks: updatedFields.totalChecks,
         
-        // FIXED: Keep weightKg as the definitive total honey collected (never changes after creation)
+        // Keep weightKg as the definitive total honey collected (never changes after creation)
         // Don't update weightKg here as it represents the original honey collected
         
-        // FIXED: Store honey tracking amounts correctly
+        // Store honey tracking amounts correctly
         totalHoneyCollected: totalHoneyCollected, // Keep consistent with weightKg
         honeyCertified: newTotalCertified, // Cumulative certified amount
         honeyRemaining: newHoneyRemaining, // Remaining honey after this certification
@@ -288,7 +287,7 @@ export async function PUT(request: NextRequest) {
             }
           });
         } else {
-          // FIXED: Create new apiary with proper user and batch relationships
+          // Create new apiary with proper user and batch relationships
           await prisma.apiary.create({
             data: {
               name: apiaryData.name || '',
@@ -313,31 +312,9 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update Token Stats after batch update is successful
-    try {
-      const tokenStatsResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/token-stats/update`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${request.headers.get('Authorization')}`
-        },
-        body: JSON.stringify({
-          originOnly,
-          qualityOnly,
-          bothCertifications,
-          tokensUsed: originOnly + qualityOnly + bothCertifications
-        })
-      });
-      
-      if (!tokenStatsResponse.ok) {
-        console.error('Token stats update failed:', await tokenStatsResponse.text());
-      } else {
-        console.log('Token stats updated successfully');
-      }
-    } catch (tokenError) {
-      console.error('Error updating token stats:', tokenError);
-      // Don't fail the entire request - just log the error
-    }
+    // ✅ REMOVED: No more automatic token stats update from batch API
+    // Token stats should be updated separately by your frontend or dedicated service
+    // This prevents the duplicate token charging issue
 
     console.log('Batch completion summary:', {
       batchId,
@@ -348,7 +325,9 @@ export async function PUT(request: NextRequest) {
       originOnly,
       qualityOnly,
       bothCertifications,
-      totalJarsUsed
+      totalJarsUsed,
+      // Note: Token stats are NOT updated here to prevent duplicate charges
+      tokenStatsNote: 'Token stats should be updated separately by frontend'
     });
 
     return NextResponse.json({

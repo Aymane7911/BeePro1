@@ -1,21 +1,88 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CreditCard, ArrowLeft, Check, AlertCircle, Loader, Sparkles, Star, Zap } from 'lucide-react';
 import Web3 from "../../web3";
 import { contractAddress, contractABI } from "../../contractsinfo";
-
 
 const BuyTokensPage = () => {
   // Get initial token amount from URL params if redirected from modal
   const urlParams = new URLSearchParams(window.location.search);
   const initialTokens = parseInt(urlParams.get('tokens') ?? '100');
 
-  
   const [tokensToAdd, setTokensToAdd] = useState(initialTokens);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [selectedPackage, setSelectedPackage] = useState(null);
+  
+  // Authentication state
+  const [authToken, setAuthToken] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Get token from storage (localStorage/sessionStorage)
+  const getTokenFromStorage = () => {
+    if (typeof window !== 'undefined') {
+      // Debug: Check all possible token storage locations
+      console.log('🔍 Checking token storage locations:');
+      console.log('localStorage.authToken:', localStorage.getItem('authToken'));
+      console.log('sessionStorage.authToken:', sessionStorage.getItem('authToken'));
+      console.log('localStorage.token:', localStorage.getItem('token'));
+      console.log('sessionStorage.token:', sessionStorage.getItem('token'));
+      console.log('localStorage.accessToken:', localStorage.getItem('accessToken'));
+      console.log('sessionStorage.accessToken:', sessionStorage.getItem('accessToken'));
+      console.log('localStorage.jwt:', localStorage.getItem('jwt'));
+      console.log('sessionStorage.jwt:', sessionStorage.getItem('jwt'));
+      console.log('localStorage.userToken:', localStorage.getItem('userToken'));
+      console.log('sessionStorage.userToken:', sessionStorage.getItem('userToken'));
+      
+      // Check all localStorage keys
+      console.log('All localStorage keys:', Object.keys(localStorage));
+      console.log('All sessionStorage keys:', Object.keys(sessionStorage));
+      
+      // Try different common token key names
+      return localStorage.getItem('authToken') || 
+             sessionStorage.getItem('authToken') ||
+             localStorage.getItem('token') ||
+             sessionStorage.getItem('token') ||
+             localStorage.getItem('accessToken') ||
+             sessionStorage.getItem('accessToken') ||
+             localStorage.getItem('jwt') ||
+             sessionStorage.getItem('jwt') ||
+             localStorage.getItem('userToken') ||
+             sessionStorage.getItem('userToken');
+    }
+    return null;
+  };
+
+  // Initialize authentication
+  useEffect(() => {
+    const token = getTokenFromStorage();
+    console.log('🔐 Found token:', token ? 'Yes' : 'No');
+    console.log('🔐 Token preview:', token ? `${token.substring(0, 20)}...` : 'null');
+    
+    if (token) {
+      setAuthToken(token);
+      setIsAuthenticated(true);
+      console.log('✅ Authentication successful');
+    } else {
+      setIsAuthenticated(false);
+      console.log('❌ No authentication token found');
+    }
+  }, []);
+
+  // Get authentication headers
+  const getAuthHeaders = () => {
+    const token = authToken || getTokenFromStorage();
+    if (token) {
+      return {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+    }
+    return {
+      'Content-Type': 'application/json',
+    };
+  };
 
   // Token packages with enhanced styling data
   const tokenPackages = [
@@ -61,17 +128,76 @@ const BuyTokensPage = () => {
     }
   ];
 
-  const calculatePrice = (tokens: number): string => {
+  const calculatePrice = (tokens) => {
     return (tokens * 0.10).toFixed(2);
   };
 
-  const handlePackageSelect = (pkg: { tokens: number; price: number; popular: boolean; gradient: string; icon: string; badge: string }) => {
+  const handlePackageSelect = (pkg) => {
     setSelectedPackage(pkg);
     setTokensToAdd(pkg.tokens);
   };
 
+  // Function to update token balance in database
+  const updateTokenBalance = async (tokensToAdd) => {
+    try {
+      console.log(`🔄 Updating database with ${tokensToAdd} tokens...`);
+      
+      // Get auth headers
+      const headers = getAuthHeaders();
+      console.log('🔐 Using headers:', headers);
+      
+      // First, get current token stats
+      const getCurrentStats = await fetch('/api/token-stats/update', {
+        method: 'GET',
+        headers: headers,
+      });
+
+      if (!getCurrentStats.ok) {
+        if (getCurrentStats.status === 401) {
+          throw new Error('Authentication failed. Please log in again.');
+        }
+        throw new Error('Failed to get current token stats');
+      }
+
+      const currentStats = await getCurrentStats.json();
+      console.log('📊 Current stats:', currentStats);
+
+      // Add tokens to balance
+      const updateResponse = await fetch('/api/token-stats/add-tokens', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          tokensToAdd: tokensToAdd
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        if (updateResponse.status === 401) {
+          throw new Error('Authentication failed. Please log in again.');
+        }
+        const errorData = await updateResponse.json();
+        throw new Error(errorData.error || 'Failed to update token balance');
+      }
+
+      const updatedStats = await updateResponse.json();
+      console.log('✅ Updated stats:', updatedStats);
+      
+      return updatedStats;
+    } catch (error) {
+      console.error('❌ Error updating token balance:', error);
+      throw error;
+    }
+  };
+
   // Simulate Stripe payment process
   const handleStripePayment = async () => {
+    // Check authentication first
+    if (!isAuthenticated) {
+      setPaymentStatus('error');
+      alert('Please log in to purchase tokens.');
+      return;
+    }
+
     setIsProcessing(true);
     setPaymentStatus(null);
 
@@ -83,27 +209,43 @@ const BuyTokensPage = () => {
       const testCardSuccess = Math.random() > 0.2; // 80% success rate for demo
       
       if (testCardSuccess) {
-        setPaymentStatus('success');
-        const currentBalance = parseInt(localStorage.getItem('tokenBalance') || '0');
-        const newBalance = currentBalance + tokensToAdd;
-        localStorage.setItem('tokenBalance', newBalance.toString());
-        
-        // Dispatch custom event to update token balance
-        window.dispatchEvent(new CustomEvent('tokensUpdated', {
-          detail: { 
-            action: 'add',
-            tokensAdded: tokensToAdd,
-            newBalance: newBalance
+        // ✅ FIXED: Update database first, then localStorage
+        try {
+          await updateTokenBalance(tokensToAdd);
+          
+          // Update localStorage for immediate UI feedback
+          const currentBalance = parseInt(localStorage.getItem('tokenBalance') || '0');
+          const newBalance = currentBalance + tokensToAdd;
+          localStorage.setItem('tokenBalance', newBalance.toString());
+          
+          // Dispatch custom event to update token balance in UI
+          window.dispatchEvent(new CustomEvent('tokensUpdated', {
+            detail: { 
+              action: 'add',
+              tokensAdded: tokensToAdd,
+              newBalance: newBalance
+            }
+          }));
+          
+          setPaymentStatus('success');
+          console.log(`✅ Successfully purchased ${tokensToAdd} tokens for $${calculatePrice(tokensToAdd)}`);
+          
+        } catch (dbError) {
+          console.error('❌ Database update failed:', dbError);
+          setPaymentStatus('error');
+          
+          // Show specific error message for authentication issues
+          if (dbError.message.includes('Authentication failed')) {
+            alert('Your session has expired. Please log in again.');
           }
-        }));
-        
-        console.log(`Successfully purchased ${tokensToAdd} tokens for ${calculatePrice(tokensToAdd)}`);
+          return;
+        }
       } else {
         setPaymentStatus('error');
       }
     } catch (error) {
       setPaymentStatus('error');
-      console.error('Payment failed:', error);
+      console.error('❌ Payment failed:', error);
     } finally {
       setIsProcessing(false);
     }
@@ -114,6 +256,29 @@ const BuyTokensPage = () => {
     setTokensToAdd(100);
     setSelectedPackage(null);
   };
+
+  // Show authentication warning if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/50 p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-gradient-to-r from-red-400 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h2>
+          <p className="text-gray-600 mb-6">
+            You need to log in to purchase tokens. Please authenticate your account first.
+          </p>
+          <button
+            onClick={() => window.location.href = '/login'} // Adjust path as needed
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-lg"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (paymentStatus === 'success') {
     return (
@@ -165,8 +330,6 @@ const BuyTokensPage = () => {
       </div>
     );
   }
-   
-   
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">

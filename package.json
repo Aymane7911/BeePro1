@@ -17,6 +17,7 @@
     "@types/pg": "^8.15.1",
     "@types/recharts": "^1.8.29",
     "bcryptjs": "^2.4.3",
+    "ethers": "^6.15.0",
     "formidable": "^3.5.4",
     "git-filter-repo": "^0.0.30",
     "google-auth-library": "^9.15.1",

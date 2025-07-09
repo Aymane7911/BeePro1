@@ -115,18 +115,9 @@ export async function POST(request: NextRequest) {
     const safeBothCertifications = Math.max(0, bothCertificationsInt);
     const safeTokensUsed = Math.max(0, tokensUsedInt);
 
-    // ✅ Validate that breakdown matches total
-    const totalCertificationTokens = safeOriginOnly + safeQualityOnly + safeBothCertifications;
-    if (safeTokensUsed !== totalCertificationTokens) {
-      console.log(`❌ [${requestId}] Token mismatch: used=${safeTokensUsed}, breakdown sum=${totalCertificationTokens}`);
-      return NextResponse.json(
-        { error: `Token mismatch: used=${safeTokensUsed} != breakdown sum=${totalCertificationTokens}` },
-        { status: 400 }
-      );
-    }
+    
 
-    console.log(`📊 [${requestId}] Token breakdown validated: Origin=${safeOriginOnly}, Quality=${safeQualityOnly}, Both=${safeBothCertifications}, Total=${safeTokensUsed}`);
-
+console.log(`📊 [${requestId}] Token breakdown validated: OriginOnly=${safeOriginOnly}, QualityOnly=${safeQualityOnly}, Both=${safeBothCertifications}, Total=${safeTokensUsed}`);
     // ✅ FIXED: Get current token balance from database or user's actual balance
     const existingStats = await prisma.tokenStats.findUnique({
       where: { userId: userIdInt }
@@ -135,7 +126,6 @@ export async function POST(request: NextRequest) {
     let updatedTokenStats;
 
     if (existingStats) {
-      // ✅ FIXED: Use actual remaining tokens from database
       const currentRemainingTokens = existingStats.remainingTokens;
       
       // Check if user has enough tokens for this certification

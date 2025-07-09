@@ -4,7 +4,6 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 interface TokenStats {
   originOnly: number;
   qualityOnly: number;
-  bothCertifications: number;
   remainingTokens: number;
   totalTokens: number;
   usedTokens?: number;
@@ -22,7 +21,6 @@ const getTokenFromStorage = (): string | null => {
   );
 };
 
-
 const TokenStatistics: React.FC = () => {
   
   // State for API data
@@ -34,7 +32,6 @@ const TokenStatistics: React.FC = () => {
   const [liveTokenStats, setLiveTokenStats] = useState({
     originOnly: 0,
     qualityOnly: 0,
-    bothCertifications: 0,
     totalUsed: 0,
     uncertified: 0
   });
@@ -57,7 +54,6 @@ const TokenStatistics: React.FC = () => {
   const defaultStats: TokenStats = {
     originOnly: 0,
     qualityOnly: 0,
-    bothCertifications: 0,
     remainingTokens: 0,
     totalTokens: 0
   };
@@ -72,13 +68,6 @@ const TokenStatistics: React.FC = () => {
       };
     }
     
-    // Option 2: If using session cookies
-    // return {
-    //   'Content-Type': 'application/json',
-    //   'credentials': 'include'
-    // };
-    
-    // Fallback to basic headers
     return {
       'Content-Type': 'application/json',
     };
@@ -93,7 +82,7 @@ const TokenStatistics: React.FC = () => {
       const fetchOptions: RequestInit = {
         method: 'GET',
         headers: headers,
-        credentials: 'include', // Include cookies for authentication
+        credentials: 'include',
       };
 
       const response = await fetch('/api/token-stats/update', fetchOptions);
@@ -117,7 +106,6 @@ const TokenStatistics: React.FC = () => {
       const stats: TokenStats = {
         originOnly: data.originOnly || 0,
         qualityOnly: data.qualityOnly || 0,
-        bothCertifications: data.bothCertifications || 0,
         remainingTokens: data.remainingTokens || 0,
         totalTokens: data.totalTokens || 0,
         usedTokens: data.usedTokens || 0
@@ -130,14 +118,12 @@ const TokenStatistics: React.FC = () => {
       // Calculate initial live stats
       const totalUsed = stats.totalTokens - stats.remainingTokens;
       const hasValidData = stats.totalTokens > 0 || totalUsed > 0 || 
-                          stats.originOnly > 0 || stats.qualityOnly > 0 || 
-                          stats.bothCertifications > 0;
+                          stats.originOnly > 0 || stats.qualityOnly > 0;
       
       if (hasValidData || !hasReceivedValidData) {
         setLiveTokenStats({
           originOnly: stats.originOnly,
           qualityOnly: stats.qualityOnly,
-          bothCertifications: stats.bothCertifications,
           totalUsed,
           uncertified: stats.remainingTokens
         });
@@ -155,18 +141,16 @@ const TokenStatistics: React.FC = () => {
         const demoStats = {
           originOnly: 150,
           qualityOnly: 200,
-          bothCertifications: 75,
-          totalUsed: 425,
-          uncertified: 575
+          totalUsed: 350,
+          uncertified: 650
         };
         setLiveTokenStats(demoStats);
         setApiTokenStats({
           ...defaultStats,
           totalTokens: 1000,
-          remainingTokens: 575,
+          remainingTokens: 650,
           originOnly: 150,
-          qualityOnly: 200,
-          bothCertifications: 75
+          qualityOnly: 200
         });
         setHasReceivedValidData(true);
         console.log('Using demo data due to API failure');
@@ -188,8 +172,7 @@ const TokenStatistics: React.FC = () => {
         certificationBreakdown, 
         tokensUsed, 
         originOnlyTokens, 
-        qualityOnlyTokens, 
-        bothCertificationsTokens
+        qualityOnlyTokens
       } = event.detail || {};
       
       setIsUpdating(true);
@@ -199,7 +182,6 @@ const TokenStatistics: React.FC = () => {
         const newStats = {
           originOnly: prev.originOnly + Math.floor(originOnlyTokens || certificationBreakdown?.originOnly || 0),
           qualityOnly: prev.qualityOnly + Math.floor(qualityOnlyTokens || certificationBreakdown?.qualityOnly || 0),
-          bothCertifications: prev.bothCertifications + Math.floor(bothCertificationsTokens || certificationBreakdown?.bothCertifications || 0),
           totalUsed: prev.totalUsed + Math.floor(tokensUsed || 0),
           uncertified: Math.max(0, prev.uncertified - Math.floor(tokensUsed || 0))
         };
@@ -212,8 +194,7 @@ const TokenStatistics: React.FC = () => {
         tokensUsed: Math.floor(tokensUsed || 0),
         certificationBreakdown: certificationBreakdown || {
           originOnly: Math.floor(originOnlyTokens || 0),
-          qualityOnly: Math.floor(qualityOnlyTokens || 0),
-          bothCertifications: Math.floor(bothCertificationsTokens || 0)
+          qualityOnly: Math.floor(qualityOnlyTokens || 0)
         },
         timestamp: Date.now()
       });
@@ -234,7 +215,6 @@ const TokenStatistics: React.FC = () => {
         const newStats = {
           originOnly: Math.max(0, prev.originOnly - Math.floor(certificationBreakdown?.originOnly || 0)),
           qualityOnly: Math.max(0, prev.qualityOnly - Math.floor(certificationBreakdown?.qualityOnly || 0)),
-          bothCertifications: Math.max(0, prev.bothCertifications - Math.floor(certificationBreakdown?.bothCertifications || 0)),
           totalUsed: Math.max(0, prev.totalUsed - Math.floor(tokensRestored || 0)),
           uncertified: prev.uncertified + Math.floor(tokensRestored || 0)
         };
@@ -272,7 +252,6 @@ const TokenStatistics: React.FC = () => {
   const pieData = [
     { name: 'Origin Only', value: liveTokenStats.originOnly, color: '#3182CE' },
     { name: 'Quality Only', value: liveTokenStats.qualityOnly, color: '#38A169' },
-    { name: 'Both Certifications', value: liveTokenStats.bothCertifications, color: '#805AD5' },
     { name: 'Uncertified', value: liveTokenStats.uncertified, color: '#E2E8F0' }
   ].filter(item => item.value > 0);
 
@@ -295,15 +274,6 @@ const TokenStatistics: React.FC = () => {
   // Login function with localStorage persistence
   const handleLogin = async () => {
     try {
-      // In a real app, this would make an API call to authenticate
-      // const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ username, password })
-      // });
-      // const data = await response.json();
-      // const token = data.token;
-      
       // For demo purposes, simulate a successful login
       const token = 'demo-token-123';
       
@@ -329,7 +299,6 @@ const TokenStatistics: React.FC = () => {
     setLiveTokenStats({
       originOnly: 0,
       qualityOnly: 0,
-      bothCertifications: 0,
       totalUsed: 0,
       uncertified: 0
     });
@@ -430,7 +399,7 @@ const TokenStatistics: React.FC = () => {
       {/* Token Summary Section */}
       <div className="mb-6 bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
         <h3 className="text-sm font-medium text-blue-800 mb-2">Token Statistics</h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div className="text-center">
             <div className={`text-2xl font-bold text-blue-600 transition-transform duration-200 ${isUpdating ? 'scale-110' : ''}`}>
               {liveTokenStats.originOnly}
@@ -442,12 +411,6 @@ const TokenStatistics: React.FC = () => {
               {liveTokenStats.qualityOnly}
             </div>
             <div className="text-xs text-gray-600">Quality Only</div>
-          </div>
-          <div className="text-center">
-            <div className={`text-2xl font-bold text-purple-600 transition-transform duration-200 ${isUpdating ? 'scale-110' : ''}`}>
-              {liveTokenStats.bothCertifications}
-            </div>
-            <div className="text-xs text-gray-600">Both Certs</div>
           </div>
           <div className="text-center">
             <div className={`text-2xl font-bold text-yellow-600 transition-transform duration-200 ${isUpdating ? 'scale-110' : ''}`}>
@@ -544,13 +507,6 @@ const TokenStatistics: React.FC = () => {
               </span>
               <span className="font-medium">{liveTokenStats.qualityOnly}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="flex items-center">
-                <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
-                Both Certifications:
-              </span>
-              <span className="font-medium">{liveTokenStats.bothCertifications}</span>
-            </div>
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between font-medium">
                 <span>Total Used:</span>
@@ -580,9 +536,9 @@ const TokenStatistics: React.FC = () => {
             </div>
             <div className="text-center">
               <div className="text-lg font-bold text-purple-600">
-                {liveTokenStats.totalUsed > 0 ? ((liveTokenStats.bothCertifications / liveTokenStats.totalUsed) * 100).toFixed(1) : 0}%
+                {liveTokenStats.totalUsed > 0 ? ((liveTokenStats.originOnly + liveTokenStats.qualityOnly) / (liveTokenStats.totalUsed * 2) * 100).toFixed(1) : 0}%
               </div>
-              <div className="text-xs text-gray-600">Dual Certified</div>
+              <div className="text-xs text-gray-600">Total Certification Coverage</div>
             </div>
           </div>
         </div>

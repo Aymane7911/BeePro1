@@ -1342,18 +1342,24 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
   console.log('Total weight (kg for certification):', totalCertifiedAmount);
 
   // Calculate token breakdown
-  const originOnlyTokens = batchJars.reduce((sum, jar) => 
-    jarCertifications[jar.id]?.origin && !jarCertifications[jar.id]?.quality 
-      ? sum + jar.quantity 
-      : sum, 0)
-  const qualityOnlyTokens = batchJars.reduce((sum, jar) => 
-    jarCertifications[jar.id]?.quality && !jarCertifications[jar.id]?.origin 
-      ? sum + jar.quantity 
-      : sum, 0)
-  const bothTokens = batchJars.reduce((sum, jar) => 
-    jarCertifications[jar.id]?.origin && jarCertifications[jar.id]?.quality 
-      ? sum + jar.quantity 
-      : sum, 0)
+  const originOnlyTokens = batchJars.reduce((sum, jar) => {
+  const cert = jarCertifications[jar.id];
+  return cert?.origin && !cert?.quality ? sum + jar.quantity : sum;
+}, 0);
+
+const qualityOnlyTokens = batchJars.reduce((sum, jar) => {
+  const cert = jarCertifications[jar.id];
+  return cert?.quality && !cert?.origin ? sum + jar.quantity : sum;
+}, 0);
+
+const bothCertificationsTokens = batchJars.reduce((sum, jar) => {
+  const cert = jarCertifications[jar.id];
+  return cert?.origin && cert?.quality ? sum + jar.quantity : sum;
+}, 0);
+  
+ // NEW: Calculate what gets added to origin and quality totals
+const totalOriginToAdd = originOnlyTokens + bothCertificationsTokens;
+const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
 
   // Calculate NEW token balance BEFORE making API calls
   const newTokenBalance = tokenBalance - tokensUsed;
@@ -1486,9 +1492,18 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
     }
 
     // Add this check before API call
-    if (tokensUsed !== (originOnlyTokens + qualityOnlyTokens + bothTokens)) {
+    if (tokensUsed !== (originOnlyTokens + qualityOnlyTokens + bothCertificationsTokens)) {
       throw new Error("Token breakdown doesn't match total jar count");
     }
+     
+    console.log('📊 Token breakdown:', {
+  tokensUsed,                    // Total tokens deducted from user's balance
+  originOnlyTokens,              // Tokens with ONLY origin certification
+  qualityOnlyTokens,             // Tokens with ONLY quality certification  
+  bothCertificationsTokens,      // Tokens with BOTH certifications
+  totalOriginToAdd,              // What gets added to origin counter
+  totalQualityToAdd,             // What gets added to quality counter
+});
 
     // STEP 1: Pre-calculate all batch updates for immediate UI refresh
     const batchUpdates = selectedBatches.map(batchId => {
@@ -1578,9 +1593,11 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
       userId: userData.id,
       originOnly: originOnlyTokens,
       qualityOnly: qualityOnlyTokens,
-      bothCertifications: bothTokens,
+      bothCertifications: bothCertificationsTokens,
       tokensUsed: tokensUsed,
-      tokenBalance: tokenBalance
+      tokenBalance: tokenBalance,
+      totalOriginCertified: originOnlyTokens + bothCertificationsTokens,
+      totalQualityCertified: qualityOnlyTokens + bothCertificationsTokens
     });
 
     try {
@@ -1592,9 +1609,9 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
         },
         body: JSON.stringify({
           userId: userData.id,
-          originOnly: originOnlyTokens,
-          qualityOnly: qualityOnlyTokens,
-          bothCertifications: bothTokens,
+          originOnly: totalOriginToAdd,
+          qualityOnly: totalQualityToAdd,
+          bothCertifications: 0,
           tokensUsed: tokensUsed,
         })
       });
@@ -1733,22 +1750,24 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
     setTimeout(() => {
       // Single combined event dispatch
       window.dispatchEvent(new CustomEvent('batchCompleted', {
-        detail: {
-          action: 'completed',
-          tokensUsed: tokensUsed,
-          newTokenBalance: newTokenBalance,
-          batchIds: selectedBatches,
-          jarCount: tokensUsed,
-          updatedBatches: updatedBatches,
-          completedBatchIds: selectedBatches,
-          totalCertified: totalCertifiedAmount,
-          certificationData: certData,
-          originOnlyTokens,
-          qualityOnlyTokens,
-          bothTokens,
-          tokenStatsUpdated: true
-        }
-      }));
+  detail: {
+    action: 'completed',
+    tokensUsed: tokensUsed,
+    newTokenBalance: newTokenBalance,
+    batchIds: selectedBatches,
+    jarCount: tokensUsed,
+    updatedBatches: updatedBatches,
+    completedBatchIds: selectedBatches,
+    totalCertified: totalCertifiedAmount,
+    totalOriginCertified: totalOriginToAdd,
+    totalQualityCertified: totalQualityToAdd,
+    certificationData: certData,
+    originOnlyTokens: originOnlyTokens,
+    qualityOnlyTokens: qualityOnlyTokens,
+    bothCertificationsTokens: bothCertificationsTokens,
+    tokenStatsUpdated: true
+  }
+}));
     }, 100);
 
     // STEP 9: Show success popup ONLY ONCE
@@ -1757,15 +1776,17 @@ const handleCompleteBatch = async (e: React.FormEvent<HTMLFormElement>): Promise
     // SINGLE SUCCESS NOTIFICATION
     setNotification({
       show: true,
-      message: `Batch completed successfully! ${tokensUsed} tokens used (${originOnlyTokens} origin, ${qualityOnlyTokens} quality, ${bothTokens} both), ${totalCertifiedAmount.toFixed(2)} kg certified.`,
+      message: `Batch completed successfully! ${tokensUsed} tokens used (${totalOriginToAdd} origin, ${totalQualityToAdd} quality, ${bothCertificationsTokens} both), ${totalCertifiedAmount.toFixed(2)} kg certified.`,
       type: 'success'
     });
 
     console.log('✅ Batch completion successful - UI updated immediately with token statistics:', {
       tokensUsed,
+      totalOriginToAdd,
+      totalQualityToAdd,
       originOnlyTokens,
       qualityOnlyTokens,
-      bothTokens,
+      bothCertificationsTokens,
       totalCertifiedAmount,
       singleTokenUpdate: true
     });

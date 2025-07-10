@@ -342,23 +342,22 @@ const ProfilePage = () => {
   const userData = await fetchUserProfile();
   if (userData) {
     setUserProfile(prev => ({
-      ...prev,
-      firstname: userData.firstname || '',
-      lastname: userData.lastname || '',
-      email: userData.email || '',
-      phonenumber: userData.phonenumber || '',
-      passportId: userData.passportId || '', // Add this line
-      passportNumber: prev.passportNumber || '',
-      profileImage: userData.profileImage || null,
-      passportScan: userData.passportScan || null,
-      faceScan: userData.faceScan || null,
-      verificationStatus: {
-        email: userData.isConfirmed || false,
-        phone: userData.phoneConfirmed || false, // Updated to match API response
-        identity: userData.identityVerified || false,
-        face: userData.faceVerified || false
-      }
-    }));
+  ...prev,
+  firstname: userData.firstname || '',
+  lastname: userData.lastname || '',
+  email: userData.email || '',
+  phonenumber: userData.phonenumber || '',
+  passportId: userData.passportId || '',
+  profileImage: userData.profileImage || null,
+  passportScan: userData.passportScan || null,
+  faceScan: userData.faceScan || null,
+  verificationStatus: {
+    email: userData.isConfirmed || false,
+    phone: userData.phoneConfirmed || false,
+    identity: !!(userData.passportId || userData.identityVerified), // Check if passportId exists OR identityVerified
+    face: userData.faceVerified || false
+  }
+}));
   }
 };
 
@@ -494,9 +493,9 @@ const ProfilePage = () => {
                 { icon: Home, label: 'Dashboard', href: '/dashboard' },
                 { icon: Layers, label: 'Batches', href: '/batches' },
                 { icon: Activity, label: 'Analytics', href: '/analytics' },
-                { icon: Wallet, label: 'Token Wallet', href: '#' },
+                
                 { icon: Users, label: 'Profile', href: '/profile' },
-                { icon: Settings, label: 'Settings', href: '#' },
+                
                 { icon: HelpCircle, label: 'Help', href: '#' }
               ].map((item, index) => (
                 <li key={index}>
@@ -697,19 +696,7 @@ const ProfilePage = () => {
     </div>
   ))}
                     
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
-                      {editMode.personal ? (
-                        <textarea
-                          value={userProfile.address}
-                          onChange={(e) => setUserProfile(prev => ({ ...prev, address: e.target.value }))}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors"
-                          rows={3}
-                        />
-                      ) : (
-                        <p className="py-2 text-gray-800">{userProfile.address}</p>
-                      )}
-                    </div>
+                    
                   </div>
                 </div>
               </div>
@@ -842,20 +829,20 @@ const ProfilePage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Passport Scan */}
                   <div className="border-2 border-dashed border-amber-300 rounded-xl p-8 text-center hover:border-amber-400 transition-colors bg-amber-50/50">
-                    <div className="mb-6">
-                      {userProfile.passportScan ? (
-                        <div className="relative">
-                          <img src={userProfile.passportScan} alt="Passport" className="w-full h-40 object-cover rounded-lg shadow-md" />
-                          <div className="absolute top-2 right-2 bg-green-500 text-white p-2 rounded-full shadow-lg">
-                            <CheckCircle className="h-4 w-4" />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-full h-40 bg-white/80 rounded-lg flex items-center justify-center shadow-inner">
-                          <FileText className="h-16 w-16 text-amber-400" />
-                        </div>
-                      )}
-                    </div>
+  <div className="mb-6">
+    {userProfile.passportScan ? ( // Changed from !userProfile.passportScan to userProfile.passportScan
+      <div className="relative">
+        <img src={userProfile.passportScan} alt="Passport" className="w-full h-40 object-cover rounded-lg shadow-md" />
+        <div className="absolute top-2 right-2 bg-green-500 text-white p-2 rounded-full shadow-lg">
+          <CheckCircle className="h-4 w-4" />
+        </div>
+      </div>
+    ) : (
+      <div className="w-full h-40 bg-white/80 rounded-lg flex items-center justify-center shadow-inner">
+        <FileText className="h-16 w-16 text-amber-400" />
+      </div>
+    )}
+  </div>
                     <h4 className="text-lg font-semibold text-gray-800 mb-2">Passport Document</h4>
                     <p className="text-sm text-gray-600 mb-6">Upload a clear photo of your passport for identity verification</p>
                     <button
@@ -874,50 +861,17 @@ const ProfilePage = () => {
                     />
                   </div>
 
-                  {/* Face Scan */}
-                  <div className="border-2 border-dashed border-amber-300 rounded-xl p-8 text-center hover:border-amber-400 transition-colors bg-amber-50/50">
-                    <div className="mb-6">
-                      {userProfile.faceScan ? (
-                        <div className="relative">
-                          <img src={userProfile.faceScan} alt="Face Verification" className="w-full h-40 object-cover rounded-lg shadow-md" />
-                          <div className="absolute top-2 right-2 bg-green-500 text-white p-2 rounded-full shadow-lg">
-                            <CheckCircle className="h-4 w-4" />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-full h-40 bg-white/80 rounded-lg flex items-center justify-center shadow-inner">
-                          <User className="h-16 w-16 text-amber-400" />
-                        </div>
-                      )}
-                    </div>
-                    <h4 className="text-lg font-semibold text-gray-800 mb-2">Face Verification</h4>
-                    <p className="text-sm text-gray-600 mb-6">Take a clear selfie to complete your identity verification process</p>
-                    <button
-                      onClick={() => faceScanRef.current?.click()}
-                      className="flex items-center justify-center w-full px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors"
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      {userProfile.faceScan ? 'Retake Photo' : 'Take Selfie'}
-                    </button>
-                    <input
-                      ref={faceScanRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileUpload('faceScan', e.target.files?.[0] || null)}
-                      className="hidden"
-                    />
-                  </div>
+                  
                 </div>
 
                 {/* Verification Progress */}
                 <div className="mt-8 p-6 bg-white/80 rounded-xl border border-gray-200">
                   <h4 className="text-lg font-semibold text-gray-800 mb-4">Verification Progress</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {[
                       { key: 'email', label: 'Email Verification', icon: CheckCircle },
                       { key: 'phone', label: 'Phone Verification', icon: CheckCircle },
                       { key: 'identity', label: 'Identity Document', icon: userProfile.verificationStatus.identity ? CheckCircle : AlertCircle },
-                      { key: 'face', label: 'Face Verification', icon: userProfile.verificationStatus.face ? CheckCircle : AlertCircle }
                     ].map(({ key, label, icon: Icon }) => (
                       <div key={key} className="text-center">
                         <div className={`inline-flex items-center justify-center w-12 h-12 rounded-full mb-3 ${userProfile.verificationStatus[key] ? 'bg-green-100' : 'bg-orange-100'}`}>
@@ -936,14 +890,14 @@ const ProfilePage = () => {
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm font-medium text-gray-700">Overall Progress</span>
                       <span className="text-sm text-gray-600">
-                        {Object.values(userProfile.verificationStatus).filter(Boolean).length}/4 Complete
+                        {Object.values(userProfile.verificationStatus).filter(Boolean).length}/3 Complete
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="bg-gradient-to-r from-amber-500 to-yellow-500 h-2 rounded-full transition-all duration-300"
                         style={{ 
-                          width: `${(Object.values(userProfile.verificationStatus).filter(Boolean).length / 4) * 100}%` 
+                          width: `${(Object.values(userProfile.verificationStatus).filter(Boolean).length / 3) * 100}%` 
                         }}
                       ></div>
                     </div>
@@ -1048,29 +1002,7 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-4 justify-center">
-          <a 
-            href="/dashboard" 
-            className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-          >
-            <Home className="h-5 w-5 mr-2" />
-            Back to Dashboard
-          </a>
-          
-          <a 
-            href="/batches" 
-            className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Create New Batch
-          </a>
-          
-          <button className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-            <Settings className="h-5 w-5 mr-2" />
-            Account Settings
-          </button>
-        </div>
+        
       </div>
     </div>
   );

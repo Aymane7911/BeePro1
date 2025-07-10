@@ -234,6 +234,9 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
   // Calculate total pending tokens
   const totalPendingTokens = pendingTokens.originOnly + pendingTokens.qualityOnly + pendingTokens.bothCertifications;
   
+  // Calculate total used tokens
+  const totalUsedTokens = tokenStats.totalTokens - tokenStats.remainingTokens;
+  
   // Use the remainingTokens from the database, subtract pending tokens
   const availableTokens = Math.max(0, tokenStats.remainingTokens - totalPendingTokens);
 
@@ -280,24 +283,24 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
             )}
           </div>
           
-          {/* Both Certifications */}
+          {/* Total Used - CHANGED FROM BOTH CERTIFICATIONS */}
           <div className="p-3 bg-white rounded-lg shadow">
             <div className="flex items-center mb-1">
-              <div className="h-3 w-3 rounded-full bg-purple-500 mr-2"></div>
-              <p className="text-sm font-medium">Both Certifications</p>
+              <div className="h-3 w-3 rounded-full bg-yellow-500 mr-2"></div>
+              <p className="text-sm font-medium">Total Used</p>
             </div>
             <p className="text-xl font-bold">
-              {tokenStats.bothCertifications + pendingTokens.bothCertifications}
+              {totalUsedTokens + totalPendingTokens}
             </p>
             <p className="text-xs text-gray-500">tokens used</p>
-            {pendingTokens.bothCertifications > 0 && (
-              <p className="text-xs text-purple-500">
-                +{pendingTokens.bothCertifications} pending
+            {totalPendingTokens > 0 && (
+              <p className="text-xs text-yellow-500">
+                +{totalPendingTokens} pending
               </p>
             )}
           </div>
           
-          {/* Available Tokens - NOW MATCHES TOKEN BALANCE */}
+          {/* Available Tokens */}
           <div className="p-3 bg-white rounded-lg shadow">
             <div className="flex items-center mb-1">
               <div className="h-3 w-3 rounded-full bg-gray-400 mr-2"></div>
@@ -316,18 +319,13 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
         {/* Usage Summary */}
         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-yellow-800">
-              Total Tokens Used:
-            </span>
-            <span className="text-lg font-bold text-yellow-900">
-              {tokenStats.totalTokens - tokenStats.remainingTokens}
-            </span>
+           
           </div>
           <div className="flex justify-between items-center mt-1">
             <span className="text-sm text-yellow-700">Usage Rate:</span>
             <span className="text-sm font-medium text-yellow-900">
               {tokenStats.totalTokens > 0 
-                ? (((tokenStats.totalTokens - tokenStats.remainingTokens) / tokenStats.totalTokens) * 100).toFixed(1) 
+                ? (((totalUsedTokens + totalPendingTokens) / tokenStats.totalTokens) * 100).toFixed(1) 
                 : 0}%
             </span>
           </div>

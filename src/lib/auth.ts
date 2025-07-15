@@ -42,6 +42,7 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
+  
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === "google" || account?.provider === "linkedin") {
@@ -90,6 +91,7 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
+    
     async session({ session, token }) {
       // Pass JWT token data to session for frontend access
       if (token.userId) {

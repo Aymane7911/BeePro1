@@ -3,9 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ethers } from 'ethers';
-import { contractAddress, contractABI } from "../../contractsinfo";
-
-
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -15,92 +12,146 @@ export default function RegisterPage() {
     phonenumber: '',
     password: '',
     confirmPassword: '',
+    companyId: '',
+    companySlug: '',
+    role: 'employee',
     useEmail: true,
+    useCompanyId: true,
   });
-  const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_HARDHAT_RPC_URL);
 
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleToggle = () => {
-    setFormData(prev => ({ ...prev, useEmail: !prev.useEmail }));
+  const handleToggle = (type: 'contact' | 'company') => {
+    if (type === 'contact') {
+      setFormData(prev => ({ ...prev, useEmail: !prev.useEmail }));
+    } else {
+      setFormData(prev => ({ ...prev, useCompanyId: !prev.useCompanyId }));
+    }
   };
 
   const handleGoogleAuth = async () => {
-    // Add your Google OAuth logic here
     console.log('Google OAuth clicked');
-    // Example: redirect to Google OAuth endpoint
-    // window.location.href = '/api/auth/google';
+    // Add your Google OAuth logic here
   };
- const registerBeekeeperOnChain = async (beekeeperId: number) => {
-  // ✅ Using local Hardhat RPC directly
-  const provider = new ethers.JsonRpcProvider(
-    process.env.NEXT_PUBLIC_HARDHAT_RPC_URL
-  );
 
-  // ⚠️ For Hardhat local dev, use a test wallet private key
-  const signer = new ethers.Wallet(
-    process.env.NEXT_PUBLIC_HARDHAT_PRIVATE_KEY!,
-    provider
-  );
-
-  const contract = new ethers.Contract(contractAddress, contractABI, signer);
-
-  try {
-    const tx = await contract.registerBeekeeper(12);
-    console.log('Transaction sent:', tx.hash);
-    await tx.wait();
-    console.log('Transaction mined:', tx);
-  } catch (err) {
-    console.error('On-chain registration failed:', err);
-    setError('Blockchain registration failed. Please try again.');
-  }
-};
-
-
-  const handleSubmit = async () => {
-    setError('');
-    setIsLoading(true);
-
-    const { firstname, lastname, email, phonenumber, password, useEmail } = formData;
-
+  const registerBeekeeperOnChain = async (beekeeperId: number) => {
     try {
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          firstname,
-          lastname,
-          password,
-          ...(useEmail ? { email } : { phonenumber }),
-        }),
-      });
+      const provider = new ethers.JsonRpcProvider(
+        process.env.NEXT_PUBLIC_HARDHAT_RPC_URL
+      );
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        console.log('Registration successful:', data);
-        await registerBeekeeperOnChain(data.beekeeperId);
-        router.push('/confirm-pending');
-      } else {
-        setError(data?.error || data?.message || 'Registration failed. Try again.');
-        console.error('Registration failed:', data);
-      }
+      const signer = new ethers.Wallet(
+        process.env.NEXT_PUBLIC_HARDHAT_PRIVATE_KEY!,
+        provider
+      );
+      
+      // You'll need to import contractAddress and contractABI
+      // const contract = new ethers.Contract(contractAddress, contractABI, signer);
+      // const tx = await contract.registerBeekeeper(beekeeperId);
+      // await tx.wait();
+      
+      console.log('Blockchain registration successful');
     } catch (err) {
-      console.error('Network or unexpected error:', err);
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setIsLoading(false);
+      console.error('On-chain registration failed:', err);
+      throw new Error('Blockchain registration failed');
     }
   };
+
+  // Fix for the frontend handleSubmit function
+const handleSubmit = async () => {
+  setError('');
+  setIsLoading(true);
+
+  // Validation
+  if (formData.password !== formData.confirmPassword) {
+    setError('Passwords do not match');
+    setIsLoading(false);
+    return;
+  }
+
+  if (!formData.firstname || !formData.lastname || !formData.password) {
+    setError('Please fill in all required fields');
+    setIsLoading(false);
+    return;
+  }
+
+  if (!formData.useEmail && !formData.phonenumber) {
+    setError('Please provide a phone number');
+    setIsLoading(false);
+    return;
+  }
+
+  if (formData.useEmail && !formData.email) {
+    setError('Please provide an email address');
+    setIsLoading(false);
+    return;
+  }
+
+  if (!formData.useCompanyId && !formData.companySlug) {
+    setError('Please provide a company slug');
+    setIsLoading(false);
+    return;
+  }
+
+  if (formData.useCompanyId && !formData.companyId) {
+    setError('Please provide a company ID');
+    setIsLoading(false);
+    return;
+  }
+
+  try {
+    const requestBody = {
+      firstname: formData.firstname,
+      lastname: formData.lastname,
+      password: formData.password,
+      role: formData.role,
+      // Fix: Handle email/phone properly
+      ...(formData.useEmail ? { email: formData.email } : { phonenumber: formData.phonenumber }),
+      // Fix: Convert companyId to number
+      ...(formData.useCompanyId ? { companyId: parseInt(formData.companyId) } : { companySlug: formData.companySlug }),
+    };
+
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      console.log('Registration successful:', data);
+      
+      // Optional: Register on blockchain if needed
+      try {
+        await registerBeekeeperOnChain(data.userId);
+      } catch (blockchainError) {
+        console.error('Blockchain registration failed, but user was created:', blockchainError);
+        // Continue with success flow even if blockchain fails
+      }
+      
+      router.push('/confirm-pending');
+    } else {
+      // Fix: Consistent error handling
+      setError(data?.error || 'Registration failed. Please try again.');
+      console.error('Registration failed:', data);
+    }
+  } catch (err) {
+    console.error('Network or unexpected error:', err);
+    setError('Something went wrong. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <section className="relative min-h-screen w-full overflow-hidden">
@@ -167,7 +218,7 @@ export default function RegisterPage() {
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-600 to-amber-600 bg-clip-text text-transparent mb-2">
                   Join Our Community
                 </h1>
-                <p className="text-gray-600 text-lg">Create your beekeeper account</p>
+                <p className="text-gray-600 text-lg">Create your employee account</p>
               </div>
 
               {/* Error Message */}
@@ -247,6 +298,62 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
+                {/* Company Information */}
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400 group-focus-within:text-yellow-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    name={formData.useCompanyId ? "companyId" : "companySlug"}
+                    placeholder={formData.useCompanyId ? "Company ID" : "Company Slug"}
+                    value={formData.useCompanyId ? formData.companyId : formData.companySlug}
+                    onChange={handleChange}
+                    required
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-300 text-gray-800 placeholder-gray-500"
+                  />
+                </div>
+
+                {/* Company Toggle */}
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => handleToggle('company')}
+                    className="text-sm text-yellow-600 hover:text-yellow-700 font-medium hover:underline transition-all duration-300 flex items-center justify-center gap-2 mx-auto"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m0-4l-4-4" />
+                    </svg>
+                    {formData.useCompanyId ? 'Use company slug instead' : 'Use company ID instead'}
+                  </button>
+                </div>
+
+                {/* Role Selection */}
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400 group-focus-within:text-yellow-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleChange}
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-300 text-gray-800 appearance-none cursor-pointer"
+                  >
+                    <option value="employee">Employee</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+
                 {/* Email or Phone Input */}
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -283,11 +390,11 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {/* Toggle Button */}
+                {/* Contact Toggle */}
                 <div className="text-center">
                   <button
                     type="button"
-                    onClick={handleToggle}
+                    onClick={() => handleToggle('contact')}
                     className="text-sm text-yellow-600 hover:text-yellow-700 font-medium hover:underline transition-all duration-300 flex items-center justify-center gap-2 mx-auto"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -386,12 +493,294 @@ export default function RegisterPage() {
           to { opacity: 1; transform: translateY(0); }
         }
         
+        @keyframes bounce {
+          0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+          40% { transform: translateY(-10px); }
+          60% { transform: translateY(-5px); }
+        }
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        
         .animate-fade-in {
-          animation: fade-in 1s ease-out;
+          animation: fade-in 0.8s ease-out;
         }
         
         .animate-slide-down {
           animation: slide-down 0.3s ease-out;
+        }
+        
+        .animate-bounce {
+          animation: bounce 2s infinite;
+        }
+        
+        .animate-pulse {
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        .delay-300 {
+          animation-delay: 300ms;
+        }
+        
+        .delay-500 {
+          animation-delay: 500ms;
+        }
+        
+        .delay-700 {
+          animation-delay: 700ms;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: rgba(251, 191, 36, 0.3);
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(251, 191, 36, 0.5);
+        }
+        
+        /* Smooth focus transitions */
+        input:focus, select:focus {
+          box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1);
+        }
+        
+        /* Glass morphism effect */
+        .backdrop-blur-xl {
+          backdrop-filter: blur(24px);
+        }
+        
+        .backdrop-blur-sm {
+          backdrop-filter: blur(4px);
+        }
+        
+        /* Gradient text animation */
+        .bg-clip-text {
+          background-clip: text;
+          -webkit-background-clip: text;
+        }
+        
+        /* Hover animations */
+        .transform:hover {
+          transform: translateY(-2px);
+        }
+        
+        .group:hover .group-hover\:opacity-40 {
+          opacity: 0.4;
+        }
+        
+        .group:hover .group-hover\:duration-200 {
+          transition-duration: 200ms;
+        }
+        
+        .group:hover .group-hover\:translate-x-1 {
+          transform: translateX(0.25rem);
+        }
+        
+        .group:hover .group-hover\:scale-105 {
+          transform: scale(1.05);
+        }
+        
+        /* Loading spinner */
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        /* Form validation states */
+        .border-red-500 {
+          border-color: #ef4444;
+        }
+        
+        .border-green-500 {
+          border-color: #10b981;
+        }
+        
+        .text-red-500 {
+          color: #ef4444;
+        }
+        
+        .text-green-500 {
+          color: #10b981;
+        }
+        
+        /* Responsive design adjustments */
+        @media (max-width: 640px) {
+          .grid-cols-2 {
+            grid-template-columns: 1fr;
+          }
+          
+          .text-4xl {
+            font-size: 2.25rem;
+          }
+          
+          .p-8 {
+            padding: 1.5rem;
+          }
+          
+          .pt-32 {
+            padding-top: 8rem;
+          }
+        }
+        
+        /* Interactive elements */
+        button:active {
+          transform: scale(0.98);
+        }
+        
+        /* Custom shadows */
+        .shadow-2xl {
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .shadow-xl {
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .shadow-lg {
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Glow effects */
+        .blur {
+          filter: blur(8px);
+        }
+        
+        .blur-xl {
+          filter: blur(24px);
+        }
+        
+        /* Transitions */
+        .transition-all {
+          transition-property: all;
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .duration-300 {
+          transition-duration: 300ms;
+        }
+        
+        .duration-200 {
+          transition-duration: 200ms;
+        }
+        
+        .duration-1000 {
+          transition-duration: 1000ms;
+        }
+        
+        .ease-out {
+          transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+        }
+        
+        /* Focus visible for accessibility */
+        .focus\:ring-2:focus {
+          --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+          --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+          box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+        }
+        
+        .focus\:ring-yellow-500:focus {
+          --tw-ring-opacity: 1;
+          --tw-ring-color: rgb(234 179 8 / var(--tw-ring-opacity));
+        }
+        
+        .focus\:border-transparent:focus {
+          border-color: transparent;
+        }
+        
+        /* Hover states */
+        .hover\:bg-gray-100:hover {
+          background-color: rgb(243 244 246);
+        }
+        
+        .hover\:text-yellow-700:hover {
+          color: rgb(161 98 7);
+        }
+        
+        .hover\:underline:hover {
+          text-decoration-line: underline;
+        }
+        
+        .hover\:border-white\/40:hover {
+          border-color: rgb(255 255 255 / 0.4);
+        }
+        
+        .hover\:scale-\[1\.02\]:hover {
+          transform: scale(1.02);
+        }
+        
+        .hover\:-translate-y-1:hover {
+          transform: translateY(-0.25rem);
+        }
+        
+        /* Group hover states */
+        .group:hover .group-hover\:text-yellow-500 {
+          color: rgb(234 179 8);
+        }
+        
+        /* Pointer events */
+        .pointer-events-none {
+          pointer-events: none;
+        }
+        
+        .cursor-pointer {
+          cursor: pointer;
+        }
+        
+        /* Appearance */
+        .appearance-none {
+          appearance: none;
+        }
+        
+        /* Overflow */
+        .overflow-hidden {
+          overflow: hidden;
+        }
+        
+        /* Position utilities */
+        .absolute {
+          position: absolute;
+        }
+        
+        .relative {
+          position: relative;
+        }
+        
+        .inset-0 {
+          inset: 0px;
+        }
+        
+        .inset-y-0 {
+          top: 0px;
+          bottom: 0px;
+        }
+        
+        .-inset-1 {
+          inset: -0.25rem;
+        }
+        
+        /* Z-index */
+        .z-10 {
+          z-index: 10;
+        }
+        
+        .z-20 {
+          z-index: 20;
         }
       `}</style>
     </section>

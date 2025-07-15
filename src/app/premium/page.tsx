@@ -1,8 +1,22 @@
 'use client'
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, X, Crown, AlertCircle, Zap, Bot, FileText, BarChart, Shield, ArrowRight, ChevronLeft, Menu, Package, Database, Home, Settings, Users, Activity, HelpCircle, Wallet, CreditCard, Lock } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
+import { useSession } from 'next-auth/react';
+
+
+interface User {
+  passportId?: string;
+  passportFile?: string;
+  // Add other user properties as needed
+  id?: string;
+  name?: string;
+  email?: string;
+  isProfileComplete: boolean;
+  isPremium: boolean;
+}
+
 
 export default function Premium() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -11,13 +25,10 @@ export default function Premium() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '' });
-  const [isPremiumActive, setIsPremiumActive] = useState(() => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('honeycertify_premium') === 'true';
-  }
-  return false;
-});
-  
+  const [user, setUser] = useState<User | null>(null);
+  const [isPremiumActive, setIsPremiumActive] = useState(false); // Added this missing state
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
   // Payment form state
   const [paymentForm, setPaymentForm] = useState({
     cardNumber: '',
@@ -100,30 +111,95 @@ export default function Premium() {
       handlePaymentInputChange('expiryDate', formatted);
     }
   };
-  
+
+
+  function getAuthToken() {
+  // Try localStorage first
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('authToken') || 
+                 localStorage.getItem('token') || 
+                 localStorage.getItem('jwt');
+    if (token) return token;
+    
+    // Try cookies as fallback
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'token' || name === 'authToken' || name === 'jwt') {
+        return value;
+      }
+    }
+  }
+  return null;
+}
 
   const handlePaymentSubmit = async (e) => {
   e.preventDefault();
   setPaymentProcessing(true);
   
-  // Simulate payment processing
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  
-  // Set premium status to active after successful payment
-  setIsPremiumActive(true);
-  localStorage.setItem('honeycertify_premium', 'true');
-  
-  setPaymentProcessing(false);
-  setShowPaymentModal(false);
-  setNotification({
-    show: true,
-    message: 'Payment successful! You now have access to Premium features. Welcome to HoneyCertify Premium!'
-  });
-  
-  setTimeout(() => {
-    setNotification({ show: false, message: '' });
-  }, 5000);
+  try {
+    // Get authentication token
+    const token = getAuthToken();
+    
+    if (!token) {
+      throw new Error('No authentication token found. Please log in again.');
+    }
+    
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // Update premium status in database
+    const response = await fetch('/api/user/premium', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`, // Include token in Authorization header
+      },
+      body: JSON.stringify({ isPremium: true }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update premium status');
+    }
+
+    const data = await response.json();
+    
+    // Update local state with database response
+    setUser(data.user);
+    setIsPremiumActive(true);
+    
+    setPaymentProcessing(false);
+    setShowPaymentModal(false);
+    setNotification({
+      show: true,
+      message: 'Payment successful! You now have access to Premium features. Welcome to HoneyCertify Premium!'
+    });
+    
+    setTimeout(() => {
+      setNotification({ show: false, message: '' });
+    }, 5000);
+    
+  } catch (error) {
+    console.error('Payment processing error:', error);
+    setPaymentProcessing(false);
+    setNotification({
+      show: true,
+      message: `Payment failed: ${error.message}. Please try again or contact support.`
+    });
+    
+    setTimeout(() => {
+      setNotification({ show: false, message: '' });
+    }, 5000);
+  }
 };
+
+useEffect(() => {
+  // This will trigger a re-render of the sidebar when premium status changes
+  if (user?.isPremium && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('premiumStatusChanged'));
+  }
+}, [user?.isPremium]);
 
   const handleFreePlanConfirm = () => {
     setShowModal(false);
@@ -175,6 +251,70 @@ export default function Premium() {
       ]
     }
   ];
+  useEffect(() => {
+   const fetchUserPremiumStatus = async () => {
+  try {
+    const token = getAuthToken();
+    
+    if (!token) {
+      console.log('No authentication token found');
+      return;
+    }
+    
+    const response = await fetch('/api/user/premium', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      setUser(data.user);
+      setIsPremiumActive(data.user.isPremium);
+    } else {
+      console.error('Failed to fetch premium status:', await response.json());
+    }
+  } catch (error) {
+    console.error('Error fetching user premium status:', error);
+  }
+};
+
+    fetchUserPremiumStatus();
+  }, [session]);
+
+if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin h-8 w-8 border-4 border-yellow-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+ if (user?.isPremium) {
+    return (
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">
+        {/* Existing header and sidebar code */}
+        
+        <main className="flex-1 container mx-auto px-4 py-8">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center p-4 bg-green-100 rounded-full mb-6">
+              <Crown className="h-8 w-8 text-green-600" />
+            </div>
+            <h1 className="text-4xl font-bold mb-4">You're Already Premium!</h1>
+            <p className="text-xl text-gray-600 mb-8">
+              Thanks for being a Premium subscriber. You have access to all our advanced features.
+            </p>
+            <button 
+              onClick={() => window.history.back()}
+              className="px-6 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition font-semibold"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">
@@ -247,7 +387,10 @@ export default function Premium() {
       </div>
       
       {/* Backdrop overlay when sidebar is open */}
-      <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} isPremium={isPremiumActive} />
+      <Sidebar 
+      sidebarOpen={sidebarOpen} 
+      toggleSidebar={toggleSidebar} 
+      userPremiumStatus={user?.isPremium || isPremiumActive} />
 
       <header className="bg-white p-4 rounded-lg shadow text-black sticky top-0 z-10">
         <div className="flex justify-between items-center">
@@ -464,7 +607,7 @@ export default function Premium() {
             </div>
           </div>
         </div>
-
+        
         {/* FAQs */}
         <div className="bg-white rounded-xl p-8 shadow-md">
           <h2 className="text-2xl font-bold mb-6 text-center">Frequently Asked Questions</h2>
@@ -525,19 +668,7 @@ export default function Premium() {
               </div>
 
               <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    value={paymentForm.email}
-                    onChange={(e) => handlePaymentInputChange('email', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    placeholder="your@email.com"
-                    required
-                  />
-                </div>
-
+                
                 {/* Card Information */}
                 <div>
                   <label className="block text-sm font-medium mb-1">Card Information</label>
@@ -783,3 +914,5 @@ export default function Premium() {
     </div>
   );
 }
+
+

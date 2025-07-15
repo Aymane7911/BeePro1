@@ -71,7 +71,7 @@ const Header: React.FC<HeaderProps> = ({
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-800">Profile Management</h1>
+              <h1 className="text-xl font-bold text-gray-800">HoneyCertify</h1>
               <p className="text-xs text-gray-500">Last updated: {lastUpdated}</p>
             </div>
           </div>

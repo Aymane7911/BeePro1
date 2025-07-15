@@ -35,6 +35,17 @@ interface SelectedApiary extends Apiary {
   kilosCollected: number; // Override to ensure this is always present
 }
 
+interface User {
+  passportId?: string;
+  passportFile?: string;
+  // Add other user properties as needed
+  id?: string;
+  name?: string;
+  email?: string;
+  isProfileComplete: boolean;
+  isPremium: boolean;
+}
+
 interface ApiaryLocation extends LocationCoordinates {
   id: number;
   name: string;
@@ -259,6 +270,7 @@ const [batchHoneyCollected, setBatchHoneyCollected] = useState(0);
 const [isLoggingOut, setIsLoggingOut] = useState(false);
 const [isOpen, setIsOpen] = useState(false);
 const [batches, setBatches] = useState<Batch[]>([]);
+const [user, setUser] = useState<User | null>(null);
   
 
   // 1. Add clickPosition state to track where user clicked for bubble positioning
@@ -2142,7 +2154,7 @@ const handleLocationCancel = () => {
     <Sidebar 
       sidebarOpen={sidebarOpen} 
       toggleSidebar={toggleSidebar}
-      isPremium={userPremiumStatus}
+      userPremiumStatus={user?.isPremium}
     />
     
     <Backdrop 

@@ -10,17 +10,32 @@ import {
 interface Batch {
   id: string;
   name: string;
+  batchNumber?: string;
   status: string;
   completedChecks: number;
   totalChecks: number;
+  // Real certification data from API
   originOnly: number;
   qualityOnly: number;
+  bothCertifications: number;
   uncertified: number;
+  // Percentages
+  originOnlyPercent: number;
+  qualityOnlyPercent: number;
+  bothCertificationsPercent: number;
+  uncertifiedPercent: number;
+  // Honey tracking
+  weightKg: number; // Total honey collected
+  totalHoneyCollected: number;
+  honeyCertified: number;
+  honeyRemaining: number;
   jarsUsed: number;
   containerType: string;
   labelType: string;
-  totalKg?: number;
   certificationDate?: string;
+  expiryDate?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface InventoryItem {
@@ -178,45 +193,64 @@ const BatchStatusSection = ({
       <div className="space-y-2">
         {displayedBatches.length > 0 ? (
           displayedBatches.map((batch) => {
-            const total = batch.originOnly + batch.qualityOnly + batch.uncertified;
-            const originOnlyPercent = total > 0 ? Math.round((batch.originOnly / total) * 100) : 0;
-            const qualityOnlyPercent = total > 0 ? Math.round((batch.qualityOnly / total) * 100) : 0;
-            const uncertifiedPercent = total > 0 ? Math.round((batch.uncertified / total) * 100) : 0;
+            // Use real data from API instead of sample values
+            const totalHoneyCollected = batch.totalHoneyCollected || batch.weightKg || 0;
+            const originOnlyAmount = batch.originOnly || 0;
+            const qualityOnlyAmount = batch.qualityOnly || 0;
+            const bothCertificationsAmount = batch.bothCertifications || 0;
+            const uncertifiedAmount = batch.uncertified || batch.honeyRemaining || 0;
             
+            // Calculate percentages (use API percentages if available, otherwise calculate)
+            const total = originOnlyAmount + qualityOnlyAmount + bothCertificationsAmount + uncertifiedAmount;
+            const originOnlyPercent = batch.originOnlyPercent || (total > 0 ? Math.round((originOnlyAmount / total) * 100) : 0);
+            const qualityOnlyPercent = batch.qualityOnlyPercent || (total > 0 ? Math.round((qualityOnlyAmount / total) * 100) : 0);
+            const bothCertificationsPercent = batch.bothCertificationsPercent || (total > 0 ? Math.round((bothCertificationsAmount / total) * 100) : 0);
+            const uncertifiedPercent = batch.uncertifiedPercent || (total > 0 ? Math.round((uncertifiedAmount / total) * 100) : 0);
+            
+            // Calculate jar distribution based on proportions
             const totalJars = batch.jarsUsed || 0;
-            const originOnlyJars = total > 0 ? Math.round(batch.originOnly * totalJars / total) : 0;
-            const qualityOnlyJars = total > 0 ? Math.round(batch.qualityOnly * totalJars / total) : 0;
-            const uncertifiedJars = total > 0 ? Math.round(batch.uncertified * totalJars / total) : 0;
+            const originOnlyJars = total > 0 ? Math.round(originOnlyAmount * totalJars / total) : 0;
+            const qualityOnlyJars = total > 0 ? Math.round(qualityOnlyAmount * totalJars / total) : 0;
+            const bothCertificationsJars = total > 0 ? Math.round(bothCertificationsAmount * totalJars / total) : 0;
+            const uncertifiedJars = total > 0 ? Math.round(uncertifiedAmount * totalJars / total) : 0;
             
             const certificationData = [
               {
                 color: "bg-blue-500",
                 label: "Origin Certified",
-                value: batch.originOnly,
+                value: originOnlyAmount,
                 percent: originOnlyPercent,
                 jars: originOnlyJars
               },
               {
                 color: "bg-green-500",
                 label: "Quality Certified",
-                value: batch.qualityOnly,
+                value: qualityOnlyAmount,
                 percent: qualityOnlyPercent,
                 jars: qualityOnlyJars
               },
               {
+                color: "bg-purple-500",
+                label: "Both Certifications",
+                value: bothCertificationsAmount,
+                percent: bothCertificationsPercent,
+                jars: bothCertificationsJars
+              },
+              {
                 color: "bg-gray-400",
                 label: "Uncertified",
-                value: batch.uncertified,
+                value: uncertifiedAmount,
                 percent: uncertifiedPercent,
                 jars: uncertifiedJars
               },
             ];
             
             const pieData = [
-              { name: 'Origin Certified', value: batch.originOnly, color: '#3B82F6' },
-              { name: 'Quality Certified', value: batch.qualityOnly, color: '#10B981' },
-              { name: 'Uncertified', value: batch.uncertified, color: '#9CA3AF' }
-            ];
+              { name: 'Origin Certified', value: originOnlyAmount, color: '#3B82F6' },
+              { name: 'Quality Certified', value: qualityOnlyAmount, color: '#10B981' },
+              { name: 'Both Certifications', value: bothCertificationsAmount, color: '#8B5CF6' },
+              { name: 'Uncertified', value: uncertifiedAmount, color: '#9CA3AF' }
+            ].filter(item => item.value > 0); // Only show non-zero values in pie chart
 
             return (
               <div key={batch.id} className="border rounded-lg bg-gray-50 overflow-hidden">
@@ -230,7 +264,7 @@ const BatchStatusSection = ({
                       (batch.status === "Certified" || batch.status === "Rejected") && batch.completedChecks === batch.totalChecks 
                         ? "bg-green-500" : "bg-yellow-500"
                     }`}></span>
-                    <span className="font-medium">{batch.name}</span>
+                    <span className="font-medium">{batch.name || batch.batchNumber}</span>
                   </div>
                   <div className="flex items-center">
                     <span className="text-sm text-gray-600 mr-3">
@@ -262,7 +296,7 @@ const BatchStatusSection = ({
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Expiry Date</p>
-                        <p className="font-medium">{"-"}</p>
+                        <p className="font-medium">{batch.expiryDate || "-"}</p>
                       </div>
                     </div>
 
@@ -284,7 +318,11 @@ const BatchStatusSection = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                       <div>
                         <div className="text-center mb-2">
-                          <h3 className="text-md font-semibold">Total Kilograms: {batch.totalKg || 0}</h3>
+                          <h3 className="text-md font-semibold">Total Honey: {totalHoneyCollected.toFixed(1)} kg</h3>
+                          <p className="text-xs text-gray-500">
+                            Certified: {batch.honeyCertified?.toFixed(1) || 0} kg • 
+                            Remaining: {batch.honeyRemaining?.toFixed(1) || 0} kg
+                          </p>
                           <p className="text-xs text-gray-500">Jars used: {batch.jarsUsed || 0}</p>
                         </div>
                         <div className="h-48 flex items-center justify-center">
@@ -304,12 +342,12 @@ const BatchStatusSection = ({
                                     <Cell key={`cell-${index}`} fill={entry.color} />
                                   ))}
                                 </Pie>
-                                <Tooltip formatter={(value) => [`${value} kg`, 'Weight']} />
+                                <Tooltip formatter={(value) => [`${Number(value).toFixed(1)} kg`, 'Weight']} />
                               </PieChart>
                             </ResponsiveContainer>
                             
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                              <span className="text-sm font-medium">{batch.totalKg || 0} kg</span>
+                              <span className="text-sm font-medium">{totalHoneyCollected.toFixed(1)} kg</span>
                               <span className="text-xs text-gray-500">{batch.jarsUsed || 0} jars</span>
                             </div>
                           </div>
@@ -317,7 +355,7 @@ const BatchStatusSection = ({
                       </div>
 
                       <div className="border rounded-lg p-4 bg-gray-50">
-                        <h3 className="text-md font-semibold mb-3">Certification Progress</h3>
+                        <h3 className="text-md font-semibold mb-3">Certification Breakdown</h3>
                         <div className="flex flex-wrap justify-between mb-4">
                           {certificationData.map((item, index) => (
                             <div 
@@ -326,16 +364,16 @@ const BatchStatusSection = ({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setSelectedItem({
-                                  batchName: batch.name,
+                                  batchName: batch.name || batch.batchNumber || `Batch ${batch.id}`,
                                   batchId: batch.id,
                                   category: item.label,
                                   weight: item.value,
                                   jars: item.jars,
-                                  containerType: batch.containerType,
-                                  labelType: batch.labelType,
+                                  containerType: batch.containerType || "Standard Jar",
+                                  labelType: batch.labelType || "Standard Label",
                                   stockLevel: "In Stock",
                                   location: item.label === "Uncertified" ? "Pending Area" : "Certified Storage",
-                                  lastUpdated: new Date().toLocaleDateString()
+                                  lastUpdated: new Date(batch.updatedAt || batch.createdAt).toLocaleDateString()
                                 });
                               }}
                             >
@@ -343,9 +381,9 @@ const BatchStatusSection = ({
                                 <div className={`h-3 w-3 rounded-full ${item.color} mr-2`}></div>
                                 <p className="text-sm font-medium">{item.label}</p>
                               </div>
-                              <p className="text-xl font-bold">{item.value} kg</p>
+                              <p className="text-xl font-bold">{item.value.toFixed(1)} kg</p>
                               <p className="text-xs text-gray-500">
-                                {item.jars} jars {item.percent > 0 ? `· ${item.percent}% of batch` : ''}
+                                {item.jars} jars {item.percent > 0 ? `• ${item.percent}% of batch` : ''}
                               </p>
                             </div>
                           ))}

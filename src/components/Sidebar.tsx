@@ -2,29 +2,92 @@ import { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Layers, Database, Tag, Package, RefreshCw, Menu, X, Home, Settings, Users, Activity, HelpCircle, Wallet, PlusCircle, MapPin, CheckCircle, Trash2, Globe, FileText, AlertCircle, Sparkles, LogOut, Plus, Star, Lock, Crown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { signOut } from 'next-auth/react';
 
 interface SidebarProps {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
-  isPremium?: boolean;
+  userPremiumStatus?: boolean; // This will come from the database
 }
 
-const Sidebar = ({ sidebarOpen, toggleSidebar, isPremium }: SidebarProps) => {
+// Utility function to get auth token
+const getAuthToken = () => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('authToken') || 
+                 localStorage.getItem('token') || 
+                 localStorage.getItem('jwt');
+    if (token) return token;
+    
+    // Try cookies as fallback
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'token' || name === 'authToken' || name === 'jwt') {
+        return value;
+      }
+    }
+  }
+  return null;
+};
+
+const Sidebar = ({ sidebarOpen, toggleSidebar, userPremiumStatus }: SidebarProps) => {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [userPremiumData, setUserPremiumData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  
+  // Fetch user premium status from API
+  useEffect(() => {
+    const fetchUserPremiumStatus = async () => {
+      try {
+        const token = getAuthToken();
+        
+        if (!token) {
+          console.log('No authentication token found');
+          setLoading(false);
+          return;
+        }
+        
+        const response = await fetch('/api/user/premium', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUserPremiumData(data.user);
+          console.log('User premium status fetched:', data.user);
+        } else {
+          console.error('Failed to fetch premium status:', await response.json());
+        }
+      } catch (error) {
+        console.error('Error fetching user premium status:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserPremiumStatus();
+  }, []);
+  
+  // Use the premium status from API response, fallback to props, then false
+  const isUserPremium = userPremiumData?.isPremium || userPremiumStatus || false;
+  
   const handleAnalyticsClick = (e) => {
     e.preventDefault();
-    if (!isPremium) {
+    if (!isUserPremium) {
       setShowPremiumModal(true);
     } else {
       // Navigate to analytics - user has premium access
-      router.push('/analytics'); // or use your router
+      router.push('/analytics');
     }
   };
+  
   const closePremiumModal = () => {
     setShowPremiumModal(false);
   };
+  
   return (
     <>
       <div className={`fixed top-0 left-0 h-full bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-white transition-all duration-500 ease-in-out z-20 ${sidebarOpen ? 'w-72' : 'w-0'} overflow-hidden shadow-2xl`}>
@@ -36,19 +99,32 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isPremium }: SidebarProps) => {
               <X className="h-6 w-6" />
             </button>
           </div>
+          
+          {/* Premium Status Indicator */}
+          {!loading && (
+            <div className="px-6 py-4 border-b border-gray-700/50">
+              <div className={`flex items-center space-x-2 p-3 rounded-xl ${isUserPremium ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/30' : 'bg-gray-800/50 border border-gray-600/30'}`}>
+                <Crown className={`h-5 w-5 ${isUserPremium ? 'text-amber-400' : 'text-gray-400'}`} />
+                <span className={`font-medium ${isUserPremium ? 'text-amber-300' : 'text-gray-300'}`}>
+                  {isUserPremium ? 'Premium User' : 'Free User'}
+                </span>
+              </div>
+            </div>
+          )}
+          
           <nav className="mt-8 px-4">
             <ul className="space-y-3">
               {[
                 { icon: Home, label: 'Dashboard', href: '/dashboard', locked: false },
                 { icon: Layers, label: 'Batches', href: '/batches', locked: false },
-                { icon: Activity, label: 'Analytics', href: '/analytics', locked: !isPremium },
+                { icon: Activity, label: 'Analytics', href: '/analytics', locked: !isUserPremium },
                 { icon: Users, label: 'Profile', href: '/profile', locked: false },
                 { icon: HelpCircle, label: 'Help', href: '#', locked: false }
               ].map((item, index) => (
                 <li key={index}>
                   {item.locked ? (
                     <button 
-                      onClick={handleAnalyticsClick}
+                      onClick={item.label === 'Analytics' ? handleAnalyticsClick : undefined}
                       className="group flex items-center justify-between w-full px-4 py-4 rounded-xl hover:bg-gradient-to-r hover:from-amber-500/10 hover:to-yellow-500/10 transition-all duration-300 cursor-pointer border border-amber-500/30"
                     >
                       <div className="flex items-center">
@@ -70,6 +146,34 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isPremium }: SidebarProps) => {
               ))}
             </ul>
           </nav>
+          
+          {/* Premium Upgrade Section for Free Users */}
+          {!loading && !isUserPremium && (
+            <div className="absolute bottom-6 left-4 right-4">
+              <div className="bg-gradient-to-r from-amber-500/20 to-yellow-500/20 p-4 rounded-xl border border-amber-500/30">
+                <div className="flex items-center space-x-3 mb-3">
+                  <Crown className="h-6 w-6 text-amber-400" />
+                  <span className="font-semibold text-amber-300">Upgrade to Premium</span>
+                </div>
+                <p className="text-gray-300 text-sm mb-4">
+                  Unlock advanced analytics and premium features!
+                </p>
+                <button
+                  onClick={() => router.push('/premium')}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-lg transition-all duration-300 font-medium"
+                >
+                  Upgrade Now
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Premium User Benefits */}
+          {!loading && isUserPremium && userPremiumData && (
+            <div className="absolute bottom-6 left-4 right-4">
+              
+            </div>
+          )}
         </div>
       </div>
 
@@ -120,7 +224,6 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isPremium }: SidebarProps) => {
                 </button>
                 <button
                   onClick={() => {
-                    // Handle premium upgrade logic here
                     router.push('/premium');
                     closePremiumModal();
                   }}

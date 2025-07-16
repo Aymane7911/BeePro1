@@ -16,25 +16,30 @@ model Company {
   phone            String?
   address          String?
   logo             String?
+  databaseName     String?         @unique // New field to store company-specific database name
   subscriptionPlan String          @default("basic")
   isActive         Boolean         @default(true)
   maxUsers         Int             @default(10)
   maxBatches       Int             @default(100)
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
-  apiaries         Apiary[]
-  batches          Batch[]
-  certifications   Certification[]
-  users            beeusers[]
+  // Remove direct relations since users will be in separate databases
+  // apiaries         Apiary[]
+  // batches          Batch[]
+  // certifications   Certification[]
+  // users            beeusers[]
 
   @@map("companies")
 }
+
+// Main database will only contain company records
+// Individual company databases will have the following models:
 
 model beeusers {
   id                Int             @id @default(autoincrement()) @map("id")
   firstname         String          @map("firstname")
   lastname          String          @map("lastname")
-  email             String          @map("email")
+  email             String          @unique @map("email")
   phonenumber       String?         @map("phonenumber")
   password          String          @map("password")
   createdAt         DateTime        @default(now()) @map("created_at")
@@ -48,7 +53,6 @@ model beeusers {
   isPremium         Boolean         @default(false) @map("is_premium")
   premiumExpiresAt  DateTime?       @map("premium_expires_at")
   premiumStartedAt  DateTime?       @map("premium_started_at")
-  companyId         String?         @map("company_id")
   role              String          @default("employee")
   accounts          Account[]
   Apiary            Apiary[]
@@ -56,16 +60,16 @@ model beeusers {
   certifications    Certification[]
   sessions          Session[]
   tokenStats        TokenStats?
-  company           Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // Remove companyId since each company has its own database
+  // companyId         String?         @map("company_id")
+  // company           Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  @@unique([email, companyId])
-  @@unique([phonenumber, companyId])
   @@map("beeusers")
 }
 
 model Batch {
   id                        String   @id @default(uuid())
-  batchNumber               String
+  batchNumber               String   @unique
   createdAt                 DateTime @default(now())
   bothCertifications        Float    @default(0)
   bothCertificationsPercent Int      @default(0)
@@ -93,12 +97,11 @@ model Batch {
   honeyCertified            Float?
   honeyRemaining            Float?
   totalHoneyCollected       Float?
-  companyId                 String?  @map("company_id")
   apiaries                  Apiary[]
-  company                   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user                      beeusers @relation(fields: [userId], references: [id])
-
-  @@unique([batchNumber, companyId])
+  // Remove companyId since each company has its own database
+  // companyId                 String?  @map("company_id")
+  // company                   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model TokenStats {
@@ -123,10 +126,11 @@ model Apiary {
   kilosCollected Float    @default(0)
   createdAt      DateTime @default(now())
   userId         Int
-  companyId      String?  @map("company_id")
   batch          Batch?   @relation(fields: [batchId], references: [id])
-  company        Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user           beeusers @relation(fields: [userId], references: [id])
+  // Remove companyId since each company has its own database
+  // companyId      String?  @map("company_id")
+  // company        Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model Certification {
@@ -144,9 +148,10 @@ model Certification {
   userId            Int      @map("user_id")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
-  companyId         String?  @map("company_id")
-  company           Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user              beeusers @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Remove companyId since each company has its own database
+  // companyId         String?  @map("company_id")
+  // company           Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([verificationCode])
   @@index([userId])

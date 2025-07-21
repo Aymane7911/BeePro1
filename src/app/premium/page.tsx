@@ -5,18 +5,15 @@ import { Check, X, Crown, AlertCircle, Zap, Bot, FileText, BarChart, Shield, Arr
 import Sidebar from '@/components/Sidebar';
 import { useSession } from 'next-auth/react';
 
-
 interface User {
   passportId?: string;
   passportFile?: string;
-  // Add other user properties as needed
   id?: string;
   name?: string;
   email?: string;
   isProfileComplete: boolean;
   isPremium: boolean;
 }
-
 
 export default function Premium() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,9 +23,10 @@ export default function Premium() {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '' });
   const [user, setUser] = useState<User | null>(null);
-  const [isPremiumActive, setIsPremiumActive] = useState(false); // Added this missing state
+  const [isPremiumActive, setIsPremiumActive] = useState(false);
   const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
+  
   // Payment form state
   const [paymentForm, setPaymentForm] = useState({
     cardNumber: '',
@@ -112,48 +110,26 @@ export default function Premium() {
     }
   };
 
-
-  function getAuthToken() {
-  // Try localStorage first
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('authToken') || 
-                 localStorage.getItem('token') || 
-                 localStorage.getItem('jwt');
-    if (token) return token;
-    
-    // Try cookies as fallback
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === 'token' || name === 'authToken' || name === 'jwt') {
-        return value;
-      }
-    }
-  }
-  return null;
-}
-
+  
   const handlePaymentSubmit = async (e) => {
   e.preventDefault();
   setPaymentProcessing(true);
   
   try {
-    // Get authentication token
     const token = getAuthToken();
-    
     if (!token) {
       throw new Error('No authentication token found. Please log in again.');
     }
-    
+
     // Simulate payment processing
     await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Update premium status in database
+
+    // Update premium status
     const response = await fetch('/api/user/premium', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`, // Include token in Authorization header
+        'Authorization': `Bearer ${token}`, // Fixed template literal
       },
       body: JSON.stringify({ isPremium: true }),
     });
@@ -165,41 +141,68 @@ export default function Premium() {
 
     const data = await response.json();
     
-    // Update local state with database response
+    // Update state
     setUser(data.user);
     setIsPremiumActive(true);
     
+    // Close modal and show success
     setPaymentProcessing(false);
     setShowPaymentModal(false);
-    setNotification({
-      show: true,
-      message: 'Payment successful! You now have access to Premium features. Welcome to HoneyCertify Premium!'
-    });
-    
-    setTimeout(() => {
-      setNotification({ show: false, message: '' });
-    }, 5000);
+    showNotification(
+      'Payment successful! You now have access to Premium features. Welcome to HoneyCertify Premium!',
+      5000
+    );
     
   } catch (error) {
     console.error('Payment processing error:', error);
     setPaymentProcessing(false);
-    setNotification({
-      show: true,
-      message: `Payment failed: ${error.message}. Please try again or contact support.`
-    });
-    
-    setTimeout(() => {
-      setNotification({ show: false, message: '' });
-    }, 5000);
+    showNotification(
+      `Payment failed: ${error.message}. Please try again or contact support.`,
+      5000
+    );
   }
 };
 
-useEffect(() => {
-  // This will trigger a re-render of the sidebar when premium status changes
-  if (user?.isPremium && typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('premiumStatusChanged'));
+// Helper function for notifications
+function showNotification(message, duration) {
+  setNotification({ show: true, message });
+  setTimeout(() => {
+    setNotification({ show: false, message: '' });
+  }, duration);
+}
+
+// Get authentication token
+function getAuthToken() {
+  // 1. Check localStorage first
+  if (typeof window !== 'undefined') {
+    const localStorageToken = localStorage.getItem('token');
+    if (localStorageToken) return localStorageToken;
   }
-}, [user?.isPremium]);
+
+  // 2. Check session storage
+  if (typeof window !== 'undefined') {
+    const sessionToken = sessionStorage.getItem('authToken');
+    if (sessionToken) return sessionToken;
+  }
+
+  // 3. Check cookies
+  if (typeof window !== 'undefined') {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'authToken') return value;
+    }
+  }
+
+  return null;
+}
+
+  useEffect(() => {
+    // This will trigger a re-render of the sidebar when premium status changes
+    if (user?.isPremium && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('premiumStatusChanged'));
+    }
+  }, [user?.isPremium]);
 
   const handleFreePlanConfirm = () => {
     setShowModal(false);
@@ -251,50 +254,90 @@ useEffect(() => {
       ]
     }
   ];
+
   useEffect(() => {
-   const fetchUserPremiumStatus = async () => {
-  try {
-    const token = getAuthToken();
-    
-    if (!token) {
-      console.log('No authentication token found');
-      return;
-    }
-    
-    const response = await fetch('/api/user/premium', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      setUser(data.user);
-      setIsPremiumActive(data.user.isPremium);
-    } else {
-      console.error('Failed to fetch premium status:', await response.json());
-    }
-  } catch (error) {
-    console.error('Error fetching user premium status:', error);
-  }
-};
+    const fetchUserPremiumStatus = async () => {
+      try {
+        const token = getAuthToken();
+        
+        if (!token) {
+          console.log('No authentication token found');
+          setLoading(false);
+          return;
+        }
+        
+        const response = await fetch('/api/user/premium', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+          setIsPremiumActive(data.user.isPremium);
+        } else {
+          console.error('Failed to fetch premium status:', await response.json());
+        }
+      } catch (error) {
+        console.error('Error fetching user premium status:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchUserPremiumStatus();
   }, [session]);
 
-if (loading) {
+  if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin h-8 w-8 border-4 border-yellow-500 border-t-transparent rounded-full"></div>
       </div>
     );
   }
- if (user?.isPremium) {
+
+  if (user?.isPremium) {
     return (
       <div className="flex flex-col min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">
-        {/* Existing header and sidebar code */}
+        {/* Header */}
+        <header className="bg-white p-4 rounded-lg shadow text-black sticky top-0 z-10">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <button 
+                onClick={toggleSidebar}
+                className="mr-4 p-1 rounded hover:bg-gray-100 md:mr-6"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+              <div className="flex items-center">
+                <div className="mr-3 bg-yellow-500 p-2 rounded">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM6 14C5.45 14 5 13.55 5 13C5 12.45 5.45 12 6 12C6.55 12 7 12.45 7 13C7 13.55 6.55 14 6 14ZM9 9C8.45 9 8 8.55 8 8C8 7.45 8.45 7 9 7C9.55 7 10 7.45 10 8C10 8.55 9.55 9 9 9ZM15 9C14.45 9 14 8.55 14 8C14 7.45 14.45 7 15 7C15.55 7 16 7.45 16 8C16 8.55 15.55 9 15 9ZM18 14C17.45 14 17 13.55 17 13C17 12.45 17.45 12 18 12C18.55 12 19 12.45 19 13C19 13.55 18.55 14 18 14Z" fill="white"/>
+                  </svg>
+                </div>
+                <h1 className="text-2xl font-bold text-gray-800">HoneyCertify</h1>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <button 
+                onClick={() => window.history.back()}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 flex items-center"
+              > 
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        </header>
         
+        <Sidebar 
+          sidebarOpen={sidebarOpen} 
+          toggleSidebar={toggleSidebar} 
+          userPremiumStatus={user?.isPremium || isPremiumActive} 
+        />
+
         <main className="flex-1 container mx-auto px-4 py-8">
           <div className="text-center">
             <div className="inline-flex items-center justify-center p-4 bg-green-100 rounded-full mb-6">
@@ -319,78 +362,11 @@ if (loading) {
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">
       {/* Sidebar */}
-      <div className={`fixed top-0 left-0 h-full bg-gray-800 text-white transition-all duration-300 ease-in-out z-20 ${sidebarOpen ? 'w-64' : 'w-0'} overflow-hidden`}>
-        <div className="p-4 flex justify-between items-center">
-          <h2 className="text-xl font-bold">Menu</h2>
-          <button onClick={toggleSidebar} className="p-1 hover:bg-gray-700 rounded">
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-        <nav className="mt-8">
-          <ul className="space-y-2">
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 hover:bg-gray-700">
-                <Home className="h-5 w-5 mr-3" />
-                Dashboard
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 hover:bg-gray-700">
-                <Package className="h-5 w-5 mr-3" />
-                Inventory
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 hover:bg-gray-700">
-                <Database className="h-5 w-5 mr-3" />
-                Batches
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 bg-yellow-500 text-white">
-                <Crown className="h-5 w-5 mr-3" />
-                Premium
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 hover:bg-gray-700">
-                <Activity className="h-5 w-5 mr-3" />
-                Analytics
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 hover:bg-gray-700">
-                <Wallet className="h-5 w-5 mr-3" />
-                Token Wallet
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 hover:bg-gray-700">
-                <Users className="h-5 w-5 mr-3" />
-                Profile
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 hover:bg-gray-700">
-                <Settings className="h-5 w-5 mr-3" />
-                Settings
-              </a>
-            </li>
-            <li>
-              <a href="#" className="flex items-center px-4 py-3 hover:bg-gray-700">
-                <HelpCircle className="h-5 w-5 mr-3" />
-                Help
-              </a>
-            </li>
-          </ul>
-        </nav>
-      </div>
-      
-      {/* Backdrop overlay when sidebar is open */}
       <Sidebar 
-      sidebarOpen={sidebarOpen} 
-      toggleSidebar={toggleSidebar} 
-      userPremiumStatus={user?.isPremium || isPremiumActive} />
+        sidebarOpen={sidebarOpen} 
+        toggleSidebar={toggleSidebar} 
+        userPremiumStatus={user?.isPremium || isPremiumActive} 
+      />
 
       <header className="bg-white p-4 rounded-lg shadow text-black sticky top-0 z-10">
         <div className="flex justify-between items-center">
@@ -412,8 +388,9 @@ if (loading) {
           </div>
           <div className="flex items-center">
             <button 
-            onClick={() => window.history.back()}
-              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 flex items-center"> 
+              onClick={() => window.history.back()}
+              className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 flex items-center"
+            > 
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back to Dashboard
             </button>
@@ -640,7 +617,7 @@ if (loading) {
         </div>
       </main>
 
-      {/* Stripe Payment Modal */}
+      {/* Payment Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-30 p-4">
           <div className="bg-white rounded-lg w-full max-w-md max-h-screen overflow-y-auto">
@@ -668,6 +645,8 @@ if (loading) {
               </div>
 
               <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                
+        
                 
                 {/* Card Information */}
                 <div>

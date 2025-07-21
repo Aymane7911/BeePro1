@@ -92,8 +92,9 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, userPremiumStatus }: SidebarProps
     <>
       <div className={`fixed top-0 left-0 h-full bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-white transition-all duration-500 ease-in-out z-20 ${sidebarOpen ? 'w-72' : 'w-0'} overflow-hidden shadow-2xl`}>
         <div className="absolute inset-0 bg-gradient-to-r from-blue-900/20 to-purple-900/20"></div>
-        <div className="relative z-10">
-          <div className="p-6 flex justify-between items-center border-b border-gray-700/50">
+        <div className="relative z-10 h-full flex flex-col">
+          {/* Header */}
+          <div className="p-6 flex justify-between items-center border-b border-gray-700/50 flex-shrink-0">
             <h2 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-amber-300 bg-clip-text text-transparent">Navigation</h2>
             <button onClick={toggleSidebar} className="p-2 hover:bg-gray-700/50 rounded-xl transition-all duration-300">
               <X className="h-6 w-6" />
@@ -102,7 +103,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, userPremiumStatus }: SidebarProps
           
           {/* Premium Status Indicator */}
           {!loading && (
-            <div className="px-6 py-4 border-b border-gray-700/50">
+            <div className="px-6 py-4 border-b border-gray-700/50 flex-shrink-0">
               <div className={`flex items-center space-x-2 p-3 rounded-xl ${isUserPremium ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/30' : 'bg-gray-800/50 border border-gray-600/30'}`}>
                 <Crown className={`h-5 w-5 ${isUserPremium ? 'text-amber-400' : 'text-gray-400'}`} />
                 <span className={`font-medium ${isUserPremium ? 'text-amber-300' : 'text-gray-300'}`}>
@@ -112,68 +113,45 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, userPremiumStatus }: SidebarProps
             </div>
           )}
           
-          <nav className="mt-8 px-4">
-            <ul className="space-y-3">
-              {[
-                { icon: Home, label: 'Dashboard', href: '/dashboard', locked: false },
-                { icon: Layers, label: 'Batches', href: '/batches', locked: false },
-                { icon: Activity, label: 'Analytics', href: '/analytics', locked: !isUserPremium },
-                { icon: Users, label: 'Profile', href: '/profile', locked: false },
-                { icon: HelpCircle, label: 'Help', href: '#', locked: false }
-              ].map((item, index) => (
-                <li key={index}>
-                  {item.locked ? (
-                    <button 
-                      onClick={item.label === 'Analytics' ? handleAnalyticsClick : undefined}
-                      className="group flex items-center justify-between w-full px-4 py-4 rounded-xl hover:bg-gradient-to-r hover:from-amber-500/10 hover:to-yellow-500/10 transition-all duration-300 cursor-pointer border border-amber-500/30"
-                    >
-                      <div className="flex items-center">
-                        <item.icon className="h-6 w-6 mr-4 transition-all duration-300 text-amber-400" />
-                        <span className="font-medium text-amber-300">{item.label}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Crown className="h-4 w-4 text-amber-400" />
-                        <Lock className="h-4 w-4 text-amber-400" />
-                      </div>
-                    </button>
-                  ) : (
-                    <a href={item.href} className="group flex items-center px-4 py-4 rounded-xl hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-amber-500/20 transition-all duration-300 transform hover:translate-x-2">
-                      <item.icon className="h-6 w-6 mr-4 transition-all duration-300 group-hover:text-yellow-400 group-hover:scale-110" />
-                      <span className="font-medium group-hover:text-yellow-300 transition-colors duration-300">{item.label}</span>
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </nav>
+          {/* Navigation Menu - Scrollable */}
+          <div className="flex-1 overflow-y-auto">
+            <nav className="mt-6 px-4 pb-6">
+              <ul className="space-y-3">
+                {[
+                  { icon: Home, label: 'Dashboard', href: '/dashboard', locked: false },
+                  { icon: Layers, label: 'Batches', href: '/batches', locked: false },
+                  { icon: Activity, label: 'Analytics', href: '/analytics', locked: !isUserPremium },
+                  { icon: Users, label: 'Profile', href: '/profile', locked: false },
+                  { icon: HelpCircle, label: 'Help', href: '#', locked: false }
+                ].map((item, index) => (
+                  <li key={index}>
+                    {item.locked ? (
+                      <button 
+                        onClick={item.label === 'Analytics' ? handleAnalyticsClick : undefined}
+                        className="group flex items-center justify-between w-full px-4 py-4 rounded-xl hover:bg-gradient-to-r hover:from-amber-500/10 hover:to-yellow-500/10 transition-all duration-300 cursor-pointer border border-amber-500/30"
+                      >
+                        <div className="flex items-center">
+                          <item.icon className="h-6 w-6 mr-4 transition-all duration-300 text-amber-400" />
+                          <span className="font-medium text-amber-300">{item.label}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Crown className="h-4 w-4 text-amber-400" />
+                          <Lock className="h-4 w-4 text-amber-400" />
+                        </div>
+                      </button>
+                    ) : (
+                      <a href={item.href} className="group flex items-center px-4 py-4 rounded-xl hover:bg-gradient-to-r hover:from-yellow-500/20 hover:to-amber-500/20 transition-all duration-300 transform hover:translate-x-2">
+                        <item.icon className="h-6 w-6 mr-4 transition-all duration-300 group-hover:text-yellow-400 group-hover:scale-110" />
+                        <span className="font-medium group-hover:text-yellow-300 transition-colors duration-300">{item.label}</span>
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </div>
           
-          {/* Premium Upgrade Section for Free Users */}
-          {!loading && !isUserPremium && (
-            <div className="absolute bottom-6 left-4 right-4">
-              <div className="bg-gradient-to-r from-amber-500/20 to-yellow-500/20 p-4 rounded-xl border border-amber-500/30">
-                <div className="flex items-center space-x-3 mb-3">
-                  <Crown className="h-6 w-6 text-amber-400" />
-                  <span className="font-semibold text-amber-300">Upgrade to Premium</span>
-                </div>
-                <p className="text-gray-300 text-sm mb-4">
-                  Unlock advanced analytics and premium features!
-                </p>
-                <button
-                  onClick={() => router.push('/premium')}
-                  className="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white rounded-lg transition-all duration-300 font-medium"
-                >
-                  Upgrade Now
-                </button>
-              </div>
-            </div>
-          )}
           
-          {/* Premium User Benefits */}
-          {!loading && isUserPremium && userPremiumData && (
-            <div className="absolute bottom-6 left-4 right-4">
-              
-            </div>
-          )}
         </div>
       </div>
 

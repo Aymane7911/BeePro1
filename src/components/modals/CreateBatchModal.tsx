@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { Layers, Database, Tag, Package, RefreshCw, Menu, X, Home, Settings, Users, Activity, HelpCircle, Wallet, PlusCircle, MapPin, CheckCircle, Trash2, Globe, FileText, AlertCircle, Sparkles, LogOut, Plus, Star } from 'lucide-react';
+import { Layers, Database, Tag, Package, RefreshCw, Menu, X, Home, Settings, Users, Activity, HelpCircle, Wallet, PlusCircle, MapPin, CheckCircle, Trash2, Globe, FileText, AlertCircle, Sparkles, LogOut, Plus, Star, Save } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 
@@ -30,6 +30,8 @@ interface CreateBatchModalProps {
   createBatch: () => void;
   selectedDropdownApiary: string;
   setSelectedDropdownApiary: (value: string) => void;
+  // Add this new prop for updating apiary hive count in database
+  updateApiaryHiveCount?: (apiaryId: string | number, newHiveCount: number) => Promise<void>;
 }
 
 const CreateBatchModal = ({ 
@@ -48,15 +50,58 @@ const CreateBatchModal = ({
   setShowApiaryModal,
   createBatch,
   selectedDropdownApiary,
-  setSelectedDropdownApiary
+  setSelectedDropdownApiary,
+  updateApiaryHiveCount
 }: CreateBatchModalProps) => {
   
+  // Track which apiaries have unsaved changes
+  const [unsavedChanges, setUnsavedChanges] = useState<Set<string | number>>(new Set());
+  const [savingChanges, setSavingChanges] = useState<Set<string | number>>(new Set());
+
   const resetBatchForm = () => {
     setBatchNumber('');
     setBatchName('');
     setBatchHoneyCollected(0);
     setSelectedApiaries([]);
     setSelectedDropdownApiary('');
+    setUnsavedChanges(new Set());
+    setSavingChanges(new Set());
+  };
+
+
+
+  const saveHiveCount = async (apiaryId: string | number, newHiveCount: number) => {
+    if (!updateApiaryHiveCount) {
+      console.warn('updateApiaryHiveCount function not provided');
+      return;
+    }
+
+    // Mark as saving
+    setSavingChanges(prev => new Set(prev).add(apiaryId));
+    
+    try {
+      await updateApiaryHiveCount(apiaryId, newHiveCount);
+      
+      // Remove from unsaved changes
+      setUnsavedChanges(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(apiaryId);
+        return newSet;
+      });
+      
+      console.log(`Successfully updated hive count for apiary ${apiaryId} to ${newHiveCount}`);
+    } catch (error) {
+      console.error('Failed to update hive count:', error);
+      // You might want to show a toast notification here
+      alert('Failed to save hive count. Please try again.');
+    } finally {
+      // Remove from saving state
+      setSavingChanges(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(apiaryId);
+        return newSet;
+      });
+    }
   };
 
   return showBatchModal ? (
@@ -237,12 +282,52 @@ const CreateBatchModal = ({
                             <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
                               Number of Hives
                             </label>
-                            <input
-                              type="number"
-                              value={apiary.hiveCount}
-                              readOnly
-                              className="w-full px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-gray-700 text-sm cursor-not-allowed"
-                            />
+                            <div className="flex items-center space-x-2">
+                              <input
+  type="number"
+  min="0"
+  value={apiary.hiveCount}
+  onChange={(e) => {
+    const newHiveCount = parseInt(e.target.value) || 0;
+    // Update local state only
+    setSelectedApiaries(prev => 
+      prev.map(a => 
+        String(a.id) === String(apiary.id) 
+          ? { ...a, hiveCount: newHiveCount } 
+          : a
+      )
+    );
+    // Mark as unsaved
+    setUnsavedChanges(prev => new Set(prev).add(apiary.id));
+  }}
+  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+/>
+                              {unsavedChanges.has(apiary.id) && (
+                                <button
+                                  type="button"
+                                  onClick={() => saveHiveCount(apiary.id, apiary.hiveCount)}
+                                  disabled={savingChanges.has(apiary.id)}
+                                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                                    savingChanges.has(apiary.id)
+                                      ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                                      : 'bg-green-600 hover:bg-green-700 text-white'
+                                  }`}
+                                  title="Save changes to database"
+                                >
+                                  {savingChanges.has(apiary.id) ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Save className="h-4 w-4" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                            {unsavedChanges.has(apiary.id) && (
+                              <p className="text-xs text-amber-600 mt-1 flex items-center">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Unsaved changes - click save to update database
+                              </p>
+                            )}
                           </div>
                         </div>
                         
@@ -268,9 +353,17 @@ const CreateBatchModal = ({
                     
                     <button
                       type="button"
-                      onClick={() => setSelectedApiaries((prev: Apiary[]) => 
-                        prev.filter(a => String(a.id) !== String(apiary.id))
-                      )}
+                      onClick={() => {
+                        setSelectedApiaries((prev: Apiary[]) => 
+                          prev.filter(a => String(a.id) !== String(apiary.id))
+                        );
+                        // Remove from unsaved changes when removing apiary
+                        setUnsavedChanges(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(apiary.id);
+                          return newSet;
+                        });
+                      }}
                       className="text-red-500 hover:text-red-700 text-sm flex items-center ml-4 hover:bg-red-50 px-2 py-1 rounded"
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
@@ -282,6 +375,18 @@ const CreateBatchModal = ({
             </div>
           )}
         </div>
+
+        {/* Show warning if there are unsaved changes */}
+        {unsavedChanges.size > 0 && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+            <div className="flex items-center">
+              <AlertCircle className="h-5 w-5 text-amber-500 mr-2" />
+              <p className="text-amber-700 text-sm">
+                You have unsaved changes to hive counts. Make sure to save them before creating the batch.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex justify-end space-x-3 pt-4 border-t">
@@ -300,12 +405,14 @@ const CreateBatchModal = ({
               !batchNumber?.trim() || 
               !batchHoneyCollected ||
               batchHoneyCollected <= 0 ||
-              selectedApiaries.length === 0
+              selectedApiaries.length === 0 ||
+              unsavedChanges.size > 0 // Prevent creating batch with unsaved changes
             }
             className={`px-6 py-2 rounded-md text-white font-medium transition-colors ${
               batchNumber?.trim() && 
               batchHoneyCollected > 0 &&
-              selectedApiaries.length > 0
+              selectedApiaries.length > 0 &&
+              unsavedChanges.size === 0
                 ? 'bg-green-600 hover:bg-green-700' 
                 : 'bg-gray-300 cursor-not-allowed'
             }`}

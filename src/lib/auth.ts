@@ -145,11 +145,25 @@ export async function getUserIdFromToken(token: string): Promise<string | null> 
       return null;
     }
 
+    // Log the original token for debugging
+    console.log('[getUserIdFromToken] Original token:', token.substring(0, 20) + '...');
+
     // Remove 'Bearer ' prefix if present
     const cleanToken = token.replace(/^Bearer\s+/i, '').trim();
     
     if (!cleanToken) {
       console.log('[getUserIdFromToken] Empty token after cleaning');
+      return null;
+    }
+
+    // Log cleaned token for debugging
+    console.log('[getUserIdFromToken] Cleaned token:', cleanToken.substring(0, 20) + '...');
+    
+    // Check if token looks like a JWT (has 3 parts separated by dots)
+    const tokenParts = cleanToken.split('.');
+    if (tokenParts.length !== 3) {
+      console.error('[getUserIdFromToken] Token does not appear to be a valid JWT format. Parts:', tokenParts.length);
+      console.error('[getUserIdFromToken] Token value:', cleanToken);
       return null;
     }
 
@@ -159,7 +173,7 @@ export async function getUserIdFromToken(token: string): Promise<string | null> 
       return null;
     }
 
-    console.log('[getUserIdFromToken] Processing JWT token');
+    console.log('[getUserIdFromToken] Processing JWT token with', tokenParts.length, 'parts');
 
     // Verify and decode JWT
     const decoded = jwt.verify(cleanToken, secret) as any;
@@ -209,7 +223,8 @@ export async function getUserIdFromToken(token: string): Promise<string | null> 
     if (error.name === 'TokenExpiredError') {
       console.log('[getUserIdFromToken] JWT token expired');
     } else if (error.name === 'JsonWebTokenError') {
-      console.log('[getUserIdFromToken] Invalid JWT token');
+      console.log('[getUserIdFromToken] Invalid JWT token format or signature');
+      console.log('[getUserIdFromToken] Error details:', error.message);
     } else {
       console.error('[getUserIdFromToken] JWT verification error:', error.message);
     }

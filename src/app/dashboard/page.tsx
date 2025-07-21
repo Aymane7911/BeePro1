@@ -231,7 +231,7 @@ export default function JarManagementDashboard() {
   
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleString());
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [token] = useState("HCT-73829-ABC45"); // Placeholder token
+
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showBuyTokensModal, setShowBuyTokensModal] = useState(false);
   const [tokensToAdd, setTokensToAdd] = useState(100);
@@ -271,7 +271,7 @@ const [isLoggingOut, setIsLoggingOut] = useState(false);
 const [isOpen, setIsOpen] = useState(false);
 const [batches, setBatches] = useState<Batch[]>([]);
 const [user, setUser] = useState<User | null>(null);
-  
+
 
   // 1. Add clickPosition state to track where user clicked for bubble positioning
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
@@ -298,7 +298,30 @@ const [user, setUser] = useState<User | null>(null);
   const [notification, setNotification] = useState({ show: false, message: '' });
   const [batchName, setBatchName] = useState(''); // Added batch name field
 
+  // Add this function in your parent component
+const handleUpdateApiaryHiveCount = async (apiaryId: string | number, newHiveCount: number) => {
+  try {
+    const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
 
+    const response = await fetch(`/api/apiaries/${apiaryId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ hiveCount: newHiveCount }),
+    });
+    
+    // ... rest of your code
+  } catch (error) {
+    console.error('Error updating hive count:', error);
+    throw error;
+  }
+};
   {/* Add this function to extract coordinates from Google Maps links */}
 
 {/* Add this function to handle manual coordinate input */}
@@ -2191,6 +2214,7 @@ const handleLocationCancel = () => {
       createBatch={createBatch}
       selectedDropdownApiary={selectedDropdownApiary}
       setSelectedDropdownApiary={setSelectedDropdownApiary}
+      updateApiaryHiveCount={handleUpdateApiaryHiveCount}
     />
     
     <CreateApiaryModal

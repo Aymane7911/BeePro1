@@ -7,34 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Company {
-  id               String          @id @default(uuid())
-  name             String          @unique
-  slug             String          @unique
-  domain           String?         @unique
-  email            String          @unique
-  phone            String?
-  address          String?
-  logo             String?
-  databaseName     String?         @unique // New field to store company-specific database name
-  subscriptionPlan String          @default("basic")
-  isActive         Boolean         @default(true)
-  maxUsers         Int             @default(10)
-  maxBatches       Int             @default(100)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  // Remove direct relations since users will be in separate databases
-  // apiaries         Apiary[]
-  // batches          Batch[]
-  // certifications   Certification[]
-  // users            beeusers[]
-
-  @@map("companies")
-}
-
-// Main database will only contain company records
-// Individual company databases will have the following models:
-
 model beeusers {
   id                Int             @id @default(autoincrement()) @map("id")
   firstname         String          @map("firstname")
@@ -60,9 +32,6 @@ model beeusers {
   certifications    Certification[]
   sessions          Session[]
   tokenStats        TokenStats?
-  // Remove companyId since each company has its own database
-  // companyId         String?         @map("company_id")
-  // company           Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("beeusers")
 }
@@ -99,9 +68,6 @@ model Batch {
   totalHoneyCollected       Float?
   apiaries                  Apiary[]
   user                      beeusers @relation(fields: [userId], references: [id])
-  // Remove companyId since each company has its own database
-  // companyId                 String?  @map("company_id")
-  // company                   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model TokenStats {
@@ -128,9 +94,6 @@ model Apiary {
   userId         Int
   batch          Batch?   @relation(fields: [batchId], references: [id])
   user           beeusers @relation(fields: [userId], references: [id])
-  // Remove companyId since each company has its own database
-  // companyId      String?  @map("company_id")
-  // company        Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model Certification {
@@ -149,9 +112,6 @@ model Certification {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   user              beeusers @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Remove companyId since each company has its own database
-  // companyId         String?  @map("company_id")
-  // company           Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([verificationCode])
   @@index([userId])

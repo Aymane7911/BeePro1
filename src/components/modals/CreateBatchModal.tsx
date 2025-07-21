@@ -11,6 +11,7 @@ interface Apiary {
   hiveCount: number;
   latitude?: number;
   longitude?: number;
+  locationName?: string;
 }
 
 interface CreateBatchModalProps {
@@ -340,7 +341,9 @@ const CreateBatchModal = ({
                               type="text"
                               value={
                                 apiary.latitude !== undefined && apiary.longitude !== undefined
-                                  ? `${apiary.latitude?.toFixed(6)}, ${apiary.longitude?.toFixed(6)}` 
+                                  ? apiary.locationName 
+                                    ? `${apiary.locationName} (${apiary.latitude?.toFixed(6)}, ${apiary.longitude?.toFixed(6)})`
+                                    : `${apiary.latitude?.toFixed(6)}, ${apiary.longitude?.toFixed(6)}`
                                   : 'No location set'
                               }
                               readOnly

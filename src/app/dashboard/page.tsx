@@ -527,7 +527,7 @@ async function makeAuthenticatedRequest(url, options = {}) {
   });
 }
 
-  async function saveApiaryToDatabase(apiaryData: any) {
+ async function saveApiaryToDatabase(apiaryData: any) {
   console.log('=== SAVING APIARY - SINGLE SAVE ===');
   console.log('Raw apiaryData received:', apiaryData);
   
@@ -569,16 +569,28 @@ async function makeAuthenticatedRequest(url, options = {}) {
       throw new Error('Longitude must be between -180 and 180');
     }
 
+    // Process location name - use provided name or generate from coordinates
+    let locationName = null; // Default to null to match database schema
+    if (apiaryData.locationName && typeof apiaryData.locationName === 'string') {
+      const trimmedLocationName = apiaryData.locationName.trim();
+      if (trimmedLocationName.length > 0) {
+        locationName = trimmedLocationName;
+      }
+    }
+    
+    // If no location name provided, keep it as null (optional field in database)
+    // The coordinates will be stored separately in latitude/longitude fields
+
     // PREPARE DATA - Send structure that matches your API interface
     const dataForAPI = {
       name: String(apiaryData.name).trim(),
       number: String(apiaryData.number).trim(),
       hiveCount: Math.max(0, parseInt(apiaryData.hiveCount) || 0),
       honeyCollected: Math.max(0, parseFloat(apiaryData.honeyCollected) || 0),
-      location: {
-        latitude: lat,
-        longitude: lng
-      }
+      kilosCollected: Math.max(0, parseFloat(apiaryData.kilosCollected) || 0), // Added to match schema
+      latitude: lat,
+      longitude: lng,
+      locationName: locationName // This will be null if no name provided, which is fine for optional field
     };
 
     console.log('Data being sent to API:', dataForAPI);
@@ -601,7 +613,7 @@ async function makeAuthenticatedRequest(url, options = {}) {
 
     console.log('Making SINGLE POST request to /api/apiaries');
 
-    // SINGLE API CALL - This will create ONE apiary with a batchId
+    // SINGLE API CALL - This will create ONE apiary with locationName included
     const response = await fetch('/api/apiaries', {
       method: 'POST',
       headers,
@@ -616,7 +628,7 @@ async function makeAuthenticatedRequest(url, options = {}) {
       console.error('API Error Response:', errorData);
       
       let errorMessage = 'Failed to save apiary';
-
+      
       switch (response.status) {
         case 401:
           errorMessage = 'Authentication failed. Please log in again.';
@@ -633,7 +645,7 @@ async function makeAuthenticatedRequest(url, options = {}) {
         default:
           errorMessage = errorData.message || errorData.error || errorMessage;
       }
-
+      
       throw new Error(errorMessage);
     }
 
@@ -642,7 +654,7 @@ async function makeAuthenticatedRequest(url, options = {}) {
 
     // Return the created apiary
     return result;
-
+  
   } catch (error) {
     console.error('Error in saveApiaryToDatabase:', error);
     throw error;

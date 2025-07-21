@@ -88,6 +88,7 @@ model Apiary {
   hiveCount      Int
   latitude       Float
   longitude      Float
+  locationName   String?  // Optional location name field
   batchId        String?
   kilosCollected Float    @default(0)
   createdAt      DateTime @default(now())

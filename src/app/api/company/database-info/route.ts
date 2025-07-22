@@ -1,17 +1,39 @@
-// app/api/company/database-info/route.ts
+// src/app/api/company/database-info/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route'; // Adjust path as needed
+import { authOptions, authenticateRequest } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
-    // Use getServerSession instead of getSession for API routes
+    let userId: string | null = null;
+    let databaseId: string | null = null;
+    let companyId: string | null = null;
+
+    // First try to get session from NextAuth (for web app users)
     const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.databaseId) {
+    if (session?.user?.id && session?.user?.companyId) {
+      userId = session.user.id;
+      companyId = session.user.companyId;
+      
+      // Option 1: Get databaseId from company relationship
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { databaseId: true }
+      });
+      databaseId = company?.databaseId || null;
+    } else {
+      // Fallback to JWT authentication (for API users)
+      const authResult = await authenticateRequest(request);
+      if (authResult) {
+        userId = authResult.userId;
+        databaseId = authResult.databaseId;
+      }
+    }
+        
+    if (!userId || !databaseId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -19,8 +41,8 @@ export async function GET(request: NextRequest) {
     }
 
     const database = await prisma.database.findUnique({
-      where: { id: session.user.databaseId },
-      select: { 
+      where: { id: databaseId },
+      select: {
         name: true,
         displayName: true,
         isActive: true,

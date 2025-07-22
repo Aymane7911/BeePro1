@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error(`❌ [${requestId}] FATAL GET ERROR:`, error);
     return NextResponse.json(
-      { error: "Failed to fetch token stats", details: error.message },
+      { error: "Failed to fetch token stats", details: (error as Error).message },
       { status: 500 }
     );
   } finally {
@@ -237,7 +237,7 @@ console.log(`📊 [${requestId}] Token breakdown validated: OriginOnly=${safeOri
 
   } catch (error) {
     console.error(`❌ [${requestId}] FATAL POST ERROR:`, error);
-    return NextResponse.json({ error: "Failed to update token stats", details: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update token stats", details:(error as Error).message }, { status: 500 });
   } finally {
     await prisma.$disconnect();
     console.log(`🏁 [${requestId}] POST request completed`);

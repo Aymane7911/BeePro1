@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if verification code already exists
-    const existingCert = await prisma.certification.findUnique({
+    // Check if verification code already exists - using findFirst instead of findUnique
+    const existingCert = await prisma.certification.findFirst({
       where: { verificationCode }
     });
 

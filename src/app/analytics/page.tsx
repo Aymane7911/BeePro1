@@ -1,10 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Menu, RefreshCw, Upload, Download, TrendingUp, X, Home, Settings, Users, Activity, HelpCircle, Wallet, Crown, Lock, MessageCircle } from 'lucide-react';
-import Sidebar   from '@/components/Sidebar'; // Importing the Sidebar component
-
-
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Menu, RefreshCw, Upload, Download, TrendingUp, X, MessageCircle } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
 
 interface BackdropProps {
   sidebarOpen: boolean;
@@ -21,23 +19,183 @@ const Backdrop = ({ sidebarOpen, toggleSidebar }: BackdropProps) => (
 );
 
 const Analytics = () => {
-  const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiStatus, setApiStatus] = useState('checking');
-  const [selectedFiles, setSelectedFiles] = useState([]);
-  const [uploadLoading, setUploadLoading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lastUpdated, setLastUpdated] = useState('');
   const [iframeKey, setIframeKey] = useState(0);
-  const [isPremium, setIsPremium] = useState(true); // Assume premium access for analytics
-  const fileInputRef = useRef(null);
+  const [chatbotOpen, setChatbotOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const invoiceApiBaseUrl = 'https://invoicesdashapi.onrender.com';
   const productionApiBaseUrl = 'https://productionapidash.onrender.com';
   const beehiveApiBaseUrl = 'https://beehivedah.onrender.com';
+  const isPremium = true;
 
-  // Slide configurations
+  const fetchInvoices = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${invoiceApiBaseUrl}/invoices/`);
+      const result = await response.json();
+      
+      if (response.ok && result.invoices) {
+        setApiStatus('connected');
+      } else {
+        setApiStatus('error');
+      }
+    } catch (error) {
+      console.error('Error fetching invoices:', error);
+      setApiStatus('error');
+    } finally {
+      setLoading(false);
+    }
+  }, [invoiceApiBaseUrl]);
+
+  const checkHealth = useCallback(async () => {
+    try {
+      const response = await fetch(`${invoiceApiBaseUrl}/health/`);
+      const result = await response.json();
+      
+      if (response.ok && result.status === 'healthy') {
+        setApiStatus('connected');
+      } else {
+        setApiStatus('error');
+      }
+    } catch (error) {
+      setApiStatus('error');
+    }
+  }, [invoiceApiBaseUrl]);
+
+  const uploadFiles = useCallback(async () => {
+    if (selectedFiles.length === 0) {
+      alert('Please select at least one file');
+      return;
+    }
+
+    const currentConfig = slideConfigs[currentSlide];
+    
+    try {
+      const formData = new FormData();
+      for (const file of selectedFiles) {
+        if (currentSlide === 0 && !file.name.toLowerCase().endsWith('.pdf')) {
+          alert(`${file.name} is not a PDF file. Only PDF files are allowed for invoices.`);
+          return;
+        }
+        formData.append('files', file);
+      }
+
+      const response = await fetch(currentConfig.uploadEndpoint, {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        setSelectedFiles([]);
+        if (currentSlide === 0) {
+          await fetchInvoices();
+        }
+        alert(`${currentConfig.title.split(' ')[0]} data uploaded and processed successfully!`);
+      } else {
+        alert('Upload failed: ' + (result.message || 'Unknown error'));
+      }
+    } catch (error: any) {
+      alert('Upload error: ' + error.message);
+    }
+  }, [selectedFiles, currentSlide, fetchInvoices]);
+
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  const toggleChatbot = () => setChatbotOpen(!chatbotOpen);
+  
+  const refreshData = useCallback(async () => {
+    if (currentSlide === 0) {
+      await fetchInvoices();
+    } else {
+      setIframeKey(prev => prev + 1);
+    }
+    setLastUpdated(new Date().toLocaleString());
+  }, [currentSlide, fetchInvoices]);
+
+  const handleHeaderUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleExport = () => {
+    alert("Export functionality is not implemented yet.");
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      setSelectedFiles(Array.from(event.target.files));
+    }
+  };
+
+  const slideLeft = () => {
+    setCurrentSlide(prev => (prev > 0 ? prev - 1 : slideConfigs.length - 1));
+    setSelectedFiles([]);
+  };
+
+  const slideRight = () => {
+    setCurrentSlide(prev => (prev < slideConfigs.length - 1 ? prev + 1 : 0));
+    setSelectedFiles([]);
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentSlide(index);
+    setSelectedFiles([]);
+  };
+
+  const handleSwipeStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const startX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    e.currentTarget.setAttribute('data-start-x', startX.toString());
+  };
+
+  const handleSwipeEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    const endX = 'changedTouches' in e ? e.changedTouches[0].clientX : e.clientX;
+    const startX = parseFloat(e.currentTarget.getAttribute('data-start-x') || '0');
+    const diff = startX - endX;
+    
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        slideRight();
+      } else {
+        slideLeft();
+      }
+    }
+  };
+
+  const getColorClasses = (color: string, variant = 'primary') => {
+    const colorMap = {
+      blue: {
+        primary: 'from-blue-500 to-purple-600',
+        secondary: 'bg-blue-100 text-blue-600 hover:bg-blue-200',
+        accent: 'border-blue-300 bg-blue-50 hover:bg-blue-100',
+        gradient: 'from-blue-500/5 via-transparent to-purple-500/5',
+        glow: 'from-blue-400/10 to-transparent'
+      },
+      green: {
+        primary: 'from-green-500 to-blue-600',
+        secondary: 'bg-green-100 text-green-600 hover:bg-green-200',
+        accent: 'border-green-300 bg-green-50 hover:bg-green-100',
+        gradient: 'from-green-500/5 via-transparent to-blue-500/5',
+        glow: 'from-green-400/10 to-transparent'
+      },
+      yellow: {
+        primary: 'from-yellow-500 to-orange-600',
+        secondary: 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200',
+        accent: 'border-yellow-300 bg-yellow-50 hover:bg-yellow-100',
+        gradient: 'from-yellow-500/5 via-transparent to-orange-500/5',
+        glow: 'from-yellow-400/10 to-transparent'
+      }
+    };
+    return colorMap[color][variant];
+  };
+
   const slideConfigs = [
     {
       title: 'Invoice Analytics Dashboard',
@@ -86,222 +244,25 @@ const Analytics = () => {
     }
   ];
 
-  // Fetch processed invoices from API
-  const fetchInvoices = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${invoiceApiBaseUrl}/invoices/`);
-      const result = await response.json();
-      
-      console.log('API Response:', result);
-      
-      if (response.ok && result.invoices) {
-        setInvoices(result.invoices);
-        setApiStatus('connected');
-        updateInvoiceStats(result.invoices);
-      } else {
-        setApiStatus('error');
-      }
-    } catch (error) {
-      console.error('Error fetching invoices:', error);
-      setApiStatus('error');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Update invoice stats based on real data
-  const updateInvoiceStats = (invoiceData) => {
-    if (!invoiceData.length) return;
-
-    const totalValue = invoiceData.reduce((sum, invoice) => {
-      const total = parseFloat(invoice.total?.replace(/[^0-9.-]/g, '') || 0);
-      return sum + total;
-    }, 0);
-
-    const avgValue = totalValue / invoiceData.length;
-
-    slideConfigs[0].statsCards = [
-      { label: 'Total Invoices', value: invoiceData.length.toString(), change: '+5.2%', trend: 'up' },
-      { label: 'Processed Invoices', value: invoiceData.length.toString(), change: '+12.1%', trend: 'up' },
-      { label: 'Total Value', value: `$${totalValue.toFixed(2)}`, change: '+18.3%', trend: 'up' },
-      { label: 'Avg Invoice Value', value: `$${avgValue.toFixed(2)}`, change: '+3.7%', trend: 'up' }
-    ];
-  };
-
-  // Check API health
-  const checkHealth = async () => {
-    try {
-      const response = await fetch(`${invoiceApiBaseUrl}/health/`);
-      const result = await response.json();
-      
-      if (response.ok && result.status === 'healthy') {
-        setApiStatus('connected');
-      } else {
-        setApiStatus('error');
-      }
-    } catch (error) {
-      setApiStatus('error');
-    }
-  };
-
-  // Generic upload function
-  const uploadFiles = async () => {
-    if (selectedFiles.length === 0) {
-      alert('Please select at least one file');
-      return;
-    }
-
-    const currentConfig = slideConfigs[currentSlide];
-    
-    try {
-      setUploadLoading(true);
-      
-      const formData = new FormData();
-      for (let file of selectedFiles) {
-        // Check file type for invoice uploads
-        if (currentSlide === 0 && !file.name.toLowerCase().endsWith('.pdf')) {
-          alert(`${file.name} is not a PDF file. Only PDF files are allowed for invoices.`);
-          return;
-        }
-        formData.append('files', file);
-      }
-
-      const response = await fetch(currentConfig.uploadEndpoint, {
-        method: 'POST',
-        body: formData
-      });
-
-      const result = await response.json();
-      
-      if (response.ok) {
-        setSelectedFiles([]);
-        if (currentSlide === 0) {
-          await fetchInvoices();
-        }
-        alert(`${currentConfig.title.split(' ')[0]} data uploaded and processed successfully!`);
-      } else {
-        alert('Upload failed: ' + (result.message || 'Unknown error'));
-      }
-    } catch (error) {
-      alert('Upload error: ' + error.message);
-    } finally {
-      setUploadLoading(false);
-    }
-  };
-
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
-  
-  const refreshData = async () => {
-    if (currentSlide === 0) {
-      await fetchInvoices();
-    } else {
-      // Force iframe refresh by changing key
-      setIframeKey(prev => prev + 1);
-    }
-    setLastUpdated(new Date().toLocaleString());
-  };
-
-  const handleHeaderUpload = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleExport = () => {
-    alert("Export functionality is not implemented yet.");
-  };
-
   useEffect(() => {
     checkHealth();
     fetchInvoices();
     setLastUpdated(new Date().toLocaleString());
-  }, []);
+  }, [checkHealth, fetchInvoices]);
 
   const currentConfig = slideConfigs[currentSlide];
 
-  const handleFileSelect = (event) => {
-    setSelectedFiles(Array.from(event.target.files));
-  };
-
-  const slideLeft = () => {
-    setCurrentSlide((prev) => (prev > 0 ? prev - 1 : slideConfigs.length - 1));
-    setSelectedFiles([]);
-  };
-
-  const slideRight = () => {
-    setCurrentSlide((prev) => (prev < slideConfigs.length - 1 ? prev + 1 : 0));
-    setSelectedFiles([]);
-  };
-
-  const goToSlide = (index) => {
-    setCurrentSlide(index);
-    setSelectedFiles([]);
-  };
-
-  const handleSwipeStart = (e) => {
-    const startX = e.touches ? e.touches[0].clientX : e.clientX;
-    e.target.dataset.startX = startX;
-  };
-
-  const handleSwipeEnd = (e) => {
-    const endX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
-    const startX = parseFloat(e.target.dataset.startX);
-    const diff = startX - endX;
-    
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) {
-        slideRight();
-      } else {
-        slideLeft();
-      }
-    }
-  };
-
-  const getColorClasses = (color, variant = 'primary') => {
-    const colorMap = {
-      blue: {
-        primary: 'from-blue-500 to-purple-600',
-        secondary: 'bg-blue-100 text-blue-600 hover:bg-blue-200',
-        accent: 'border-blue-300 bg-blue-50 hover:bg-blue-100',
-        gradient: 'from-blue-500/5 via-transparent to-purple-500/5',
-        glow: 'from-blue-400/10 to-transparent'
-      },
-      green: {
-        primary: 'from-green-500 to-blue-600',
-        secondary: 'bg-green-100 text-green-600 hover:bg-green-200',
-        accent: 'border-green-300 bg-green-50 hover:bg-green-100',
-        gradient: 'from-green-500/5 via-transparent to-blue-500/5',
-        glow: 'from-green-400/10 to-transparent'
-      },
-      yellow: {
-        primary: 'from-yellow-500 to-orange-600',
-        secondary: 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200',
-        accent: 'border-yellow-300 bg-yellow-50 hover:bg-yellow-100',
-        gradient: 'from-yellow-500/5 via-transparent to-orange-500/5',
-        glow: 'from-yellow-400/10 to-transparent'
-      }
-    };
-    return colorMap[color][variant];
-  };
-  
-const [chatbotOpen, setChatbotOpen] = useState(false);
-const toggleChatbot = () => setChatbotOpen(!chatbotOpen);
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-200 via-purple-100 to-yellow-100 text-black flex">
-
-       <Backdrop sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
-       
-      {/* Sidebar Component */}
+      <Backdrop sidebarOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+      
       <Sidebar 
         sidebarOpen={sidebarOpen} 
         toggleSidebar={toggleSidebar} 
         isPremium={isPremium} 
       />
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col relative">
-        {/* Animated Background Elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 left-10 w-32 h-32 bg-blue-300 rounded-full opacity-20 animate-pulse"></div>
           <div className="absolute top-40 right-20 w-24 h-24 bg-purple-300 rounded-full opacity-20 animate-pulse delay-1000"></div>
@@ -309,7 +270,6 @@ const toggleChatbot = () => setChatbotOpen(!chatbotOpen);
         </div>
 
         <div className="relative z-10 flex-1 flex flex-col">
-          {/* Header Section */}
           <div className="p-6 pb-4">
             <AnalyticsHeader
               toggleSidebar={toggleSidebar}
@@ -323,7 +283,6 @@ const toggleChatbot = () => setChatbotOpen(!chatbotOpen);
             />
           </div>
 
-          {/* Sliding Navigation */}
           <div className="flex justify-center px-6 pb-4">
             <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-white/20">
               <div className="flex space-x-2">
@@ -344,7 +303,6 @@ const toggleChatbot = () => setChatbotOpen(!chatbotOpen);
             </div>
           </div>
 
-          {/* Full Screen Dashboard Container */}
           <div className="flex-1 px-6 pb-6">
             <div className="h-full bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
               <div className="h-1000 p-8">
@@ -404,7 +362,6 @@ const toggleChatbot = () => setChatbotOpen(!chatbotOpen);
             </div>
           </div>
 
-          {/* Slide Indicators */}
           <div className="flex justify-center space-x-3 pb-6">
             {slideConfigs.map((config, index) => (
               <button
@@ -420,63 +377,71 @@ const toggleChatbot = () => setChatbotOpen(!chatbotOpen);
           </div>
         </div>
       </div>
-      {/* Floating Chatbot */}
-<div className="fixed bottom-6 right-6 z-50">
-  {chatbotOpen && (
-    <div className="mb-4 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transform transition-all duration-300 animate-in slide-in-from-bottom-2">
-      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-            <MessageCircle className="h-5 w-5 text-white" />
+      
+      <div className="fixed bottom-6 right-6 z-50">
+        {chatbotOpen && (
+          <div className="mb-4 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transform transition-all duration-300 animate-in slide-in-from-bottom-2">
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                  <MessageCircle className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold">HoneyCertify Assistant</h3>
+                  <p className="text-blue-100 text-sm">Ask me anything about beekeeping!</p>
+                </div>
+              </div>
+              <button
+                onClick={toggleChatbot}
+                className="text-white hover:text-blue-200 transition-colors p-1 hover:bg-white/10 rounded-full"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="h-96 w-80">
+              <iframe 
+                src="https://ibtissam19-beekeeperschatbot.hf.space/?__theme=light" 
+                title="HoneyCertify Chatbot" 
+                className="w-full h-130 border-0"
+                loading="lazy"
+              />
+            </div>
           </div>
-          <div>
-            <h3 className="text-white font-semibold">HoneyCertify Assistant</h3>
-            <p className="text-blue-100 text-sm">Ask me anything about beekeeping!</p>
-          </div>
-        </div>
+        )}
+        
         <button
           onClick={toggleChatbot}
-          className="text-white hover:text-blue-200 transition-colors p-1 hover:bg-white/10 rounded-full"
+          className={`group relative overflow-hidden p-4 rounded-full shadow-2xl transform transition-all duration-500 hover:scale-110 hover:shadow-xl active:scale-95 ${
+            chatbotOpen 
+              ? 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-400 hover:to-pink-500' 
+              : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500'
+          }`}
         >
-          <X className="h-5 w-5" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></div>
+          <div className="absolute top-2 right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+          {chatbotOpen ? (
+            <X className="h-6 w-6 text-white relative z-10 transition-all duration-300 group-hover:rotate-180" />
+          ) : (
+            <MessageCircle className="h-6 w-6 text-white relative z-10 transition-all duration-300 group-hover:rotate-12 group-hover:scale-110" />
+          )}
         </button>
       </div>
-      <div className="h-96 w-80">
-        <iframe 
-          src="https://ibtissam19-beekeeperschatbot.hf.space/?__theme=light" 
-          title="HoneyCertify Chatbot" 
-          className="w-full h-130 border-0"
-          loading="lazy"
-        />
-      </div>
-    </div>
-  )}
-  
-  <button
-    onClick={toggleChatbot}
-    className={`group relative overflow-hidden p-4 rounded-full shadow-2xl transform transition-all duration-500 hover:scale-110 hover:shadow-xl active:scale-95 ${
-      chatbotOpen 
-        ? 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-400 hover:to-pink-500' 
-        : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-400 hover:to-purple-500'
-    }`}
-  >
-    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></div>
-    <div className="absolute top-2 right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-    {chatbotOpen ? (
-      <X className="h-6 w-6 text-white relative z-10 transition-all duration-300 group-hover:rotate-180" />
-    ) : (
-      <MessageCircle className="h-6 w-6 text-white relative z-10 transition-all duration-300 group-hover:rotate-12 group-hover:scale-110" />
-    )}
-  </button>
-</div>
+      
+      <input 
+        type="file" 
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        multiple
+        accept={currentConfig.acceptedFiles}
+        className="hidden"
+      />
     </div>
   );
 };
 
 export default Analytics;
 
-// AnalyticsHeader component
 interface AnalyticsHeaderProps {
   toggleSidebar: () => void;
   refreshData: () => void;
@@ -487,9 +452,10 @@ interface AnalyticsHeaderProps {
     title: string;
     icon: string;
     color: string;
+    acceptedFiles: string;
   }>;
   lastUpdated: string;
-  apiStatus: 'connected' | 'error' | 'checking';
+  apiStatus: string;
 }
 
 const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
@@ -658,10 +624,7 @@ const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
               />
             ))}
           </div>
-          
         </div>
-        
-
       </div>
     </header>
   );

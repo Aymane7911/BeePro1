@@ -169,32 +169,37 @@ const Analytics = () => {
     }
   };
 
-  const getColorClasses = (color: string, variant = 'primary') => {
-    const colorMap = {
-      blue: {
-        primary: 'from-blue-500 to-purple-600',
-        secondary: 'bg-blue-100 text-blue-600 hover:bg-blue-200',
-        accent: 'border-blue-300 bg-blue-50 hover:bg-blue-100',
-        gradient: 'from-blue-500/5 via-transparent to-purple-500/5',
-        glow: 'from-blue-400/10 to-transparent'
-      },
-      green: {
-        primary: 'from-green-500 to-blue-600',
-        secondary: 'bg-green-100 text-green-600 hover:bg-green-200',
-        accent: 'border-green-300 bg-green-50 hover:bg-green-100',
-        gradient: 'from-green-500/5 via-transparent to-blue-500/5',
-        glow: 'from-green-400/10 to-transparent'
-      },
-      yellow: {
-        primary: 'from-yellow-500 to-orange-600',
-        secondary: 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200',
-        accent: 'border-yellow-300 bg-yellow-50 hover:bg-yellow-100',
-        gradient: 'from-yellow-500/5 via-transparent to-orange-500/5',
-        glow: 'from-yellow-400/10 to-transparent'
-      }
-    };
-    return colorMap[color][variant];
+ type Color = 'blue' | 'green' | 'yellow';
+type Variant = 'primary' | 'secondary' | 'accent' | 'gradient' | 'glow';
+
+const getColorClasses = (color: Color, variant: Variant = 'primary') => {
+  const colorMap = {
+    blue: {
+      primary: 'from-blue-500 to-purple-600',
+      secondary: 'bg-blue-100 text-blue-600 hover:bg-blue-200',
+      accent: 'border-blue-300 bg-blue-50 hover:bg-blue-100',
+      gradient: 'from-blue-500/5 via-transparent to-purple-500/5',
+      glow: 'from-blue-400/10 to-transparent',
+    },
+    green: {
+      primary: 'from-green-500 to-blue-600',
+      secondary: 'bg-green-100 text-green-600 hover:bg-green-200',
+      accent: 'border-green-300 bg-green-50 hover:bg-green-100',
+      gradient: 'from-green-500/5 via-transparent to-blue-500/5',
+      glow: 'from-green-400/10 to-transparent',
+    },
+    yellow: {
+      primary: 'from-yellow-500 to-orange-600',
+      secondary: 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200',
+      accent: 'border-yellow-300 bg-yellow-50 hover:bg-yellow-100',
+      gradient: 'from-yellow-500/5 via-transparent to-orange-500/5',
+      glow: 'from-yellow-400/10 to-transparent',
+    },
   };
+
+  return colorMap[color][variant];
+};
+
 
   const slideConfigs = [
     {

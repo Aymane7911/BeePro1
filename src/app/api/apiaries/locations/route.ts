@@ -92,13 +92,12 @@ export async function POST(request: NextRequest) {
       data: {
         name: name?.trim() || `Saved Location ${new Date().toLocaleDateString()}`,
         number: `LOC_${Date.now()}`, // unique identifier
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
+        latitude: parseFloat(String(latitude)),
+        longitude: parseFloat(String(longitude)),
         hiveCount: 0,
         kilosCollected: 0,
-        user: {
-          connect: { id: parseInt(String(userId)) },
-        },
+        userId: parseInt(String(userId)), // Use userId directly instead of user relation
+        // batchId is intentionally omitted (will be null by default)
       },
     });
 

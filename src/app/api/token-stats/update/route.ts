@@ -13,12 +13,15 @@ export async function GET(request: NextRequest) {
 
   try {
     console.log(`🔐 [${requestId}] Authenticating request...`);
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
 
-    if (!userId) {
+    if (!authResult) {
       console.log(`❌ [${requestId}] Authentication failed`);
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
+
+    // Extract userId from the auth result object
+    const { userId } = authResult;
 
     const userIdInt = parseInt(userId);
     if (isNaN(userIdInt)) {
@@ -85,12 +88,15 @@ export async function POST(request: NextRequest) {
 
   try {
     console.log(`🔐 [${requestId}] Authenticating request...`);
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
 
-    if (!userId) {
+    if (!authResult) {
       console.log(`❌ [${requestId}] Authentication failed`);
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
+
+    // Extract userId from the auth result object
+    const { userId } = authResult;
 
     const userIdInt = parseInt(userId);
     if (isNaN(userIdInt)) {

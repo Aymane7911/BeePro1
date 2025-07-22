@@ -17,7 +17,6 @@ const transporter = nodemailer.createTransport({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log('Received registration data:', body);
 
     const {
       firstname,
@@ -25,8 +24,8 @@ export async function POST(request: Request) {
       email,
       phonenumber,
       password,
-      companyId,
-      companySlug,
+      databaseId,
+      databaseName,
       role = 'employee'
     } = body;
 
@@ -52,8 +51,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Password must be at least 8 characters long.' }, { status: 400 });
     }
 
-    if (!companyId?.trim() && !companySlug?.trim()) {
-      return NextResponse.json({ success: false, error: 'Database identification (ID or slug) is required.' }, { status: 400 });
+    if (!databaseId?.trim() && !databaseName?.trim()) {
+      return NextResponse.json({ success: false, error: 'Database identification (ID or display name) is required.' }, { status: 400 });
     }
 
     const validRoles = ['employee', 'manager', 'admin'];
@@ -65,9 +64,8 @@ export async function POST(request: Request) {
     const dbInstance = await prisma.database.findFirst({
       where: {
         OR: [
-          { id: companyId?.trim() || undefined },
-          // If you have slug field on Database
-          { slug: companySlug?.trim() || undefined },
+          { id: databaseId?.trim() },
+          { displayName: databaseName?.trim() }
         ],
         isActive: true,
       },
@@ -80,11 +78,11 @@ export async function POST(request: Request) {
     // Check for existing user
     const existingUser = await prisma.beeusers.findFirst({
       where: {
+        databaseId: dbInstance.id,
         OR: [
           { email: email?.trim() || undefined },
           { phonenumber: phonenumber?.trim() || undefined },
         ],
-        databaseId: dbInstance.id,
       },
     });
 
@@ -151,7 +149,6 @@ export async function POST(request: Request) {
       userId: result.newUser.id,
       databaseId: result.dbInstance.id,
       displayName: result.dbInstance.displayName,
-      slug: result.dbInstance.slug,
       requiresConfirmation: result.requiresConfirmation,
     }, { status: 201 });
 
@@ -167,7 +164,7 @@ async function sendWelcomeEmail(dbInstance: any, user: any, confirmationToken: s
   if (!user.email) return;
 
   const confirmationLink = `${process.env.BASE_URL}/confirm?token=${confirmationToken}`;
-  const dashboardLink    = `${process.env.BASE_URL}/dashboard/db/${dbInstance.slug}`;
+  const dashboardLink    = `${process.env.BASE_URL}/dashboard/db/${dbInstance.id}`;
 
   const mailOptions = {
     from: process.env.EMAIL_USER,

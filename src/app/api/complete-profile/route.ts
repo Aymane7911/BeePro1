@@ -20,8 +20,8 @@ function verifyToken(token: string): { userId: string } | null {
 export async function POST(req: NextRequest) {
   try {
     // Get token from cookies
-    const cookieStore = await cookies();          // ← add await
-  const token  = cookieStore.get('token')?.value || '';
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value || '';
 
     if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -33,8 +33,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    const userId = decoded.userId;
-    console.log('Decoded User ID:', userId);
+    // Convert userId to number since Prisma expects a number
+    const userIdNumber = parseInt(decoded.userId, 10);
+    if (isNaN(userIdNumber)) {
+      return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
+    }
+
+    console.log('Decoded User ID:', userIdNumber);
 
     // Parse form data
     const formData = await req.formData();
@@ -61,7 +66,7 @@ export async function POST(req: NextRequest) {
     // Save file
     const bytes = await passportFile.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const filename = `passport-${Date.now()}-${userId}.pdf`;
+    const filename = `passport-${Date.now()}-${userIdNumber}.pdf`;
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
     
     // Ensure upload directory exists
@@ -74,9 +79,9 @@ export async function POST(req: NextRequest) {
 
     const filePath = `/uploads/${filename}`;
 
-    // Update user profile
+    // Update user profile - now using userIdNumber instead of userId
     const updatedUser = await prisma.beeusers.update({
-      where: { id: userId },
+      where: { id: userIdNumber },
       data: {
         passportId,
         phonenumber,
@@ -88,7 +93,7 @@ export async function POST(req: NextRequest) {
     // Generate new token
     const newToken = jwt.sign(
       {
-        userId: updatedUser.id,
+        userId: updatedUser.id.toString(), // Convert back to string for JWT
         email: updatedUser.email,
         isProfileComplete: true,
       },

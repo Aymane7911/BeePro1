@@ -108,7 +108,7 @@ export async function PATCH(request: NextRequest) {
    
   } catch (error) {
     console.error('❌ Error updating premium status:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Error stack:', (error as Error).stack);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
    
   } catch (error) {
     console.error('❌ Error fetching user premium status:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Error stack:', (error as Error).stack);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

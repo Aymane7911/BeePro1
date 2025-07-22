@@ -1,4 +1,21 @@
-// types/next-auth.d.ts
+// In your NextAuth configuration (likely in lib/auth.ts or similar)
+async session({ session, token }) {
+  if (token.userId) {
+    session.user = {
+      id: token.userId.toString(), // Convert number to string for NextAuth compatibility
+      email: token.email as string,
+      name: session.user?.name, // Preserve existing name if needed
+      image: session.user?.image, // Preserve existing image if needed
+      firstName: token.firstName as string,
+      lastName: token.lastName as string,
+      databaseId: token.databaseId as string, // This is already a string (UUID)
+      role: token.role as string,
+    };
+  }
+  return session;
+}
+
+// Updated types/next-auth.d.ts
 import { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
@@ -7,13 +24,13 @@ declare module "next-auth" {
     user: {
       id: string; // Keep as string for NextAuth compatibility
       email: string;
-      name?: string;
-      image?: string;
+      name?: string | null;
+      image?: string | null;
       firstName: string;
       lastName: string;
       databaseId: string; // This matches your Prisma schema (UUID string)
       role: string;
-    };
+    } & DefaultSession["user"];
   }
 
   interface User {

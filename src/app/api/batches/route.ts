@@ -316,27 +316,23 @@ export async function PUT(request: NextRequest) {
           });
         } else {
           // Create new apiary with proper user, batch, and database relationships
-          await prisma.apiary.create({
-            data: {
-              name: apiaryData.name || '',
-              number: apiaryData.number || '',
-              hiveCount: apiaryData.hiveCount || 0,
-              latitude: apiaryData.latitude != null && apiaryData.latitude !== '' && !isNaN(parseFloat(apiaryData.latitude))
-                ? parseFloat(apiaryData.latitude)
-                : 0.0, // Default latitude if not provided
-              longitude: apiaryData.longitude != null && apiaryData.longitude !== '' && !isNaN(parseFloat(apiaryData.longitude))
-                ? parseFloat(apiaryData.longitude)
-                : 0.0, // Default longitude if not provided
-              kilosCollected: apiaryData.kilosCollected || 0,
-              databaseId: user.databaseId, // Add the required databaseId
-              batch: {
-                connect: { id: batchId } // Connect to batch using relation
-              },
-              user: {
-                connect: { id: userId }
-              }
-            }
-          });
+         await prisma.apiary.create({
+  data: {
+    name: apiaryData.name || '',
+    number: apiaryData.number || '',
+    hiveCount: apiaryData.hiveCount || 0,
+    latitude: apiaryData.latitude != null && apiaryData.latitude !== '' && !isNaN(parseFloat(apiaryData.latitude))
+      ? parseFloat(apiaryData.latitude)
+      : 0.0, // Default latitude if not provided
+    longitude: apiaryData.longitude != null && apiaryData.longitude !== '' && !isNaN(parseFloat(apiaryData.longitude))
+      ? parseFloat(apiaryData.longitude)
+      : 0.0, // Default longitude if not provided
+    kilosCollected: apiaryData.kilosCollected || 0,
+    databaseId: user.databaseId, // Add the required databaseId
+    batchId: batchId, // Use direct batchId instead of relation connect
+    userId: userId // Use direct userId instead of relation connect
+  }
+});
         }
       }
     }

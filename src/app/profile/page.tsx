@@ -33,7 +33,8 @@ import {
   BarChart3,
   Sparkles,
   RefreshCw,
-  Printer
+  Printer,
+  ExternalLink // Added ExternalLink icon
 } from 'lucide-react';
 
 // Header component
@@ -184,9 +185,195 @@ const ProfilePage = () => {
            null;
   };
 
-  const setJWTToken = (token: string) => {
-    localStorage.setItem('authToken', token);
-    setAuthToken(token);
+  // Add these to your existing state declarations
+  const [apiaries, setApiaries] = useState<Apiary[]>([]);
+  const [apiariesLoading, setApiariesLoading] = useState(true);
+  const [editingApiary, setEditingApiary] = useState<number | null>(null);
+  const [newApiary, setNewApiary] = useState({
+    name: '',
+    number: '',
+    hiveCount: 0,
+    latitude: 0,
+    longitude: 0,
+    locationName: '',
+    kilosCollected: 0
+  });
+  const [showAddApiary, setShowAddApiary] = useState(false);
+
+  // Add these API functions
+  const fetchApiaries = async () => {
+    try {
+      console.log('Fetching apiaries with JWT token...');
+      const response = await makeAuthenticatedRequest('/api/apiaries');
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Apiaries fetched successfully:', data.length || 0, 'apiaries');
+        return data || [];
+      } else {
+        console.error('Failed to fetch apiaries:', response.status);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching apiaries:', error);
+      return [];
+    }
+  };
+
+ const updateApiary = async (id: number, apiaryData: any) => {
+  try {
+    console.log('updateApiary called with:', { id, apiaryData });
+         
+    // Clean the data before sending - remove fields that shouldn't be sent
+    const cleanApiaryData = {
+      name: apiaryData.name,
+      number: apiaryData.number,
+      hiveCount: apiaryData.hiveCount,
+      latitude: apiaryData.latitude,
+      longitude: apiaryData.longitude,
+      kilosCollected: apiaryData.kilosCollected,
+      locationName: apiaryData.locationName || ''
+    };
+         
+    console.log('Sending cleaned data:', cleanApiaryData);
+         
+    const response = await makeAuthenticatedRequest(`/api/apiaries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(cleanApiaryData),
+    });
+         
+    console.log('Response status:', response.status);
+         
+    if (response.ok) {
+      const updatedApiary = await response.json();
+      console.log('Updated apiary from server:', updatedApiary);
+      
+      // DON'T update local state - let the component refresh from server
+      setEditingApiary(null);
+      console.log('Update successful');
+      return true;
+    } else {
+      const errorText = await response.text();
+      console.error('Failed to update apiary:', response.status, errorText);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error updating apiary:', error);
+    return false;
+  }
+};
+
+  const createApiary = async (apiaryData: any) => {
+    try {
+      const response = await makeAuthenticatedRequest('/api/apiaries', {
+        method: 'POST',
+        body: JSON.stringify(apiaryData),
+      });
+      
+      if (response.ok) {
+        const newApiaryData = await response.json();
+        setApiaries(prev => [newApiaryData, ...prev]);
+        setNewApiary({
+          name: '',
+          number: '',
+          hiveCount: 0,
+          latitude: 0,
+          longitude: 0,
+          locationName: '',
+          kilosCollected: 0
+        });
+        setShowAddApiary(false);
+        return true;
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Failed to create apiary');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error creating apiary:', error);
+      alert('Error creating apiary');
+      return false;
+    }
+  };
+
+  const deleteApiary = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this apiary? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const response = await makeAuthenticatedRequest(`/api/apiaries/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        setApiaries(prev => prev.filter(apiary => apiary.id !== id));
+      } else {
+        alert('Failed to delete apiary');
+      }
+    } catch (error) {
+      console.error('Error deleting apiary:', error);
+      alert('Error deleting apiary');
+    }
+  };
+
+  // Add this useEffect to fetch apiaries
+  useEffect(() => {
+    if (!isAuthenticated || !authToken) {
+      setApiariesLoading(false);
+      return;
+    }
+
+    const loadApiaries = async () => {
+      setApiariesLoading(true);
+      const apiaryData = await fetchApiaries();
+      setApiaries(apiaryData);
+      setApiariesLoading(false);
+    };
+
+    loadApiaries();
+  }, [isAuthenticated, authToken]);
+
+  // Update your refreshData function to include apiaries
+  const refreshData = async () => {
+    setBatchesLoading(true);
+    setApiariesLoading(true);
+    try {
+      const userData = await fetchUserProfile();
+      if (userData) {
+        setUserProfile(prev => ({
+          ...prev,
+          firstname: userData.firstname || '',
+          lastname: userData.lastname || '',
+          email: userData.email || '',
+          phonenumber: userData.phonenumber || '',
+          passportId: userData.passportId || '',
+          profileImage: userData.profileImage || null,
+          passportScan: userData.passportScan || null,
+          faceScan: userData.faceScan || null,
+          verificationStatus: {
+            email: userData.isConfirmed || false,
+            phone: userData.phoneConfirmed || false,
+            identity: userData.identityVerified || false,
+            face: userData.faceVerified || false
+          }
+        }));
+      }
+
+      const [batchData, apiaryData] = await Promise.all([
+        fetchBatches(),
+        fetchApiaries()
+      ]);
+      
+      setBatches(batchData);
+      setApiaries(apiaryData);
+      setLastUpdated(new Date().toLocaleString());
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setBatchesLoading(false);
+      setApiariesLoading(false);
+    }
   };
 
   const clearJWTToken = () => {
@@ -432,40 +619,6 @@ const ProfilePage = () => {
   const totalHoneyCollected = batches.reduce((total, batch) => total + (batch.weightKg || 0), 0);
 
   // Header functions
-  const refreshData = async () => {
-    setBatchesLoading(true);
-    try {
-      const userData = await fetchUserProfile();
-      if (userData) {
-        setUserProfile(prev => ({
-          ...prev,
-          firstname: userData.firstname || '',
-          lastname: userData.lastname || '',
-          email: userData.email || '',
-          phonenumber: userData.phonenumber || '',
-          passportId: userData.passportId || '',
-          profileImage: userData.profileImage || null,
-          passportScan: userData.passportScan || null,
-          faceScan: userData.faceScan || null,
-          verificationStatus: {
-            email: userData.isConfirmed || false,
-            phone: userData.phoneConfirmed || false,
-            identity: userData.identityVerified || false,
-            face: userData.faceVerified || false
-          }
-        }));
-      }
-
-      const batchData = await fetchBatches();
-      setBatches(batchData);
-      setLastUpdated(new Date().toLocaleString());
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    } finally {
-      setBatchesLoading(false);
-    }
-  };
-
   const handleDelete = () => {
     alert('Delete functionality is not available on the profile page.');
   };
@@ -493,9 +646,7 @@ const ProfilePage = () => {
                 { icon: Home, label: 'Dashboard', href: '/dashboard' },
                 { icon: Layers, label: 'Batches', href: '/batches' },
                 { icon: Activity, label: 'Analytics', href: '/analytics' },
-                
                 { icon: Users, label: 'Profile', href: '/profile' },
-                
                 { icon: HelpCircle, label: 'Help', href: '#' }
               ].map((item, index) => (
                 <li key={index}>
@@ -602,6 +753,12 @@ const ProfilePage = () => {
             >
               Verification
             </button>
+            <button
+              onClick={() => setActiveTab('apiaries')}
+              className={`px-6 py-4 font-medium transition-colors ${activeTab === 'apiaries' ? 'text-amber-600 border-b-2 border-amber-600' : 'text-gray-600 hover:text-gray-800'}`}
+            >
+              My Apiaries
+            </button>
           </div>
 
           <div className="p-6">
@@ -695,8 +852,7 @@ const ProfilePage = () => {
       )}
     </div>
   ))}
-                    
-                    
+                      
                   </div>
                 </div>
               </div>
@@ -860,8 +1016,6 @@ const ProfilePage = () => {
                       className="hidden"
                     />
                   </div>
-
-                  
                 </div>
 
                 {/* Verification Progress */}
@@ -917,6 +1071,347 @@ const ProfilePage = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* My Apiaries Tab */}
+            {activeTab === 'apiaries' && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-800">My Apiaries</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Manage your apiary locations and production data
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowAddApiary(true)}
+                    className="flex items-center px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add New Apiary
+                  </button>
+                </div>
+
+                {/* Add New Apiary Form */}
+                {showAddApiary && (
+                  <div className="mb-8 p-6 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-lg font-semibold text-gray-800">Add New Apiary</h4>
+                      <button
+                        onClick={() => setShowAddApiary(false)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Apiary Name</label>
+                        <input
+                          type="text"
+                          value={newApiary.name}
+                          onChange={(e) => setNewApiary(prev => ({ ...prev, name: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="Enter apiary name"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Apiary Number</label>
+                        <input
+                          type="text"
+                          value={newApiary.number}
+                          onChange={(e) => setNewApiary(prev => ({ ...prev, number: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="Enter apiary number"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Hive Count</label>
+                        <input
+                          type="number"
+                          value={newApiary.hiveCount}
+                          onChange={(e) => setNewApiary(prev => ({ ...prev, hiveCount: parseInt(e.target.value) || 0 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="Number of hives"
+                          min="0"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                        <input
+                          type="number"
+                          step="0.000001"
+                          value={newApiary.latitude}
+                          onChange={(e) => setNewApiary(prev => ({ ...prev, latitude: parseFloat(e.target.value) || 0 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="Latitude coordinates"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                        <input
+                          type="number"
+                          step="0.000001"
+                          value={newApiary.longitude}
+                          onChange={(e) => setNewApiary(prev => ({ ...prev, longitude: parseFloat(e.target.value) || 0 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="Longitude coordinates"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Honey Collected (kg)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={newApiary.kilosCollected}
+                          onChange={(e) => setNewApiary(prev => ({ ...prev, kilosCollected: parseFloat(e.target.value) || 0 }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="Kilograms collected"
+                          min="0"
+                        />
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Location Name (Optional)</label>
+                        <input
+                          type="text"
+                          value={newApiary.locationName}
+                          onChange={(e) => setNewApiary(prev => ({ ...prev, locationName: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          placeholder="e.g., North Field, Mountain Ridge"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={() => setShowAddApiary(false)}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => createApiary(newApiary)}
+                        className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      >
+                        Create Apiary
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Apiaries List */}
+                {apiariesLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading apiaries...</p>
+                  </div>
+                ) : apiaries.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {apiaries.map((apiary) => (
+      <div 
+        key={`apiary-${apiary.id}`} // More explicit key
+        className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300"
+      >
+        {editingApiary === apiary.id ? (
+  <div className="space-y-4">
+    {/* Editing form content */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+      <input
+        type="text"
+        value={apiary.name} // Changed from defaultValue to value
+        onChange={(e) => setApiaries(prev => prev.map(a => 
+          a.id === apiary.id ? { ...a, name: e.target.value } : a
+        ))}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+      />
+    </div>
+    
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Number</label>
+      <input
+        type="text"
+        value={apiary.number} // Changed from defaultValue to value
+        onChange={(e) => setApiaries(prev => prev.map(a => 
+          a.id === apiary.id ? { ...a, number: e.target.value } : a
+        ))}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+      />
+    </div>
+    
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Hive Count</label>
+      <input
+        type="number"
+        value={apiary.hiveCount} // Changed from defaultValue to value
+        onChange={(e) => setApiaries(prev => prev.map(a => 
+          a.id === apiary.id ? { ...a, hiveCount: parseInt(e.target.value) || 0 } : a
+        ))}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+        min="0"
+      />
+    </div>
+    
+    <div className="grid grid-cols-2 gap-2">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+        <input
+          type="number"
+          step="0.000001"
+          value={apiary.latitude} // Changed from defaultValue to value
+          onChange={(e) => setApiaries(prev => prev.map(a => 
+            a.id === apiary.id ? { ...a, latitude: parseFloat(e.target.value) || 0 } : a
+          ))}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+        <input
+          type="number"
+          step="0.000001"
+          value={apiary.longitude} // Changed from defaultValue to value
+          onChange={(e) => setApiaries(prev => prev.map(a => 
+            a.id === apiary.id ? { ...a, longitude: parseFloat(e.target.value) || 0 } : a
+          ))}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+        />
+      </div>
+    </div>
+    
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">Honey Collected (kg)</label>
+      <input
+        type="number"
+        step="0.1"
+        value={apiary.kilosCollected} // Changed from defaultValue to value
+        onChange={(e) => setApiaries(prev => prev.map(a => 
+          a.id === apiary.id ? { ...a, kilosCollected: parseFloat(e.target.value) || 0 } : a
+        ))}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+        min="0"
+      />
+    </div>
+    
+    <div className="flex justify-end space-x-2 pt-4 border-t">
+      <button
+        onClick={() => {
+          setEditingApiary(null);
+          // Optional: Refresh data from server to revert any unsaved changes
+          // fetchApiaries();
+        }}
+        className="px-3 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+      >
+        Cancel
+      </button>
+     <button
+  onClick={async () => {
+    const currentApiary = apiaries.find(a => a.id === apiary.id);
+    if (currentApiary) {
+      const success = await updateApiary(apiary.id, currentApiary);
+      if (success) {
+        // Refresh the apiaries data from server
+        await fetchApiaries(); // This should be your function that fetches all apiaries
+      } else {
+        alert('Failed to update apiary. Please try again.');
+      }
+    }
+  }}
+  className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors flex items-center"
+>
+  <Save className="h-4 w-4 mr-1" />
+  Save
+</button>
+    </div>
+  </div>
+                        ) : (
+                          <>
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-800">{apiary.name}</h4>
+                                <p className="text-sm text-gray-600">#{apiary.number}</p>
+                              </div>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => setEditingApiary(apiary.id)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                >
+                                  <Edit3 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => deleteApiary(apiary.id)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <div className="flex items-center text-sm text-gray-600">
+                                 <MapPin className="h-4 w-4 mr-2 text-amber-500" />
+  <span>
+    {typeof apiary.latitude === 'number' ? apiary.latitude.toFixed(4) : '0.0000'}, {typeof apiary.longitude === 'number' ? apiary.longitude.toFixed(4) : '0.0000'}
+  </span>
+  <a
+    href={`https://www.google.com/maps?q=${apiary.latitude || 0},${apiary.longitude || 0}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="ml-2 text-blue-600 hover:text-blue-800"
+  >
+    <ExternalLink className="h-3 w-3" />
+  </a>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-4 mt-4">
+                                <div className="text-center p-3 bg-green-50 rounded-lg">
+                                  <p className="text-lg font-bold text-green-600">{apiary.hiveCount}</p>
+                                  <p className="text-xs text-gray-600">Hives</p>
+                                </div>
+                                <div className="text-center p-3 bg-orange-50 rounded-lg">
+                                  <p className="text-lg font-bold text-orange-600">{apiary.kilosCollected} kg</p>
+                                  <p className="text-xs text-gray-600">Honey</p>
+                                </div>
+                              </div>
+                              
+                              {apiary.hiveCount > 0 && (
+                                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                  <p className="text-sm text-gray-600">
+                                    Avg per hive: <span className="font-semibold text-amber-600">
+                                      {(apiary.kilosCollected / apiary.hiveCount).toFixed(1)} kg
+                                    </span>
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-gray-50 rounded-xl">
+                    <Map className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-xl text-gray-600 mb-2">No apiaries registered yet</p>
+                    <p className="text-gray-500 mb-6">Add your first apiary to start tracking your honey production</p>
+                    <button
+                      onClick={() => setShowAddApiary(true)}
+                      className="inline-flex items-center px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Your First Apiary
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

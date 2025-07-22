@@ -7,6 +7,7 @@ interface SidebarProps {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   userPremiumStatus?: boolean; // This will come from the database
+  isPremium?: boolean;
 }
 
 // Utility function to get auth token

@@ -14,94 +14,77 @@ export async function POST(request: NextRequest) {
   try {
     console.log(`🔐 [${requestId}] Authenticating request...`);
     const authResult = await authenticateRequest(request);
-    const userId = typeof authResult === 'string' ? authResult : authResult?.userId;
-
-    if (!userId) {
+    if (!authResult || typeof authResult !== 'object') {
       console.log(`❌ [${requestId}] Authentication failed`);
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    const userIdInt = parseInt(userId, 10);
+    const { userId: userIdStr, databaseId } = authResult;
+    const userIdInt = parseInt(userIdStr, 10);
     if (isNaN(userIdInt)) {
-      console.log(`❌ [${requestId}] Invalid user ID format`);
+      console.log(`❌ [${requestId}] Invalid user ID format: ${userIdStr}`);
       return NextResponse.json({ error: "Invalid user ID format" }, { status: 400 });
     }
-
     console.log(`✅ [${requestId}] User authenticated: ${userIdInt}`);
 
     const body = await request.json();
     console.log(`📥 [${requestId}] Request body:`, body);
 
-    const tokensToAddInt = parseInt(String(body.tokensToAdd || 0), 10);
-    if (tokensToAddInt <= 0) {
-      console.log(`❌ [${requestId}] Invalid tokens amount: ${tokensToAddInt}`);
+    const tokensToAdd = parseInt(String(body.tokensToAdd || 0), 10);
+    if (tokensToAdd <= 0) {
+      console.log(`❌ [${requestId}] Invalid tokens amount: ${tokensToAdd}`);
       return NextResponse.json({ error: "Tokens to add must be greater than 0" }, { status: 400 });
     }
+    console.log(`📊 [${requestId}] Adding ${tokensToAdd} tokens to user ${userIdInt}`);
 
-    console.log(`📊 [${requestId}] Adding ${tokensToAddInt} tokens to user ${userIdInt}`);
-
-    // Check if user already has token stats
-    let updatedTokenStats;
-    const existingStats = await prisma.tokenStats.findUnique({ where: { userId: userIdInt } });
-
-    if (existingStats) {
-      updatedTokenStats = await prisma.tokenStats.update({
+    // Find or create tokenStats
+    let tokenStats = await prisma.tokenStats.findUnique({ where: { userId: userIdInt } });
+    if (tokenStats) {
+      tokenStats = await prisma.tokenStats.update({
         where: { userId: userIdInt },
         data: {
-          totalTokens: existingStats.totalTokens + tokensToAddInt,
-          remainingTokens: existingStats.remainingTokens + tokensToAddInt,
+          totalTokens: tokenStats.totalTokens + tokensToAdd,
+          remainingTokens: tokenStats.remainingTokens + tokensToAdd,
         },
       });
-
-      console.log(`📊 [${requestId}] Updated existing stats:`,
-        `Total=${updatedTokenStats.totalTokens}, Remaining=${updatedTokenStats.remainingTokens}`
-      );
+      console.log(`📊 [${requestId}] Updated stats: Total=${tokenStats.totalTokens}, Remaining=${tokenStats.remainingTokens}`);
     } else {
-      updatedTokenStats = await prisma.tokenStats.create({
+      tokenStats = await prisma.tokenStats.create({
         data: {
           userId: userIdInt,
-          totalTokens: tokensToAddInt,
-          remainingTokens: tokensToAddInt,
+          totalTokens: tokensToAdd,
+          remainingTokens: tokensToAdd,
           originOnly: 0,
           qualityOnly: 0,
           bothCertifications: 0,
-          databaseId: body.databaseId,
+          databaseId: databaseId,
         },
       });
-
-      console.log(`📊 [${requestId}] Created new stats for user:`, updatedTokenStats);
+      console.log(`📊 [${requestId}] Created stats:`, tokenStats);
     }
 
-    // Verification: auto-correct remaining if mismatch
-    const usedTokens = updatedTokenStats.originOnly + updatedTokenStats.qualityOnly + updatedTokenStats.bothCertifications;
-    const expectedRemaining = updatedTokenStats.totalTokens - usedTokens;
-
-    if (expectedRemaining !== updatedTokenStats.remainingTokens) {
-      console.warn(`⚠️ [${requestId}] Token mismatch: expected=${expectedRemaining}, actual=${updatedTokenStats.remainingTokens}`);
-      updatedTokenStats = await prisma.tokenStats.update({
+    // Auto-correct remaining tokens if mismatch
+    const usedTokens = tokenStats.originOnly + tokenStats.qualityOnly + tokenStats.bothCertifications;
+    const expectedRemaining = tokenStats.totalTokens - usedTokens;
+    if (expectedRemaining !== tokenStats.remainingTokens) {
+      console.warn(`⚠️ [${requestId}] Remaining mismatch: expected=${expectedRemaining}, actual=${tokenStats.remainingTokens}`);
+      tokenStats = await prisma.tokenStats.update({
         where: { userId: userIdInt },
         data: { remainingTokens: expectedRemaining },
       });
-      console.log(`🔧 [${requestId}] Auto-corrected remaining to ${expectedRemaining}`);
+      console.log(`🔧 [${requestId}] Corrected remaining to ${expectedRemaining}`);
     }
 
-    console.log(`✅ [${requestId}] Final stats:`, updatedTokenStats);
-
+    console.log(`✅ [${requestId}] Final stats:`, tokenStats);
     return NextResponse.json({
       success: true,
-      message: `Successfully added ${tokensToAddInt} tokens`,
-      tokenStats: {
-        ...updatedTokenStats,
-        usedTokens,
-      },
+      message: `Successfully added ${tokensToAdd} tokens`,
+      tokenStats: { ...tokenStats, usedTokens },
     });
 
   } catch (error: any) {
     console.error(`❌ [${requestId}] FATAL ERROR:`, error);
-    return NextResponse.json(
-      { error: "Failed to add tokens", details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to add tokens", details: error.message }, { status: 500 });
   } finally {
     await prisma.$disconnect();
     console.log(`🏁 [${requestId}] Request completed`);

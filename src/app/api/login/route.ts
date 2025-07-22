@@ -20,9 +20,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Find user with Prisma (consistent with other APIs)
-    const user = await prisma.beeusers.findUnique({
-      where: { email },
+    // FIX: Use findFirst with explicit typing
+    const user = await prisma.beeusers.findFirst({
+      where: { 
+        email: {
+          equals: email,
+          mode: 'insensitive' // Optional: for case-insensitive search
+        } 
+      },
     });
 
     if (!user) {
@@ -53,7 +58,7 @@ export async function POST(request: Request) {
 
     console.log('[Login API] Password valid, generating JWT token');
     
-    // Generate JWT token (same format as expected by authenticateRequest)
+    // Generate JWT token
     const token = jwt.sign(
       {
         userId: user.id,

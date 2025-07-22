@@ -38,12 +38,26 @@ export async function GET(request: NextRequest) {
 
     console.log('[GET /api/apiaries] ▶ Authenticated user ID:', userId);
 
-    // Fetch all apiaries, ordered by creation date descending
+    // Get the user to access their database ID
+    const user = await prisma.beeusers.findUnique({
+      where: { id: parseInt(String(userId)) },
+      select: { databaseId: true }
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    // Fetch all apiaries for the user in their specific database
     const apiaries = await prisma.apiary.findMany({
-        where: {
-            userId: parseInt(String(userId)),
-        },
-        orderBy: {
+      where: {
+        userId: parseInt(String(userId)),
+        databaseId: user.databaseId,
+      },
+      orderBy: {
         createdAt: 'desc',
       },
     });
@@ -73,6 +87,19 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[POST /api/apiaries] ▶ Authenticated user ID:', userId);
+
+    // Get the user to access their database ID
+    const user = await prisma.beeusers.findUnique({
+      where: { id: parseInt(String(userId)) },
+      select: { databaseId: true }
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
 
     const body: CreateApiaryBody = await request.json();
     console.log('[POST /api/apiaries] ▶ Request body:', body);
@@ -137,11 +164,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if an apiary with the same number already exists
+    // Check if an apiary with the same number already exists in this database
     const existingApiary = await prisma.apiary.findFirst({
       where: { 
         number,
-        userId: parseInt(String(userId))
+        userId: parseInt(String(userId)),
+        databaseId: user.databaseId,
       },
     });
     
@@ -172,9 +200,10 @@ export async function POST(request: NextRequest) {
         hiveCount: parseInt(String(hiveCount)) || 0,
         latitude: lat,
         longitude: lng,
-        locationName: processedLocationName, // This can be null
+        locationName: processedLocationName,
         kilosCollected: Math.max(0, finalKilosCollected),
         userId: parseInt(String(userId)),
+        databaseId: user.databaseId, // Use the user's database ID
       },
     });
 

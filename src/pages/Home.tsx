@@ -1,12 +1,12 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 const Home: React.FC = () => {
   return (
     <div>
       <h1>🐝 Welcome to HoneyPatch</h1>
       <p>Use this app to upload and certify your honey batches.</p>
-      <Link to="/upload">
+      <Link href="/upload">
         <button>Upload Certificate</button>
       </Link>
     </div>

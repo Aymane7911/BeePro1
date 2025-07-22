@@ -20,6 +20,7 @@
     "bcryptjs": "^2.4.3",
     "ethers": "^6.15.0",
     "formidable": "^3.5.4",
+    "framer-motion": "^12.23.6",
     "git-filter-repo": "^0.0.30",
     "google-auth-library": "^9.15.1",
     "ipfs-http-client": "^60.0.1",

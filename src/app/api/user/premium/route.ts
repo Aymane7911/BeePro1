@@ -1,15 +1,26 @@
 // app/api/user/premium/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
+// Define interface for your JWT payload
+interface CustomJwtPayload extends JwtPayload {
+  email: string;
+}
+
 // Function to verify JWT token
-function verifyToken(token: string) {
+function verifyToken(token: string): CustomJwtPayload | null {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    return decoded;
+    
+    // Type guard to ensure we have a proper JWT payload with email
+    if (typeof decoded === 'object' && decoded !== null && 'email' in decoded) {
+      return decoded as CustomJwtPayload;
+    }
+    
+    return null;
   } catch (error) {
     console.error('Token verification failed:', error);
     return null;
@@ -17,7 +28,7 @@ function verifyToken(token: string) {
 }
 
 // Function to extract token from request
-function getTokenFromRequest(request: NextRequest) {
+function getTokenFromRequest(request: NextRequest): string | null {
   // Check Authorization header first
   const authHeader = request.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -54,8 +65,8 @@ export async function PATCH(request: NextRequest) {
     const decoded = verifyToken(token);
     console.log('Token decoded:', decoded);
     
-    if (!decoded || !decoded.email) {
-      console.log('❌ Invalid token or no email in token, returning 401');
+    if (!decoded) {
+      console.log('❌ Invalid token, returning 401');
       return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 });
     }
 
@@ -119,8 +130,8 @@ export async function GET(request: NextRequest) {
     const decoded = verifyToken(token);
     console.log('Token decoded:', decoded);
     
-    if (!decoded || !decoded.email) {
-      console.log('❌ Invalid token or no email in token, returning 401');
+    if (!decoded) {
+      console.log('❌ Invalid token, returning 401');
       return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 });
     }
 

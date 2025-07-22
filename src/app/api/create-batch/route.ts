@@ -23,7 +23,7 @@ interface BatchRequestBody {
   totalKg?: number; // Updated to totalKg
 }
 
-// GET: Fetch batches for logged-in user (unchanged)
+// GET: Fetch batches for logged-in user
 export async function GET(request: Request) {
   try {
     const authHeaderRaw = request.headers.get('Authorization');
@@ -46,13 +46,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Unauthorized: Invalid token' }, { status: 401 });
     }
 
-    const userId = user.id;
+    // FIXED: Use userId instead of user.id
+    const userId = parseInt(user.userId);
     if (!userId) {
       return NextResponse.json({ message: 'Invalid user identifier' }, { status: 401 });
     }
 
     const batches = await prisma.batch.findMany({
-      where: { userId: userId },
+      where: { 
+        userId: userId,
+        databaseId: user.databaseId // Add database filter
+      },
       orderBy: { createdAt: 'desc' },
       include: { apiaries: true },
     });
@@ -105,12 +109,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized: Invalid token' }, { status: 401 });
     }
 
-    const userId = user.id;
+    // FIXED: Use userId from the returned object and convert to integer
+    const userId = parseInt(user.userId);
+    const databaseId = user.databaseId;
+    
     if (!userId) {
       return NextResponse.json({ message: 'Invalid user identifier' }, { status: 401 });
     }
 
+    if (!databaseId) {
+      return NextResponse.json({ message: 'Invalid database identifier' }, { status: 401 });
+    }
+
     console.log('[POST] Final userId for query:', userId);
+    console.log('[POST] Final databaseId for query:', databaseId);
 
     const body = await request.json();
     // FIXED: Changed totalHoney to totalKg to match frontend
@@ -138,11 +150,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: 'Each apiary must have a valid id' }, { status: 400 });
       }
       
-      // Verify the apiary exists and belongs to the user
+      // Verify the apiary exists and belongs to the user in the same database
       const existingApiary = await prisma.apiary.findFirst({
         where: { 
           id: apiary.id,
-          userId: user.id 
+          userId: userId,
+          databaseId: databaseId // Add database filter
         }
       });
       
@@ -155,9 +168,13 @@ export async function POST(request: NextRequest) {
 
     const finalBatchName = batchName?.trim() || `${batchNumber}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}`;
 
-    // Check if batch number already exists for this user
+    // Check if batch number already exists for this user in this database
     const existingBatch = await prisma.batch.findFirst({
-      where: { batchNumber, userId: user.id },
+      where: { 
+        batchNumber, 
+        userId: userId,
+        databaseId: databaseId // Add database filter
+      },
     });
 
     if (existingBatch) {
@@ -167,7 +184,8 @@ export async function POST(request: NextRequest) {
     // STEP 1: Create the batch
     const batch = await prisma.batch.create({
       data: {
-        user: { connect: { id: user.id } },
+        user: { connect: { id: userId } },
+        database: { connect: { id: databaseId } }, // Connect to database
         batchNumber,
         batchName: finalBatchName,
         containerType: 'Glass',
@@ -216,9 +234,12 @@ export async function POST(request: NextRequest) {
       include: { apiaries: true },
     });
 
-    // Get updated list of all batches for the user
+    // Get updated list of all batches for the user in this database
     const batches = await prisma.batch.findMany({
-      where: { userId: user.id },
+      where: { 
+        userId: userId,
+        databaseId: databaseId // Add database filter
+      },
       orderBy: { createdAt: 'desc' },
       include: { apiaries: true },
     });

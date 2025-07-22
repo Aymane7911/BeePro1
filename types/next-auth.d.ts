@@ -1,30 +1,30 @@
 // types/next-auth.d.ts
-import { DefaultSession, DefaultUser } from "next-auth";
-import { JWT, DefaultJWT } from "next-auth/jwt";
+import { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
   interface Session {
-    user: {
+    accessToken?: string;
+    // Merge the built‑in user props with your own:
+    user: DefaultSession["user"] & {
       id: string;
-      firstName?: string;
-      lastName?: string;
-      isProfileComplete?: boolean;
-      dbUser?: any; // You can type this more specifically based on your Prisma model
-    } & DefaultSession["user"];
-    accessToken?: string; // Add this line
-  }
-
-  interface User {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-    isProfileComplete?: boolean;
+      firstName: string;
+      lastName: string;
+      databaseId: string;
+      companyId: string;
+      role: string;
+    };
   }
 }
 
 declare module "next-auth/jwt" {
-  interface JWT extends DefaultJWT {
+  interface JWT {
+    userId: string;
     id: string;
-    accessToken?: string; // Add this line
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    databaseId?: string;
+    companyId?: string;
+    role?: string;
   }
 }

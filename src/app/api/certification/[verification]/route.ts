@@ -21,8 +21,8 @@ export async function GET(
 
     console.log('Looking for verification code:', verificationCode);
 
-    // Fetch certification data from database with user relation
-    const certification = await prisma.certification.findUnique({
+    // Option 1: Use findFirst instead of findUnique if you want to search by verificationCode only
+    const certification = await prisma.certification.findFirst({
       where: {
         verificationCode: verificationCode
       },
@@ -39,6 +39,31 @@ export async function GET(
         }
       }
     });
+
+    // Option 2: If you need to use findUnique with compound key, you'll need both fields
+    // Uncomment this and comment out the findFirst above if you have the databaseId
+    /*
+    const certification = await prisma.certification.findUnique({
+      where: {
+        verificationCode_databaseId: {
+          verificationCode: verificationCode,
+          databaseId: "your_database_id_here" // You'll need to get this value
+        }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            email: true,
+            phonenumber: true,
+            isProfileComplete: true,
+          }
+        }
+      }
+    });
+    */
 
     console.log('Found certification:', certification);
 

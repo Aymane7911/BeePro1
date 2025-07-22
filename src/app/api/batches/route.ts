@@ -6,9 +6,9 @@ const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
         
-    if (!userId) {
+    if (!authResult) {
       console.warn('[GET /api/batches] ▶ No authenticated user found');
       return NextResponse.json(
         { error: "Authentication required" },
@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Handle both string and object returns from authenticateRequest
+    const userId = typeof authResult === 'string' ? authResult : authResult.userId;
     const userIdInt = parseInt(userId);
         
     if (isNaN(userIdInt)) {
@@ -52,15 +54,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
              
-    if (!userId) {
+    if (!authResult) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
- 
+
+    // Handle both string and object returns from authenticateRequest
+    const userId = typeof authResult === 'string' ? authResult : authResult.userId;
     const userIdInt = parseInt(userId);
              
     if (isNaN(userIdInt)) {
@@ -141,13 +145,16 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     // Authentication - get userId and convert to number
-    const userIdString = await authenticateRequest(request);
-    if (!userIdString) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+
+    // Handle both string and object returns from authenticateRequest
+    const userIdString = typeof authResult === 'string' ? authResult : authResult.userId;
     const userId = parseInt(userIdString);
 
     // Get the user's databaseId
@@ -385,9 +392,9 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
         
-    if (!userId) {
+    if (!authResult) {
       console.warn('[DELETE /api/batches] ▶ No authenticated user found');
       return NextResponse.json(
         { error: "Authentication required" },
@@ -395,6 +402,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    // Handle both string and object returns from authenticateRequest
+    const userId = typeof authResult === 'string' ? authResult : authResult.userId;
     const userIdInt = parseInt(userId);
         
     if (isNaN(userIdInt)) {

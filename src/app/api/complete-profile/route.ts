@@ -1,24 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getUserIdFromToken } from '@/lib/auth';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
+import { cookies } from 'next/headers';
 
 const prisma = new PrismaClient();
 
+// JWT verification helper
+function verifyToken(token: string): { userId: string } | null {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+  } catch (error) {
+    return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    // Authenticate user from cookies
-    const authHeader = req.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '') || '';
-    const userId = getUserIdFromToken(token);
-    console.log('Decoded User ID:', userId);  // Log the decoded user ID
+    // Get token from cookies
+    const cookieStore = await cookies();          // ← add await
+  const token  = cookieStore.get('token')?.value || '';
 
-    if (!userId) {
+    if (!token) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
+
+    // Verify token
+    const decoded = verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+    }
+
+    const userId = decoded.userId;
+    console.log('Decoded User ID:', userId);
 
     // Parse form data
     const formData = await req.formData();
@@ -26,23 +42,26 @@ export async function POST(req: NextRequest) {
     const phonenumber = formData.get('phonenumber') as string;
     const passportFile = formData.get('passportFile') as File;
 
-    console.log('Form data received:', { passportId, phonenumber, passportFile });
-
     // Validate required fields
     if (!passportId || !phonenumber || !passportFile) {
       return NextResponse.json({ message: 'All fields are required' }, { status: 400 });
     }
 
-    // Validate the phone number format (basic check)
+    // Validate phone number
     const phoneRegex = /^[0-9]{10}$/;
     if (!phoneRegex.test(phonenumber)) {
       return NextResponse.json({ message: 'Invalid phone number format' }, { status: 400 });
     }
 
-    // Save the uploaded file to /public/uploads
+    // Validate file type (PDF only)
+    if (passportFile.type !== 'application/pdf') {
+      return NextResponse.json({ message: 'Only PDF files are allowed' }, { status: 400 });
+    }
+
+    // Save file
     const bytes = await passportFile.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const filename = `${Date.now()}-${passportFile.name}`;
+    const filename = `passport-${Date.now()}-${userId}.pdf`;
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
     
     // Ensure upload directory exists
@@ -55,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     const filePath = `/uploads/${filename}`;
 
-    // Update user profile in the database
+    // Update user profile
     const updatedUser = await prisma.beeusers.update({
       where: { id: userId },
       data: {
@@ -66,29 +85,35 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Regenerate JWT token with updated information
+    // Generate new token
     const newToken = jwt.sign(
       {
         userId: updatedUser.id,
         email: updatedUser.email,
-        isProfileComplete: updatedUser.isProfileComplete,
+        isProfileComplete: true,
       },
-      process.env.JWT_SECRET!,  // Ensure JWT_SECRET is correctly set in your environment
+      process.env.JWT_SECRET!,
       { expiresIn: '1h' }
     );
 
-    // Create response with new token
-    const response = NextResponse.json({ message: 'Profile completed successfully', token: newToken });
+    // Create response
+    const response = NextResponse.json({ 
+      message: 'Profile completed successfully',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        isProfileComplete: true
+      }
+    });
 
-    // Set new token in HTTP-only cookie with security flags
+    // Set new cookie
     response.cookies.set('token', newToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Ensure cookies are secure in production
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60, // 1 hour
+      maxAge: 60 * 60,
       path: '/',
     });
-    console.log('New token generated:', newToken);
 
     return response;
   } catch (error) {

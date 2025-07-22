@@ -119,23 +119,27 @@ export const authOptions: NextAuthOptions = {
     },
     
     async session({ session, token }) {
-      // Pass JWT token data to session for frontend access
-      if (token.userId) {
-        session.user.id = token.userId.toString();
-        session.user.email = token.email as string;
-        session.user.firstName = token.firstName as string;
-        session.user.lastName = token.lastName as string;
-        session.user.databaseId = token.databaseId as string; // Add databaseId to session
-        
-        // Create a proper JWT token for API calls
-        session.accessToken = createJWTToken(
-          token.userId as number, 
-          token.email as string, 
-          token.databaseId as string
-        );
-      }
-      return session;
-    },
+  if (token.userId) {
+    // Ensure session.user has the correct structure
+    session.user = {
+      ...session.user,
+      id: token.userId.toString(),
+      email: token.email as string,
+      firstName: token.firstName as string,
+      lastName: token.lastName as string,
+      databaseId: token.databaseId as string,
+      companyId: token.companyId as string,
+      role: token.role as string,
+    };
+    
+    session.accessToken = createJWTToken(
+      parseInt(token.userId),
+      token.email as string,
+      token.databaseId as string
+    );
+  }
+  return session;
+},
   },
   session: {
     strategy: "jwt",

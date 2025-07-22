@@ -82,9 +82,20 @@ export async function PATCH(request: NextRequest) {
     console.log('🔄 Updating user premium status for:', decoded.email);
     console.log('Setting isPremium to:', isPremium);
 
-    // Update user premium status in database
-    const updatedUser = await prisma.beeusers.update({
+    // First, find the user by email to get their ID
+    const existingUser = await prisma.beeusers.findFirst({
       where: { email: decoded.email },
+      select: { id: true }
+    });
+
+    if (!existingUser) {
+      console.log('❌ User not found in database');
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Update user premium status in database using the ID
+    const updatedUser = await prisma.beeusers.update({
+      where: { id: existingUser.id },
       data: { 
         isPremium: isPremium,
         premiumStartedAt: isPremium ? new Date() : null,
@@ -138,7 +149,7 @@ export async function GET(request: NextRequest) {
     console.log('🔄 Fetching user premium status for:', decoded.email);
 
     // Get user premium status from database
-    const user = await prisma.beeusers.findUnique({
+    const user = await prisma.beeusers.findFirst({
       where: { email: decoded.email },
       select: {
         id: true,

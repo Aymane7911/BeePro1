@@ -110,9 +110,7 @@ export async function POST(request: NextRequest) {
         hiveCount: 0,
         kilosCollected: 0,
         databaseId: user.databaseId, // Add the required databaseId field
-        user: {
-          connect: { id: parseInt(String(userId)) },
-        },
+        userId: parseInt(String(userId)), // Use userId directly instead of user relation
         // batchId is intentionally omitted (will be null by default)
       },
     });

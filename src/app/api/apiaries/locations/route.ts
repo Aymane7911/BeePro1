@@ -87,6 +87,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // First, get the user to access their databaseId
+    const user = await prisma.beeusers.findUnique({
+      where: { id: parseInt(String(userId)) },
+      select: { databaseId: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
     // Create location template (no batchId, user relation connected properly)
     const newLocation = await prisma.apiary.create({
       data: {
@@ -96,7 +109,10 @@ export async function POST(request: NextRequest) {
         longitude: parseFloat(String(longitude)),
         hiveCount: 0,
         kilosCollected: 0,
-        userId: parseInt(String(userId)), // Use userId directly instead of user relation
+        databaseId: user.databaseId, // Add the required databaseId field
+        user: {
+          connect: { id: parseInt(String(userId)) },
+        },
         // batchId is intentionally omitted (will be null by default)
       },
     });

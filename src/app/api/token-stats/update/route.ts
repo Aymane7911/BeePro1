@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    // Extract userId from the auth result object
-    const { userId } = authResult;
+    // Extract userId and databaseId from the auth result object
+    const { userId, databaseId } = authResult;
 
     const userIdInt = parseInt(userId);
     if (isNaN(userIdInt)) {
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error(`❌ [${requestId}] FATAL GET ERROR:`, error);
     return NextResponse.json(
-      { error: "Failed to fetch token stats", details: (error as Error).message },
+      { error: "Failed to fetch token stats", details: error.message },
       { status: 500 }
     );
   } finally {
@@ -95,8 +95,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
-    // Extract userId from the auth result object
-    const { userId } = authResult;
+    // Extract userId and databaseId from the auth result object
+    const { userId, databaseId } = authResult;
 
     const userIdInt = parseInt(userId);
     if (isNaN(userIdInt)) {
@@ -186,6 +186,7 @@ console.log(`📊 [${requestId}] Token breakdown validated: OriginOnly=${safeOri
       updatedTokenStats = await prisma.tokenStats.create({
         data: {
           userId: userIdInt,
+          databaseId: databaseId, // Include the required databaseId field
           totalTokens: actualTokenBalance,
           remainingTokens: actualTokenBalance - safeTokensUsed,
           originOnly: safeOriginOnly,
@@ -237,7 +238,7 @@ console.log(`📊 [${requestId}] Token breakdown validated: OriginOnly=${safeOri
 
   } catch (error) {
     console.error(`❌ [${requestId}] FATAL POST ERROR:`, error);
-    return NextResponse.json({ error: "Failed to update token stats", details:(error as Error).message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update token stats", details: error.message }, { status: 500 });
   } finally {
     await prisma.$disconnect();
     console.log(`🏁 [${requestId}] POST request completed`);

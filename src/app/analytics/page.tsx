@@ -14,7 +14,7 @@ interface StatsCard {
   label: string;
   value: string;
   change: string;
-  trend: 'up' | 'down'; // or just string if you want more flexible
+  trend: string; // or just string if you want more flexible
 }
 
 interface SlideConfig {
@@ -95,7 +95,8 @@ const Analytics = () => {
       return;
     }
 
-    const currentConfig = slideConfigs[currentSlide];
+    const currentConfig = slideConfigs[0];
+    const gradient = getColorClasses(currentConfig.color, 'gradient');
     
     try {
       const formData = new FormData();
@@ -193,82 +194,81 @@ const Analytics = () => {
  type Color = 'blue' | 'green' | 'yellow';
 type Variant = 'primary' | 'secondary' | 'accent' | 'gradient' | 'glow';
 
-const getColorClasses = (color: Color, variant: Variant = 'primary') => {
-  const colorMap = {
+const getColorClasses = (color: Color, variant: Variant = 'primary'): string => {
+  const colorMap: Record<Color, Record<Variant, string>> = {
     blue: {
       primary: 'from-blue-500 to-purple-600',
       secondary: 'bg-blue-100 text-blue-600 hover:bg-blue-200',
       accent: 'border-blue-300 bg-blue-50 hover:bg-blue-100',
       gradient: 'from-blue-500/5 via-transparent to-purple-500/5',
-      glow: 'from-blue-400/10 to-transparent',
+      glow: 'from-blue-400/10 to-transparent'
     },
     green: {
       primary: 'from-green-500 to-blue-600',
       secondary: 'bg-green-100 text-green-600 hover:bg-green-200',
       accent: 'border-green-300 bg-green-50 hover:bg-green-100',
       gradient: 'from-green-500/5 via-transparent to-blue-500/5',
-      glow: 'from-green-400/10 to-transparent',
+      glow: 'from-green-400/10 to-transparent'
     },
     yellow: {
       primary: 'from-yellow-500 to-orange-600',
       secondary: 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200',
       accent: 'border-yellow-300 bg-yellow-50 hover:bg-yellow-100',
       gradient: 'from-yellow-500/5 via-transparent to-orange-500/5',
-      glow: 'from-yellow-400/10 to-transparent',
-    },
+      glow: 'from-yellow-400/10 to-transparent'
+    }
   };
 
   return colorMap[color][variant];
 };
 
-
   const slideConfigs: SlideConfig[] = [
-    {
-      title: 'Invoice Analytics Dashboard',
-      icon: '📄',
-      description: 'AI-powered invoice processing and analysis',
-      iframeUrl: `${invoiceApiBaseUrl}/dash_app/`,
-      uploadEndpoint: `${invoiceApiBaseUrl}/upload-invoices/`,
-      acceptedFiles: '.pdf',
-      color: 'blue',
-      statsCards: [
-        { label: 'Total Invoices', value: '0', change: '+5.2%', trend: 'up' },
-        { label: 'Processed Invoices', value: '0', change: '+12.1%', trend: 'up' },
-        { label: 'Total Value', value: '$0.00', change: '+18.3%', trend: 'up' },
-        { label: 'Avg Invoice Value', value: '$0.00', change: '+3.7%', trend: 'up' }
-      ]
-    },
-    {
-      title: 'Production Analytics Dashboard',
-      icon: '🏭',
-      description: 'Real-time production monitoring and analytics',
-      iframeUrl: `${productionApiBaseUrl}/dash_app/`,
-      uploadEndpoint: `${productionApiBaseUrl}/upload-production/`,
-      acceptedFiles: '*',
-      color: 'green',
-      statsCards: [
-        { label: 'Production Units', value: '2,547', change: '+8.3%', trend: 'up' },
-        { label: 'Efficiency Rate', value: '94.2%', change: '+2.1%', trend: 'up' },
-        { label: 'Quality Score', value: '98.7%', change: '+1.5%', trend: 'up' },
-        { label: 'Output Target', value: '105%', change: '+5.0%', trend: 'up' }
-      ]
-    },
-    {
-      title: 'Beehive Analytics Dashboard',
-      icon: '🐝',
-      description: 'Comprehensive beehive monitoring and analytics',
-      iframeUrl: `${beehiveApiBaseUrl}/dash_app/`,
-      uploadEndpoint: `${beehiveApiBaseUrl}/upload-beehive/`,
-      acceptedFiles: '*',
-      color: 'yellow',
-      statsCards: [
-        { label: 'Active Hives', value: '24', change: '+4.2%', trend: 'up' },
-        { label: 'Honey Production', value: '156kg', change: '+7.8%', trend: 'up' },
-        { label: 'Hive Health Score', value: '96.3%', change: '+2.3%', trend: 'up' },
-        { label: 'Queen Activity', value: '98.5%', change: '+1.2%', trend: 'up' }
-      ]
-    }
-  ];
+  {
+    title: 'Invoice Analytics Dashboard',
+    icon: '📄',
+    description: 'AI-powered invoice processing and analysis',
+    iframeUrl: `${process.env.INVOICE_API_BASE_URL}/dash_app/`,
+    uploadEndpoint: `${process.env.INVOICE_API_BASE_URL}/upload-invoices/`,
+    acceptedFiles: '.pdf',
+    color: 'blue',
+    statsCards: [
+      { label: 'Total Invoices', value: '0', change: '+5.2%', trend: 'up' },
+      { label: 'Processed Invoices', value: '0', change: '+12.1%', trend: 'up' },
+      { label: 'Total Value', value: '$0.00', change: '+18.3%', trend: 'up' },
+      { label: 'Avg Invoice Value', value: '$0.00', change: '+3.7%', trend: 'up' }
+    ]
+  },
+  {
+    title: 'Production Analytics Dashboard',
+    icon: '🏭',
+    description: 'Real-time production monitoring and analytics',
+    iframeUrl: `${process.env.PRODUCTION_API_BASE_URL}/dash_app/`,
+    uploadEndpoint: `${process.env.PRODUCTION_API_BASE_URL}/upload-production/`,
+    acceptedFiles: '*',
+    color: 'green',
+    statsCards: [
+      { label: 'Production Units', value: '2,547', change: '+8.3%', trend: 'up' },
+      { label: 'Efficiency Rate', value: '94.2%', change: '+2.1%', trend: 'up' },
+      { label: 'Quality Score', value: '98.7%', change: '+1.5%', trend: 'up' },
+      { label: 'Output Target', value: '105%', change: '+5.0%', trend: 'up' }
+    ]
+  },
+  {
+    title: 'Beehive Analytics Dashboard',
+    icon: '🐝',
+    description: 'Comprehensive beehive monitoring and analytics',
+    iframeUrl: `${process.env.BEEHIVE_API_BASE_URL}/dash_app/`,
+    uploadEndpoint: `${process.env.BEEHIVE_API_BASE_URL}/upload-beehive/`,
+    acceptedFiles: '*',
+    color: 'yellow',
+    statsCards: [
+      { label: 'Active Hives', value: '24', change: '+4.2%', trend: 'up' },
+      { label: 'Honey Production', value: '156kg', change: '+7.8%', trend: 'up' },
+      { label: 'Hive Health Score', value: '96.3%', change: '+2.3%', trend: 'up' },
+      { label: 'Queen Activity', value: '98.5%', change: '+1.2%', trend: 'up' }
+    ]
+  }
+];
 
   useEffect(() => {
     checkHealth();
@@ -276,7 +276,7 @@ const getColorClasses = (color: Color, variant: Variant = 'primary') => {
     setLastUpdated(new Date().toLocaleString());
   }, [checkHealth, fetchInvoices]);
 
-  const currentConfig = slideConfigs[currentSlide];
+  const currentConfig = slideConfigs[0];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-200 via-purple-100 to-yellow-100 text-black flex">
@@ -526,8 +526,8 @@ const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
 
   return (
     <header className="relative bg-white/90 backdrop-blur-xl p-6 rounded-3xl shadow-2xl border border-white/20 text-black overflow-hidden">
-      <div className={`absolute inset-0 bg-gradient-to-r ${getColorClasses(currentConfig.color, 'gradient')}`}></div>
-      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${getColorClasses(currentConfig.color, 'glow')} rounded-full blur-2xl`}></div>
+<div className={`absolute inset-0 bg-gradient-to-r ${getColorClasses(currentConfig.color as Color, 'gradient')}`}></div>
+<div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${getColorClasses(currentConfig.color as Color, 'glow')} rounded-full blur-2xl`}></div>
       
       <div className="relative z-10 flex justify-between items-center">
         <div className="flex items-center">
@@ -538,7 +538,7 @@ const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
             <Menu className="h-7 w-7" />
           </button>
           <div className="flex items-center">
-            <div className={`mr-4 bg-gradient-to-br ${getColorClasses(currentConfig.color)} p-3 rounded-2xl shadow-lg transform hover:scale-110 transition-all duration-300`}>
+<div className={`mr-4 bg-gradient-to-br ${getColorClasses(currentConfig.color as Color, 'gradient')} p-3 rounded-2xl shadow-lg transform hover:scale-110 transition-all duration-300`}>
               <div className="text-3xl">{currentConfig.icon}</div>
             </div>
             <div>
@@ -585,17 +585,17 @@ const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
           <button
             onClick={handleUpload}
             className={`group relative overflow-hidden px-6 py-3 rounded-xl font-semibold shadow-2xl
-                       transform transition-all duration-500 flex items-center
-                       bg-gradient-to-r ${getColorClasses(currentConfig.color)} text-white
-                       hover:scale-105 hover:shadow-lg hover:-translate-y-2
-                       active:scale-95 active:translate-y-0
-                       border border-white/20`}
+           transform transition-all duration-500 flex items-center
+           bg-gradient-to-r ${getColorClasses(currentConfig.color as Color, 'primary')} text-white
+           hover:scale-105 hover:shadow-lg hover:-translate-y-2
+           active:scale-95 active:translate-y-0
+           border border-white/20`}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
                            transform -skew-x-12 -translate-x-full 
                            group-hover:translate-x-full transition-transform duration-600"></div>
-            <div className={`absolute inset-0 rounded-xl bg-gradient-to-r ${getColorClasses(currentConfig.color)} 
-                           opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm`}></div>
+            <div className={`absolute inset-0 rounded-xl bg-gradient-to-r ${getColorClasses(currentConfig.color as Color, 'gradient')} 
+                 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm`}></div>
             <div className="absolute top-1 right-2 w-2 h-2 bg-white/30 rounded-full animate-pulse"></div>
             <Upload className="h-5 w-5 mr-3 relative z-10 transition-all duration-300 
                              group-hover:rotate-12 group-hover:scale-110" />

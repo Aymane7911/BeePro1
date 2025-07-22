@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { PrismaClient, Prisma } from '@prisma/client';
-import { getUserIdFromToken } from '@/lib/auth';
+import { getUserFromToken } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
@@ -41,26 +41,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Unauthorized: No token provided' }, { status: 401 });
     }
 
-    const userIdentifier = await getUserIdFromToken(token);
-    if (!userIdentifier) {
+    const user = await getUserFromToken(token);
+    if (!user) {
       return NextResponse.json({ message: 'Unauthorized: Invalid token' }, { status: 401 });
     }
 
-    const userId = parseInt(String(userIdentifier));
-    if (isNaN(userId)) {
+    const userId = user.id;
+    if (!userId) {
       return NextResponse.json({ message: 'Invalid user identifier' }, { status: 401 });
     }
 
-    const user = await prisma.beeusers.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ message: 'User not found' }, { status: 404 });
-    }
-
     const batches = await prisma.batch.findMany({
-      where: { userId: user.id },
+      where: { userId: userId },
       orderBy: { createdAt: 'desc' },
       include: { apiaries: true },
     });
@@ -106,29 +98,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized: No token provided' }, { status: 401 });
     }
 
-    const userIdentifier = await getUserIdFromToken(token);
-    console.log('[POST] userIdentifier returned:', userIdentifier);
+    const user = await getUserFromToken(token);
+    console.log('[POST] user returned:', user);
 
-    if (!userIdentifier) {
+    if (!user) {
       return NextResponse.json({ message: 'Unauthorized: Invalid token' }, { status: 401 });
     }
 
-    const userId = parseInt(String(userIdentifier));
-    if (isNaN(userId)) {
+    const userId = user.id;
+    if (!userId) {
       return NextResponse.json({ message: 'Invalid user identifier' }, { status: 401 });
     }
 
     console.log('[POST] Final userId for query:', userId);
-
-    const user = await prisma.beeusers.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      return NextResponse.json({ 
-        message: `User not found with ID: ${userId}` 
-      }, { status: 404 });
-    }
 
     const body = await request.json();
     // FIXED: Changed totalHoney to totalKg to match frontend

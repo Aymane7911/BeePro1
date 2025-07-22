@@ -8,6 +8,27 @@ interface BackdropProps {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
 }
+type Color = 'blue' | 'green' | 'yellow';
+
+interface StatsCard {
+  label: string;
+  value: string;
+  change: string;
+  trend: 'up' | 'down'; // or just string if you want more flexible
+}
+
+interface SlideConfig {
+  title: string;
+  icon: string; // or React.ReactNode if you replace emoji strings with components
+  description: string;
+  iframeUrl: string;
+  uploadEndpoint: string;
+  acceptedFiles: string;
+  color: Color;
+  statsCards: StatsCard[];
+}
+
+type Variant = 'primary' | 'secondary' | 'accent' | 'gradient' | 'glow';
 
 const Backdrop = ({ sidebarOpen, toggleSidebar }: BackdropProps) => (
   sidebarOpen && (
@@ -201,7 +222,7 @@ const getColorClasses = (color: Color, variant: Variant = 'primary') => {
 };
 
 
-  const slideConfigs = [
+  const slideConfigs: SlideConfig[] = [
     {
       title: 'Invoice Analytics Dashboard',
       icon: '📄',

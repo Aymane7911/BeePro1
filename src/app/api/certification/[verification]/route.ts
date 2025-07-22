@@ -21,7 +21,7 @@ export async function GET(
 
     console.log('Looking for verification code:', verificationCode);
 
-    // Option 1: Use findFirst instead of findUnique if you want to search by verificationCode only
+    // Use findFirst instead of findUnique to avoid compound unique constraint issue
     const certification = await prisma.certification.findFirst({
       where: {
         verificationCode: verificationCode

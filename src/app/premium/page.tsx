@@ -96,14 +96,14 @@ export default function Premium() {
     return v;
   };
 
-  const handleCardNumberChange = (e) => {
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCardNumber(e.target.value);
     if (formatted.length <= 19) { // 16 digits + 3 spaces
       handlePaymentInputChange('cardNumber', formatted);
     }
   };
 
-  const handleExpiryChange = (e) => {
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatExpiryDate(e.target.value);
     if (formatted.length <= 5) {
       handlePaymentInputChange('expiryDate', formatted);
@@ -111,7 +111,7 @@ export default function Premium() {
   };
 
   
-  const handlePaymentSubmit = async (e) => {
+  const handlePaymentSubmit = async (e: React.ChangeEvent<HTMLInputElement>) => {
   e.preventDefault();
   setPaymentProcessing(true);
   

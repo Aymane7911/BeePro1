@@ -1134,7 +1134,7 @@ useEffect(() => {
 };
 
 // Handle file upload
-const handleFileUpload = (e) => {
+const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files[0];
   if (file) {
     // Validate file type and size
@@ -1158,7 +1158,7 @@ const handleFileUpload = (e) => {
 };
 
 // Handle profile completion form submission
-const handleProfileSubmit = async (e) => {
+const handleProfileSubmit = async (e: React.ChangeEvent<HTMLInputElement>) => {
   e.preventDefault();
   
   // Validate required fields
@@ -2336,7 +2336,7 @@ useEffect(() => {
   };
 
   // Listen for storage changes
-  const handleStorageChange = (e) => {
+  const handleStorageChange = (e: StorageEvent) => {
     if (e.key === 'tokenBalance') {
       setTokenBalance(parseInt(e.newValue || '0'));
     }

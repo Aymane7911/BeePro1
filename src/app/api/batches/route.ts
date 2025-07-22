@@ -69,6 +69,19 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Get the user's databaseId
+    const user = await prisma.beeusers.findUnique({
+      where: { id: userIdInt },
+      select: { databaseId: true }
+    });
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
       
     const body = await request.json();
     const { apiaries, ...batchData } = body;
@@ -92,6 +105,7 @@ export async function POST(request: NextRequest) {
         ...batchData,
         weightKg: parseFloat(batchData.weightKg) || 0, // This is the total honey collected
         userId: userIdInt,
+        databaseId: user.databaseId, // Add the required databaseId
         // Initialize honey tracking fields
         totalHoneyCollected: parseFloat(batchData.weightKg) || 0, // Same as weightKg for consistency
         honeyCertified: 0, // No honey certified initially
@@ -105,6 +119,7 @@ export async function POST(request: NextRequest) {
             latitude: parseCoordinate(apiary.latitude),
             longitude: parseCoordinate(apiary.longitude),
             userId: userIdInt, // Add userId for apiary
+            databaseId: user.databaseId, // Add the required databaseId
           })) || []
         }
       },
@@ -134,6 +149,19 @@ export async function PUT(request: NextRequest) {
       );
     }
     const userId = parseInt(userIdString);
+
+    // Get the user's databaseId
+    const user = await prisma.beeusers.findUnique({
+      where: { id: userId },
+      select: { databaseId: true }
+    });
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
     
     const formData = await request.formData();
     const data = JSON.parse(formData.get('data') as string);
@@ -287,7 +315,7 @@ export async function PUT(request: NextRequest) {
             }
           });
         } else {
-          // Create new apiary with proper user and batch relationships
+          // Create new apiary with proper user, batch, and database relationships
           await prisma.apiary.create({
             data: {
               name: apiaryData.name || '',
@@ -300,6 +328,7 @@ export async function PUT(request: NextRequest) {
                 ? parseFloat(apiaryData.longitude)
                 : 0.0, // Default longitude if not provided
               kilosCollected: apiaryData.kilosCollected || 0,
+              databaseId: user.databaseId, // Add the required databaseId
               batch: {
                 connect: { id: batchId } // Connect to batch using relation
               },

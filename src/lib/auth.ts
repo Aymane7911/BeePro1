@@ -120,23 +120,16 @@ export const authOptions: NextAuthOptions = {
     
     async session({ session, token }) {
   if (token.userId) {
-    // Ensure session.user has the correct structure
     session.user = {
-      ...session.user,
-      id: token.userId.toString(),
+      id: token.userId.toString(), // Convert number to string for NextAuth compatibility
       email: token.email as string,
+      name: session.user.name, // Preserve existing name if needed
+      image: session.user.image, // Preserve existing image if needed
       firstName: token.firstName as string,
       lastName: token.lastName as string,
-      databaseId: token.databaseId as string,
-      companyId: token.companyId as string,
+      databaseId: token.databaseId as string, // This is already a string (UUID)
       role: token.role as string,
     };
-    
-    session.accessToken = createJWTToken(
-      parseInt(token.userId),
-      token.email as string,
-      token.databaseId as string
-    );
   }
   return session;
 },

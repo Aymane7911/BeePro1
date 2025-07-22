@@ -10,20 +10,12 @@ export async function GET(request: NextRequest) {
   try {
     let userId: string | null = null;
     let databaseId: string | null = null;
-    let companyId: string | null = null;
 
     // First try to get session from NextAuth (for web app users)
     const session = await getServerSession(authOptions);
-    if (session?.user?.id && session?.user?.companyId) {
+    if (session?.user?.id && session?.user?.databaseId) {
       userId = session.user.id;
-      companyId = session.user.companyId;
-      
-      // Option 1: Get databaseId from company relationship
-      const company = await prisma.company.findUnique({
-        where: { id: companyId },
-        select: { databaseId: true }
-      });
-      databaseId = company?.databaseId || null;
+      databaseId = session.user.databaseId; // Get databaseId directly from session
     } else {
       // Fallback to JWT authentication (for API users)
       const authResult = await authenticateRequest(request);
@@ -49,7 +41,14 @@ export async function GET(request: NextRequest) {
         maxUsers: true,
         maxStorage: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        managedBy: {
+          select: {
+            firstname: true,
+            lastname: true,
+            email: true
+          }
+        }
       }
     });
 
@@ -71,7 +70,11 @@ export async function GET(request: NextRequest) {
       maxUsers: database.maxUsers,
       maxStorage: `${database.maxStorage} GB`,
       createdAt: database.createdAt,
-      updatedAt: database.updatedAt
+      updatedAt: database.updatedAt,
+      managedBy: database.managedBy ? {
+        name: `${database.managedBy.firstname} ${database.managedBy.lastname}`,
+        email: database.managedBy.email
+      } : null
     });
   } catch (error) {
     console.error('Database info error:', error);

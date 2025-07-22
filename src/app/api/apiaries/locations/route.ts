@@ -50,9 +50,10 @@ export async function GET(request: NextRequest) {
 
 // POST - Save a location template (no batchId)
 export async function POST(request: NextRequest) {
+  const prisma = new PrismaClient();
   try {
     const userId = await authenticateRequest(request);
-    
+
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
     const { latitude, longitude, name } = body;
 
     // Validate required fields
-    if (!latitude || !longitude) {
+    if (latitude === undefined || longitude === undefined) {
       return NextResponse.json(
         { error: 'Latitude and longitude are required' },
         { status: 400 }
@@ -86,26 +87,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create location template (NO batchId - this makes it a saved location template)
+    // Create location template (no batchId, user relation connected properly)
     const newLocation = await prisma.apiary.create({
       data: {
-        name: name || `Saved Location ${new Date().toLocaleDateString()}`,
-        number: `LOC_${Date.now()}`, // Unique identifier for location templates
+        name: name?.trim() || `Saved Location ${new Date().toLocaleDateString()}`,
+        number: `LOC_${Date.now()}`, // unique identifier
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
         hiveCount: 0,
         kilosCollected: 0,
-        batchId: null, // No batchId = saved location template
-        userId: parseInt(String(userId)),
+        user: {
+          connect: { id: parseInt(String(userId)) },
+        },
       },
     });
 
     console.log('Created new location template:', newLocation.id);
     return NextResponse.json(newLocation, { status: 201 });
+
   } catch (error) {
     console.error('Error saving location template:', error);
     return NextResponse.json(
-      { error: 'Failed to save location template', details: error.message },
+      { error: 'Failed to save location template', details: (error as Error).message },
       { status: 500 }
     );
   } finally {

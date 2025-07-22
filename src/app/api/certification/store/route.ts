@@ -42,20 +42,26 @@ export async function POST(request: NextRequest) {
       totalJars,
       companyName,
       beekeeperName,
-      location
+      location,
+      databaseId
     } = body;
 
     // Validate required fields
-    if (!verificationCode || !batchIds || !certificationDate || !totalCertified || !certificationType || !expiryDate || !totalJars) {
+    if (!verificationCode || !batchIds || !certificationDate || !totalCertified || !certificationType || !expiryDate || !totalJars || !databaseId) {
       return NextResponse.json(
         { error: 'Missing required certification data' },
         { status: 400 }
       );
     }
 
-    // Check if verification code already exists - using findFirst instead of findUnique
-    const existingCert = await prisma.certification.findFirst({
-      where: { verificationCode }
+    // Check if verification code already exists - using compound unique constraint
+    const existingCert = await prisma.certification.findUnique({
+      where: { 
+        verificationCode_databaseId: {
+          verificationCode: verificationCode,
+          databaseId: databaseId
+        }
+      }
     });
 
     if (existingCert) {
@@ -78,7 +84,8 @@ export async function POST(request: NextRequest) {
         companyName,
         beekeeperName,
         location,
-        userId: userId
+        userId: userId,
+        databaseId: databaseId
       }
     });
 

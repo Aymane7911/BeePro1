@@ -34,6 +34,7 @@ import Header1 from '@/components/Header1';
 
 
 interface Apiary {
+  id: string; // Add this
   batchId: string,
   batchNumber: string,
   name: string;
@@ -42,6 +43,8 @@ interface Apiary {
   latitude: number;
   longitude: number;
   honeyCollected: number;
+  kilosCollected: number;
+  location?: Location | null;
 }
 interface FormApiary extends Apiary {
   batchId: string;
@@ -133,6 +136,18 @@ interface JarCertification {
   quality?: boolean;
   both?: boolean;
   selectedType?: 'origin' | 'quality' | 'both';
+}
+
+interface Location {
+  id: string;
+  // Add other location properties you might need
+  name?: string;
+  address?: string;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  // ... other location-related properties
 }
 
 interface JarDefinition {
@@ -642,7 +657,7 @@ const createBatch = async () => {
     console.error('Error creating batch:', error);
     setNotification({
       show: true,
-      message: `Error: ${error.message}`,
+      message: `Error: ${(error as Error).message}`,
     });
   } finally {
     setLoading(false);
@@ -672,7 +687,7 @@ const isApiaryFullyAllocated = (apiaryIndex: number) => {
 };
 
 
-const calculateTotalHoneyToCertify = (amounts) => {
+const calculateTotalHoneyToCertify = (amounts : any) => {
   const { origin, quality, both } = amounts;
   // The total honey to certify is the sum of all amounts
   // Note: 'both' means honey that gets both certifications, but it's still the same physical honey
@@ -680,10 +695,10 @@ const calculateTotalHoneyToCertify = (amounts) => {
 };
 
 // Add this helper function to calculate maximum jars possible for each size
-const calculateMaxJarsForSize = (totalHoneyToCertify, jarSize) => {
+const calculateMaxJarsForSize = (totalHoneyToCertify: any, jarSize: any) => {
   return Math.floor(totalHoneyToCertify / jarSize);
 };
-  const calculateTokensNeeded = (amounts, jarSizes) => {
+  const calculateTokensNeeded = (amounts: any, jarSizes: any) => {
   const { origin, quality, both } = amounts;
   const { jar250g, jar400g, jar600g } = jarSizes;
   // Calculate total honey that will be certified
@@ -725,7 +740,7 @@ const calculateMaxJarsForSize = (totalHoneyToCertify, jarSize) => {
 };
   const [tokenBalance, setTokenBalance] = useState<number>(0);
   // Add jar to batch
-const addJarToBatch = (sizeInGrams, quantity) => {
+const addJarToBatch = (sizeInGrams: any, quantity: any) => {
   if (!sizeInGrams || !quantity) return;
   
   const sizeInKg = sizeInGrams / 1000;
@@ -772,7 +787,7 @@ const addJarToBatch = (sizeInGrams, quantity) => {
 
 
 // Remove jar from batch
-const removeJarFromBatch = (jarId) => {
+const removeJarFromBatch = (jarId: any) => {
   setBatchJars(batchJars.filter(jar => jar.id !== jarId));
 };
 
@@ -788,7 +803,9 @@ const removeJarFromBatch = (jarId) => {
     passportScan: null
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // allow error to be a string or null
+const [error, setError] = useState<string | null>(null);
+
   const [batches, setBatches] = useState<Batch[]>([]);
   const [tokenStats, setTokenStats] = useState({
     totalTokens: 0,
@@ -814,6 +831,124 @@ const [formData, setFormData] = useState({
   }]
 });
 const [mapsLinkInput, setMapsLinkInput] = useState('');
+
+// Function to extract coordinates from Google Maps links or coordinate strings
+const extractCoordinatesFromMapsLink = async (input: any) => {
+  if (!input || typeof input !== 'string') {
+    return null;
+  }
+
+  const trimmedInput = input.trim();
+
+  // Check if it's a shortened URL (goo.gl, maps.app.goo.gl, etc.)
+  if (trimmedInput.match(/^https?:\/\/(goo\.gl|maps\.app\.goo\.gl|g\.co)/i)) {
+    return 'SHORTENED_URL';
+  }
+
+  // Try to extract coordinates directly from input (latitude, longitude format)
+  const coordRegex = /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/;
+  const spaceCoordRegex = /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?)\s+[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/;
+  
+  // Check for comma-separated coordinates
+  if (coordRegex.test(trimmedInput)) {
+    const [lat, lng] = trimmedInput.split(',').map(coord => parseFloat(coord.trim()));
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  // Check for space-separated coordinates
+  if (spaceCoordRegex.test(trimmedInput)) {
+    const coords = trimmedInput.split(/\s+/).map(coord => parseFloat(coord.trim()));
+    if (coords.length === 2) {
+      const [lat, lng] = coords;
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng };
+      }
+    }
+  }
+
+  // Check if it's a Google Maps URL
+  if (!trimmedInput.startsWith('http')) {
+    return null;
+  }
+
+  try {
+    const url = new URL(trimmedInput);
+    
+    // Method 1: Check for @coordinates in the URL
+    const atMatch = url.href.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (atMatch) {
+      const lat = parseFloat(atMatch[1]);
+      const lng = parseFloat(atMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng };
+      }
+    }
+
+    // Method 2: Check URL parameters
+    const searchParams = url.searchParams;
+    
+    // Check for ll parameter (latitude,longitude)
+    const ll = searchParams.get('ll');
+    if (ll) {
+      const [lat, lng] = ll.split(',').map(coord => parseFloat(coord.trim()));
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng };
+      }
+    }
+
+    // Check for center parameter
+    const center = searchParams.get('center');
+    if (center) {
+      const [lat, lng] = center.split(',').map(coord => parseFloat(coord.trim()));
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng };
+      }
+    }
+
+    // Method 3: Check for coordinates in the pathname
+    const pathMatch = url.pathname.match(/\/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (pathMatch) {
+      const lat = parseFloat(pathMatch[1]);
+      const lng = parseFloat(pathMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng };
+      }
+    }
+
+    // Method 4: Check for query parameter coordinates
+    const q = searchParams.get('q');
+    if (q) {
+      const qCoordMatch = q.match(/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+      if (qCoordMatch) {
+        const lat = parseFloat(qCoordMatch[1]);
+        const lng = parseFloat(qCoordMatch[2]);
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          return { lat, lng };
+        }
+      }
+    }
+
+    // Method 5: Check for destination parameter
+    const destination = searchParams.get('destination');
+    if (destination) {
+      const destCoordMatch = destination.match(/(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+      if (destCoordMatch) {
+        const lat = parseFloat(destCoordMatch[1]);
+        const lng = parseFloat(destCoordMatch[2]);
+        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          return { lat, lng };
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error parsing URL:', error);
+    return null;
+  }
+};
 {/* Add this function to handle maps link processing */}
 const handleMapsLinkSubmit = async () => {
   if (!mapsLinkInput.trim()) {
@@ -825,8 +960,8 @@ const handleMapsLinkSubmit = async () => {
     const coordinates = await extractCoordinatesFromMapsLink(mapsLinkInput);
     
     if (coordinates === 'SHORTENED_URL') {
-      // Handle shortened URLs with special instructions
-      const userChoice = confirm(
+      //Handle shortened URLs with special instructions
+     const userChoice = confirm(
         'This appears to be a shortened Google Maps link. Due to browser security restrictions, we cannot automatically extract coordinates from shortened links.\n\n' +
         'Would you like to:\n\n' +
         '• Click "OK" to open the link in a new tab so you can copy the full URL\n' +
@@ -895,7 +1030,7 @@ const handleMapsLinkSubmit = async () => {
   }
 };
   
- const getRemainingHoneyForBatch = (batch) => {
+ const getRemainingHoneyForBatch = (batch: any) => {
   if (!batch) return 0;
   
   // Use the original amount as the base, not the current totalHoneyCollected
@@ -1042,7 +1177,7 @@ useEffect(() => {
       // Update last updated timestamp
       const now = new Date();
       setLastUpdated(now.toLocaleDateString() + ' ' + now.toLocaleTimeString());
-    } catch (err) {
+    } catch (err: any) {
       console.error('[BatchesPage] Error fetching batches:', err);
       setError(err.message || 'Unknown error');
       setIsLoading(false);
@@ -1135,7 +1270,7 @@ useEffect(() => {
 
 // Handle file upload
 const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files[0];
+  const file = e.target.files![0];
   if (file) {
     // Validate file type and size
     const allowedTypes = ['image/png', 'image/jpeg', 'application/pdf'];

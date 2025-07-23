@@ -25,10 +25,10 @@ interface CreateApiaryBody {
 // GET handler – return all apiaries
 export async function GET(request: NextRequest) {
   try {
-    // Get the authenticated user ID
-    const userId = await authenticateRequest(request);
+    // Get the authenticated user data
+    const authResult = await authenticateRequest(request);
         
-    if (!userId) {
+    if (!authResult) {
       console.warn('[GET /api/apiaries] ▶ No authenticated user found');
       return NextResponse.json(
         { error: "Authentication required" },
@@ -36,26 +36,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('[GET /api/apiaries] ▶ Authenticated user ID:', userId);
-
-    // Get the user to access their database ID
-    const user = await prisma.beeusers.findUnique({
-      where: { id: parseInt(String(userId)) },
-      select: { databaseId: true }
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
+    // Extract userId and databaseId from the auth result
+    const { userId, databaseId } = authResult;
+    console.log('[GET /api/apiaries] ▶ Authenticated user ID:', userId, 'Database ID:', databaseId);
 
     // Fetch all apiaries for the user in their specific database
     const apiaries = await prisma.apiary.findMany({
       where: {
         userId: parseInt(String(userId)),
-        databaseId: user.databaseId,
+        databaseId: databaseId,
       },
       orderBy: {
         createdAt: 'desc',
@@ -76,30 +65,19 @@ export async function GET(request: NextRequest) {
 // POST handler – create a new apiary
 export async function POST(request: NextRequest) {
   try {
-    // Get the authenticated user ID
-    const userId = await authenticateRequest(request);
+    // Get the authenticated user data
+    const authResult = await authenticateRequest(request);
         
-    if (!userId) {
+    if (!authResult) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
 
-    console.log('[POST /api/apiaries] ▶ Authenticated user ID:', userId);
-
-    // Get the user to access their database ID
-    const user = await prisma.beeusers.findUnique({
-      where: { id: parseInt(String(userId)) },
-      select: { databaseId: true }
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
+    // Extract userId and databaseId from the auth result
+    const { userId, databaseId } = authResult;
+    console.log('[POST /api/apiaries] ▶ Authenticated user ID:', userId, 'Database ID:', databaseId);
 
     const body: CreateApiaryBody = await request.json();
     console.log('[POST /api/apiaries] ▶ Request body:', body);
@@ -169,7 +147,7 @@ export async function POST(request: NextRequest) {
       where: { 
         number,
         userId: parseInt(String(userId)),
-        databaseId: user.databaseId,
+        databaseId: databaseId,
       },
     });
     
@@ -203,7 +181,7 @@ export async function POST(request: NextRequest) {
         locationName: processedLocationName,
         kilosCollected: Math.max(0, finalKilosCollected),
         userId: parseInt(String(userId)),
-        databaseId: user.databaseId, // Use the user's database ID
+        databaseId: databaseId, // Use the databaseId from auth result
       },
     });
 

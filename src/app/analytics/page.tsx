@@ -222,13 +222,13 @@ const getColorClasses = (color: Color, variant: Variant = 'primary'): string => 
   return colorMap[color][variant];
 };
 
-  const slideConfigs: SlideConfig[] = [
+ const slideConfigs: SlideConfig[] = [
   {
     title: 'Invoice Analytics Dashboard',
     icon: '📄',
     description: 'AI-powered invoice processing and analysis',
-    iframeUrl: `${process.env.INVOICE_API_BASE_URL}/dash_app/`,
-    uploadEndpoint: `${process.env.INVOICE_API_BASE_URL}/upload-invoices/`,
+    iframeUrl: `${invoiceApiBaseUrl}/dash_app/`, // Fixed: using hardcoded variable
+    uploadEndpoint: `${invoiceApiBaseUrl}/upload-invoices/`, // Fixed: using hardcoded variable
     acceptedFiles: '.pdf',
     color: 'blue',
     statsCards: [
@@ -242,8 +242,8 @@ const getColorClasses = (color: Color, variant: Variant = 'primary'): string => 
     title: 'Production Analytics Dashboard',
     icon: '🏭',
     description: 'Real-time production monitoring and analytics',
-    iframeUrl: `${process.env.PRODUCTION_API_BASE_URL}/dash_app/`,
-    uploadEndpoint: `${process.env.PRODUCTION_API_BASE_URL}/upload-production/`,
+    iframeUrl: `${productionApiBaseUrl}/dash_app/`, // Fixed: using hardcoded variable
+    uploadEndpoint: `${productionApiBaseUrl}/upload-production/`, // Fixed: using hardcoded variable
     acceptedFiles: '*',
     color: 'green',
     statsCards: [
@@ -257,8 +257,8 @@ const getColorClasses = (color: Color, variant: Variant = 'primary'): string => 
     title: 'Beehive Analytics Dashboard',
     icon: '🐝',
     description: 'Comprehensive beehive monitoring and analytics',
-    iframeUrl: `${process.env.BEEHIVE_API_BASE_URL}/dash_app/`,
-    uploadEndpoint: `${process.env.BEEHIVE_API_BASE_URL}/upload-beehive/`,
+    iframeUrl: `${beehiveApiBaseUrl}/dash_app/`, // Fixed: using hardcoded variable
+    uploadEndpoint: `${beehiveApiBaseUrl}/upload-beehive/`, // Fixed: using hardcoded variable
     acceptedFiles: '*',
     color: 'yellow',
     statsCards: [

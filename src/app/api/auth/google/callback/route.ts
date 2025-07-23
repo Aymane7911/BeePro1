@@ -71,19 +71,35 @@ export async function POST(request: Request) {
     const googleUserData: GoogleUserData = await userResponse.json();
     console.log('[Google OAuth API] Google user data:', googleUserData);
 
-    // Check for existing user
-    const existingUserResult = await pool.query('SELECT * FROM beeusers WHERE email = $1', [googleUserData.email]);
+    // Get default database ID
+    const defaultDatabaseResult = await pool.query(
+      'SELECT id FROM databases WHERE is_active = true ORDER BY created_at ASC LIMIT 1'
+    );
+
+    if (defaultDatabaseResult.rowCount === 0) {
+      console.error('[Google OAuth API] No active database found');
+      return NextResponse.json({ message: 'No active database available' }, { status: 500 });
+    }
+
+    const defaultDatabaseId = defaultDatabaseResult.rows[0].id;
+    console.log('[Google OAuth API] Using database ID:', defaultDatabaseId);
+
+    // Check for existing user in the same database
+    const existingUserResult = await pool.query(
+      'SELECT * FROM beeusers WHERE email = $1 AND database_id = $2', 
+      [googleUserData.email, defaultDatabaseId]
+    );
     let user;
 
     if (existingUserResult.rowCount === 0) {
-      // Create new user
+      // Create new user with database_id
       const nameParts = googleUserData.name.split(' ');
       const firstname = nameParts[0] || 'Google';
       const lastname = nameParts.slice(1).join(' ') || 'User';
 
       const createUserResult = await pool.query(
-        'INSERT INTO beeusers (firstname, lastname, email, password, is_confirmed) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [firstname, lastname, googleUserData.email, 'google_oauth', true]
+        'INSERT INTO beeusers (database_id, firstname, lastname, email, password, is_confirmed, google_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+        [defaultDatabaseId, firstname, lastname, googleUserData.email, 'google_oauth', true, googleUserData.id]
       );
 
       user = createUserResult.rows[0];
@@ -91,6 +107,12 @@ export async function POST(request: Request) {
     } else {
       user = existingUserResult.rows[0];
       console.log('[Google OAuth API] Existing user found:', user);
+
+      // Update Google ID if not set
+      if (!user.google_id) {
+        await pool.query('UPDATE beeusers SET google_id = $1 WHERE id = $2', [googleUserData.id, user.id]);
+        user.google_id = googleUserData.id;
+      }
 
       if (!user.is_confirmed) {
         await pool.query('UPDATE beeusers SET is_confirmed = true WHERE id = $1', [user.id]);
@@ -104,6 +126,7 @@ export async function POST(request: Request) {
       {
         userId: user.id,
         email: user.email,
+        databaseId: user.database_id,
       },
       process.env.JWT_SECRET!,
       { expiresIn: '24h' }
@@ -125,6 +148,7 @@ export async function POST(request: Request) {
           picture: googleUserData.picture,
           verified_email: googleUserData.verified_email,
           is_confirmed: user.is_confirmed,
+          database_id: user.database_id,
         },
       },
       { status: 200 }

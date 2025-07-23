@@ -1,4 +1,4 @@
-// app/api/apiaries/locations/route.ts - Updated saved locations endpoint
+// app/api/apiaries/locations/route.ts - Fixed based on Prisma schema
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { authenticateRequest } from "@/lib/auth";
@@ -8,7 +8,13 @@ const prisma = new PrismaClient();
 // GET - Fetch saved location templates (no batchId)
 export async function GET(request: NextRequest) {
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
+    console.log('Auth result:', authResult);
+    
+    // Handle if authenticateRequest returns an object instead of just userId
+    const userId = typeof authResult === 'object' && authResult !== null ? authResult.userId : authResult;
+    
+    console.log('Extracted userId:', userId, 'Type:', typeof userId);
     
     if (!userId) {
       return NextResponse.json(
@@ -17,10 +23,35 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const userIdInt = parseInt(String(userId));
+    console.log('Parsed userId:', userIdInt);
+    
+    if (isNaN(userIdInt)) {
+      return NextResponse.json(
+        { error: "Invalid user ID" },
+        { status: 400 }
+      );
+    }
+
+    // First, get the user to access their databaseId
+    const user = await prisma.beeusers.findUnique({
+      where: { id: userIdInt },
+      select: { databaseId: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
     // Fetch ONLY saved locations (no batchId) - these are location templates
+    // Using both userId and databaseId for proper filtering
     const locations = await prisma.apiary.findMany({
       where: {
-        userId: parseInt(String(userId)),
+        userId: userIdInt,
+        databaseId: user.databaseId,
         batchId: null, // Only saved location templates
       },
       select: {
@@ -35,7 +66,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log(`Fetched ${locations.length} saved locations for user ${userId}`);
+    console.log(`Fetched ${locations.length} saved locations for user ${userIdInt}`);
     return NextResponse.json(locations, { status: 200 });
   } catch (error) {
     console.error('Error fetching saved locations:', error);
@@ -50,14 +81,29 @@ export async function GET(request: NextRequest) {
 
 // POST - Save a location template (no batchId)
 export async function POST(request: NextRequest) {
-  const prisma = new PrismaClient();
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
+    console.log('Auth result:', authResult);
+    
+    // Handle if authenticateRequest returns an object instead of just userId
+    const userId = typeof authResult === 'object' && authResult !== null ? authResult.userId : authResult;
+    
+    console.log('Extracted userId:', userId, 'Type:', typeof userId);
 
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
+      );
+    }
+
+    const userIdInt = parseInt(String(userId));
+    console.log('Parsed userId:', userIdInt);
+    
+    if (isNaN(userIdInt)) {
+      return NextResponse.json(
+        { error: "Invalid user ID" },
+        { status: 400 }
       );
     }
 
@@ -87,9 +133,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // First, get the user to access their databaseId
+    // Get the user to access their databaseId
     const user = await prisma.beeusers.findUnique({
-      where: { id: parseInt(String(userId)) },
+      where: { id: userIdInt },
       select: { databaseId: true },
     });
 
@@ -100,7 +146,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create location template (no batchId, user relation connected properly)
+    // Create location template (no batchId)
     const newLocation = await prisma.apiary.create({
       data: {
         name: name?.trim() || `Saved Location ${new Date().toLocaleDateString()}`,
@@ -109,8 +155,8 @@ export async function POST(request: NextRequest) {
         longitude: parseFloat(String(longitude)),
         hiveCount: 0,
         kilosCollected: 0,
-        databaseId: user.databaseId, // Add the required databaseId field
-        userId: parseInt(String(userId)), // Use userId directly instead of user relation
+        databaseId: user.databaseId, // Required databaseId field
+        userId: userIdInt, // Required userId field
         // batchId is intentionally omitted (will be null by default)
       },
     });
@@ -132,12 +178,28 @@ export async function POST(request: NextRequest) {
 // DELETE - Remove a saved location template
 export async function DELETE(request: NextRequest) {
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
+    console.log('Auth result:', authResult);
+    
+    // Handle if authenticateRequest returns an object instead of just userId
+    const userId = typeof authResult === 'object' && authResult !== null ? authResult.userId : authResult;
+    
+    console.log('Extracted userId:', userId, 'Type:', typeof userId);
     
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
+      );
+    }
+
+    const userIdInt = parseInt(String(userId));
+    console.log('Parsed userId:', userIdInt);
+    
+    if (isNaN(userIdInt)) {
+      return NextResponse.json(
+        { error: "Invalid user ID" },
+        { status: 400 }
       );
     }
 
@@ -151,11 +213,25 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Only allow deleting saved location templates (no batchId)
+    // Get user's databaseId for proper filtering
+    const user = await prisma.beeusers.findUnique({
+      where: { id: userIdInt },
+      select: { databaseId: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // Only allow deleting saved location templates (no batchId) that belong to this user
     const location = await prisma.apiary.findFirst({
       where: { 
         id: parseInt(id),
-        userId: parseInt(String(userId)),
+        userId: userIdInt,
+        databaseId: user.databaseId,
         batchId: null // Only allow deleting location templates, not actual apiaries
       },
     });

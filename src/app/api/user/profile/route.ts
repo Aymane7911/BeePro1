@@ -11,17 +11,50 @@ const prisma = new PrismaClient();
 // GET - Get user profile (requires authentication)
 export async function GET(request: NextRequest) {
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
+    
+    console.log('Raw authResult from auth:', authResult, 'Type:', typeof authResult);
         
-    if (!userId) {
+    if (!authResult) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
     }
 
-    const user = await prisma.beeusers.findUnique({
-      where: { id: parseInt(String(userId)) },
+    // Extract userId and databaseId from the auth result object
+    const { userId: userIdStr, databaseId } = authResult as { 
+      userId: string; 
+      databaseId: string; 
+    };
+
+    // Parse the userId to number
+    const parsedUserId = parseInt(userIdStr, 10);
+
+    // Validate the parsed ID
+    if (isNaN(parsedUserId) || parsedUserId <= 0) {
+      console.error('Invalid parsed userId:', parsedUserId, 'from original:', userIdStr);
+      return NextResponse.json(
+        { error: "Invalid user ID" },
+        { status: 400 }
+      );
+    }
+
+    // Validate databaseId
+    if (!databaseId) {
+      return NextResponse.json(
+        { error: "Database ID required" },
+        { status: 400 }
+      );
+    }
+
+    console.log('Parsed userId for Prisma:', parsedUserId, 'databaseId:', databaseId);
+
+    const user = await prisma.beeusers.findFirst({
+      where: { 
+        id: parsedUserId,
+        databaseId: databaseId
+      },
       select: {
         id: true,
         firstname: true,
@@ -59,12 +92,36 @@ export async function GET(request: NextRequest) {
 // PUT - Update user profile (requires authentication)
 export async function PUT(request: NextRequest) {
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
         
-    if (!userId) {
+    if (!authResult) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
+      );
+    }
+
+    // Extract userId and databaseId from the auth result object
+    const { userId: userIdStr, databaseId } = authResult as { 
+      userId: string; 
+      databaseId: string; 
+    };
+
+    // Parse the userId to number
+    const parsedUserId = parseInt(userIdStr, 10);
+
+    // Validate the parsed ID
+    if (isNaN(parsedUserId) || parsedUserId <= 0) {
+      return NextResponse.json(
+        { error: "Invalid user ID" },
+        { status: 400 }
+      );
+    }
+
+    if (!databaseId) {
+      return NextResponse.json(
+        { error: "Database ID required" },
+        { status: 400 }
       );
     }
 
@@ -79,12 +136,30 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const updatedUser = await prisma.beeusers.update({
-      where: { id: parseInt(String(userId)) },
+    const updatedUser = await prisma.beeusers.updateMany({
+      where: { 
+        id: parsedUserId,
+        databaseId: databaseId 
+      },
       data: {
         firstname,
         lastname,
         phonenumber,
+      },
+    });
+
+    if (updatedUser.count === 0) {
+      return NextResponse.json(
+        { error: 'User not found or access denied' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch the updated user to return
+    const user = await prisma.beeusers.findFirst({
+      where: { 
+        id: parsedUserId,
+        databaseId: databaseId 
       },
       select: {
         id: true,
@@ -96,7 +171,7 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(updatedUser, { status: 200 });
+    return NextResponse.json(user, { status: 200 });
   } catch (error) {
     console.error('Error updating profile:', error);
     return NextResponse.json(
@@ -111,12 +186,36 @@ export async function PUT(request: NextRequest) {
 // POST - Update passport information with file upload (requires authentication)
 export async function POST(request: NextRequest) {
   try {
-    const userId = await authenticateRequest(request);
+    const authResult = await authenticateRequest(request);
         
-    if (!userId) {
+    if (!authResult) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
+      );
+    }
+
+    // Extract userId and databaseId from the auth result object
+    const { userId: userIdStr, databaseId } = authResult as { 
+      userId: string; 
+      databaseId: string; 
+    };
+
+    // Parse the userId to number
+    const parsedUserId = parseInt(userIdStr, 10);
+
+    // Validate the parsed ID
+    if (isNaN(parsedUserId) || parsedUserId <= 0) {
+      return NextResponse.json(
+        { error: "Invalid user ID" },
+        { status: 400 }
+      );
+    }
+
+    if (!databaseId) {
+      return NextResponse.json(
+        { error: "Database ID required" },
+        { status: 400 }
       );
     }
 
@@ -162,14 +261,17 @@ export async function POST(request: NextRequest) {
       }
 
       // Get existing user to check for old passport file
-      const existingUser = await prisma.beeusers.findUnique({
-        where: { id: parseInt(String(userId)) },
+      const existingUser = await prisma.beeusers.findFirst({
+        where: { 
+          id: parsedUserId,
+          databaseId: databaseId 
+        },
         select: { passportFile: true },
       });
 
       // Generate unique filename
       const fileExtension = path.extname(passportScan.name);
-      const fileName = `passport_${userId}_${Date.now()}${fileExtension}`;
+      const fileName = `passport_${parsedUserId}_${Date.now()}${fileExtension}`;
       const filePath = path.join(uploadDir, fileName);
 
       // Convert file to buffer and save
@@ -193,12 +295,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Update user profile in database
-    const updatedUser = await prisma.beeusers.update({
-      where: { id: parseInt(String(userId)) },
+    const updateResult = await prisma.beeusers.updateMany({
+      where: { 
+        id: parsedUserId,
+        databaseId: databaseId 
+      },
       data: {
         passportId: passportId.trim(),
         ...(passportFilePath && { passportFile: passportFilePath }),
         isProfileComplete: true,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      return NextResponse.json(
+        { error: 'User not found or access denied' },
+        { status: 404 }
+      );
+    }
+
+    // Fetch the updated user to return
+    const updatedUser = await prisma.beeusers.findFirst({
+      where: { 
+        id: parsedUserId,
+        databaseId: databaseId 
       },
       select: {
         id: true,

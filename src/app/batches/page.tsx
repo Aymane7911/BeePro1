@@ -2286,7 +2286,7 @@ const confirmDelete = async () => {
 // Replace the above with:
 const [apiaryJars, setApiaryJars] = useState<{[key: number]: CustomJar[]}>({});
 const [newJarForApiary, setNewJarForApiary] = useState<{[key: number]: Omit<CustomJar, 'id'>}>({});
-const [jarCertifications, setJarCertifications] = useState<JarCertifications>({});
+const [jarCertifications, setJarCertifications] = useState<Record<string, JarCertification>>({});
 
 const getSelectedType = (certificationState) => {
   const { origin, quality } = certificationState || {};

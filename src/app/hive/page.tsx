@@ -2,7 +2,38 @@
 
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
-import { Thermometer, Droplets, Weight, Battery, MapPin, Camera, Volume2, Calendar, Folder, X, ChevronRight } from 'lucide-react';
+import { Thermometer, Droplets, Weight, Battery, MapPin, Camera, Volume2, Calendar, Folder, X, ChevronRight, Menu, Home, BarChart3, Settings, Bell, Users } from 'lucide-react';
+
+// Leaflet imports for maps
+import dynamic from 'next/dynamic';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix for default marker icons in Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+// Dynamically import MapContainer to avoid SSR issues
+const MapContainer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Marker),
+  { ssr: false }
+);
+const Popup = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Popup),
+  { ssr: false }
+);
 
 // Types
 interface SensorData {
@@ -44,7 +75,8 @@ const generateSampleData = (days: number = 7, isCentral: boolean = false): Senso
       timestamp: timestamp.toISOString(),
       temperature: 20 + Math.random() * 15 + Math.sin(i / 24) * 5,
       humidity: 40 + Math.random() * 30 + Math.sin(i / 12) * 10,
-      weight: 45 + Math.random() * 10 + Math.sin(i / 168) * 5,
+      // Adjusted weight to range strictly between 15-30kg
+      weight: Math.max(15, Math.min(30, 22.5 + (Math.random() - 0.5) * 6 + Math.sin(i / 168) * 3)),
       battery: Math.min(100, Math.max(20, 100 - (i / 24) * 2 + Math.random() * 10))
     };
     
@@ -82,7 +114,7 @@ const generateHives = (): Hive[] => {
     name: 'Central Hive',
     data: generateSampleData(7, true),
     isActive: true,
-    gps: { lat: 40.7128, lng: -74.0060 },
+    gps: { lat: 25.577861, lng: 56.269278 },
     images: generateMediaFiles('image', 15),
     sounds: generateMediaFiles('audio', 8)
   });
@@ -100,6 +132,31 @@ const generateHives = (): Hive[] => {
   return hives;
 };
 
+const FloatingHexagon: React.FC<{ delay: number; size: string; position: string; opacity?: string }> = ({ 
+  delay, 
+  size, 
+  position, 
+  opacity = "opacity-10" 
+}) => (
+  <div 
+    className={`absolute ${position} ${size} ${opacity} animate-pulse`}
+    style={{ animationDelay: `${delay}s`, animationDuration: '4s' }}
+  >
+    <svg viewBox="0 0 100 100" className="w-full h-full fill-amber-400">
+      <polygon points="50,5 85,25 85,75 50,95 15,75 15,25" />
+    </svg>
+  </div>
+);
+
+const FloatingBee: React.FC<{ delay: number; position: string; size?: string }> = ({ delay, position, size = "text-2xl" }) => (
+  <div 
+    className={`absolute ${position} ${size} animate-bounce opacity-30`}
+    style={{ animationDelay: `${delay}s`, animationDuration: '6s' }}
+  >
+    🐝
+  </div>
+);
+
 const HiveCard: React.FC<{ hive: Hive; onClick: () => void }> = ({ hive, onClick }) => {
   const latestData = hive.data[hive.data.length - 1];
   
@@ -111,9 +168,9 @@ const HiveCard: React.FC<{ hive: Hive; onClick: () => void }> = ({ hive, onClick
   
   return (
     <div 
-      className={`bg-white rounded-xl shadow-lg border-2 transition-all duration-300 cursor-pointer hover:shadow-xl transform hover:scale-105 h-full flex flex-col ${
-        hive.isActive ? 'border-green-400' : 'border-gray-300'
-      } ${hive.id === 0 ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-400' : ''}`}
+      className={`bg-white/90 backdrop-blur-sm rounded-xl shadow-xl border-2 transition-all duration-300 cursor-pointer hover:shadow-2xl transform hover:scale-105 h-full flex flex-col border-white/30 ${
+        hive.isActive ? 'hover:border-green-400' : 'hover:border-gray-400'
+      } ${hive.id === 0 ? 'bg-gradient-to-br from-blue-50/90 to-indigo-50/90 hover:border-blue-400' : ''}`}
       onClick={onClick}
     >
       <div className="p-4 flex-1 flex flex-col">
@@ -121,7 +178,7 @@ const HiveCard: React.FC<{ hive: Hive; onClick: () => void }> = ({ hive, onClick
           <h3 className={`font-bold text-lg ${hive.id === 0 ? 'text-blue-700' : 'text-gray-800'}`}>
             {hive.name}
           </h3>
-          <div className={`w-3 h-3 rounded-full ${hive.isActive ? 'bg-green-400' : 'bg-gray-400'}`} />
+          <div className={`w-3 h-3 rounded-full animate-pulse ${hive.isActive ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-gray-400'}`} />
         </div>
         
         {hive.id === 0 && hive.gps && (
@@ -134,19 +191,19 @@ const HiveCard: React.FC<{ hive: Hive; onClick: () => void }> = ({ hive, onClick
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="flex items-center">
             <Thermometer size={16} className="mr-2 text-red-500" />
-            <span>{latestData.temperature.toFixed(1)}°C</span>
+            <span className="text-black">{latestData.temperature.toFixed(1)}°C</span>
           </div>
           <div className="flex items-center">
             <Droplets size={16} className="mr-2 text-blue-500" />
-            <span>{latestData.humidity.toFixed(1)}%</span>
+            <span className="text-black">{latestData.humidity.toFixed(1)}%</span>
           </div>
           <div className="flex items-center">
             <Weight size={16} className="mr-2 text-purple-500" />
-            <span>{latestData.weight.toFixed(1)}kg</span>
+            <span className="text-black">{latestData.weight.toFixed(1)}kg</span>
           </div>
           <div className="flex items-center">
             <Battery size={16} className={`mr-2 ${getBatteryColor(latestData.battery)}`} />
-            <span>{latestData.battery.toFixed(0)}%</span>
+            <span className="text-black">{latestData.battery.toFixed(0)}%</span>
           </div>
         </div>
         
@@ -159,8 +216,7 @@ const HiveCard: React.FC<{ hive: Hive; onClick: () => void }> = ({ hive, onClick
             </div>
             <div className="flex items-center text-blue-600">
               <Droplets size={12} className="mr-1" />
-              Ext: {latestData.externalHumidity.toFixed(1)}%
-            </div>
+              Ext: {latestData.externalHumidity.toFixed(1)}%</div>
           </div>
         )}
         
@@ -181,35 +237,46 @@ const HiveCard: React.FC<{ hive: Hive; onClick: () => void }> = ({ hive, onClick
   );
 };
 
-const DataChart: React.FC<{ data: SensorData[]; type: string }> = ({ data, type }) => {
+const DataChart: React.FC<{ data: SensorData[]; type: string; title: string }> = ({ data, type, title }) => {
   const chartData = data.slice(-24).map(d => ({
     ...d,
     time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }));
   
   const config = {
-    temperature: { color: '#ef4444', unit: '°C', icon: Thermometer, label: 'Internal Temperature' },
-    humidity: { color: '#3b82f6', unit: '%', icon: Droplets, label: 'Internal Humidity' },
-    weight: { color: '#8b5cf6', unit: 'kg', icon: Weight, label: 'Weight' },
-    battery: { color: '#10b981', unit: '%', icon: Battery, label: 'Battery' },
-    externalTemperature: { color: '#f59e0b', unit: '°C', icon: Thermometer, label: 'External Temperature' },
-    externalHumidity: { color: '#06b6d4', unit: '%', icon: Droplets, label: 'External Humidity' }
+    temperature: { color: '#ef4444', unit: '°C', icon: Thermometer },
+    humidity: { color: '#3b82f6', unit: '%', icon: Droplets },
+    weight: { color: '#8b5cf6', unit: 'kg', icon: Weight },
+    battery: { color: '#10b981', unit: '%', icon: Battery },
+    externalTemperature: { color: '#f59e0b', unit: '°C', icon: Thermometer },
+    externalHumidity: { color: '#06b6d4', unit: '%', icon: Droplets }
   };
   
-  const { color, unit, icon: Icon, label } = config[type as keyof typeof config];
+  const { color, unit, icon: Icon } = config[type as keyof typeof config];
+  
+  // Set custom domain for weight chart
+  const yAxisProps = type === 'weight' ? { domain: [15, 30] } : {};
   
   return (
-    <div className="bg-white rounded-lg p-4 shadow">
-      <div className="flex items-center mb-4">
-        <Icon size={20} className="mr-2" style={{ color }} />
-        <h4 className="font-semibold">{label}</h4>
+    <div className="bg-white/90 backdrop-blur-sm rounded-lg p-4 shadow-xl border border-white/20">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <Icon size={20} className="mr-2" style={{ color }} />
+          <h4 className="font-semibold text-black">{title}</h4>
+        </div>
+        <span className="text-sm font-medium text-gray-600 bg-gray-100/80 px-2 py-1 rounded">
+          {unit}
+        </span>
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="time" />
-          <YAxis />
-          <Tooltip formatter={(value) => [`${Number(value).toFixed(1)} ${unit}`, label]} />
+          <YAxis 
+            label={{ value: unit, angle: -90, position: 'insideLeft' }} 
+            {...yAxisProps}
+          />
+          <Tooltip formatter={(value) => [`${Number(value).toFixed(1)} ${unit}`, title]} />
           <Area type="monotone" dataKey={type} stroke={color} fill={color} fillOpacity={0.1} />
         </AreaChart>
       </ResponsiveContainer>
@@ -219,7 +286,7 @@ const DataChart: React.FC<{ data: SensorData[]; type: string }> = ({ data, type 
 
 const MediaGallery: React.FC<{ files: MediaFile[]; type: 'image' | 'audio' }> = ({ files, type }) => {
   return (
-    <div className="bg-white rounded-lg p-4 shadow">
+    <div className="bg-white/90 backdrop-blur-sm rounded-lg p-4 shadow-xl border border-white/20">
       <div className="flex items-center mb-4">
         {type === 'image' ? <Camera size={20} className="mr-2" /> : <Volume2 size={20} className="mr-2" />}
         <h4 className="font-semibold capitalize">{type}s</h4>
@@ -249,105 +316,146 @@ const MediaGallery: React.FC<{ files: MediaFile[]; type: 'image' | 'audio' }> = 
   );
 };
 
-const HiveModal: React.FC<{ hive: Hive | null; onClose: () => void }> = ({ hive, onClose }) => {
-  const [activeFolder, setActiveFolder] = useState<string>('temperature');
+const GPSDisplay: React.FC<{ 
+  gps: { lat: number; lng: number };
+  onUpdate: (newGps: { lat: number; lng: number }) => void;
+}> = ({ gps, onUpdate }) => {
+  const [position, setPosition] = useState(gps);
   
-  if (!hive) return null;
-  
-  const folders = hive.id === 0 
-    ? ['temperature', 'humidity', 'externalTemperature', 'externalHumidity', 'weight', 'battery', 'images', 'sounds', 'gps']
-    : ['temperature', 'humidity', 'weight', 'battery'];
-  
-  const getFolderLabel = (folder: string) => {
-    const labels: { [key: string]: string } = {
-      temperature: 'Internal Temperature',
-      humidity: 'Internal Humidity',
-      externalTemperature: 'External Temperature',
-      externalHumidity: 'External Humidity',
-      weight: 'Weight',
-      battery: 'Battery',
-      images: 'Images',
-      sounds: 'Sounds',
-      gps: 'GPS'
+  // Update both local state and parent state when position changes
+  useEffect(() => {
+    setPosition(gps);
+  }, [gps]);
+
+  const handleMapClick = (e: L.LeafletMouseEvent) => {
+    const newPos = {
+      lat: e.latlng.lat,
+      lng: e.latlng.lng
     };
-    return labels[folder] || folder;
+    setPosition(newPos);
+    onUpdate(newPos);
   };
-  
-  const renderContent = () => {
-    switch (activeFolder) {
-      case 'temperature':
-      case 'humidity':
-      case 'weight':
-      case 'battery':
-      case 'externalTemperature':
-      case 'externalHumidity':
-        return <DataChart data={hive.data} type={activeFolder} />;
-      case 'images':
-        return hive.images ? <MediaGallery files={hive.images} type="image" /> : null;
-      case 'sounds':
-        return hive.sounds ? <MediaGallery files={hive.sounds} type="audio" /> : null;
-      case 'gps':
-        return hive.gps ? (
-          <div className="bg-white rounded-lg p-6 shadow">
-            <div className="flex items-center mb-4">
-              <MapPin size={20} className="mr-2" />
-              <h4 className="font-semibold">GPS Location</h4>
-            </div>
-            <div className="space-y-2">
-              <p><strong>Latitude:</strong> {hive.gps.lat}</p>
-              <p><strong>Longitude:</strong> {hive.gps.lng}</p>
-              <div className="mt-4 h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                <p className="text-gray-600">Map View Placeholder</p>
-              </div>
-            </div>
-          </div>
-        ) : null;
-      default:
+
+  return (
+    <div className="bg-white/90 backdrop-blur-sm rounded-lg p-6 shadow-xl border border-white/20">
+      <div className="flex items-center mb-4">
+        <MapPin size={20} className="mr-2 bg-red-50" />
+        <h4 className="text-black">GPS Location</h4>
+      </div>
+      <div className="space-y-2 text-black">
+        <p><strong>Latitude:</strong> {position.lat.toFixed(6)}</p>
+        <p><strong>Longitude:</strong> {position.lng.toFixed(6)}</p>
+        <div className="mt-4 h-48 bg-gray-200/80 backdrop-blur-sm rounded-lg overflow-hidden border border-white/20">
+          <MapContainer 
+            center={[position.lat, position.lng]} 
+            zoom={15} 
+            style={{ height: '100%', width: '100%' }}
+            className="rounded-lg z-0"
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <Marker position={[position.lat, position.lng]}>
+              <Popup className="font-bold">
+                Hive Location
+              </Popup>
+            </Marker>
+            
+            {/* Add click event handler */}
+            {typeof window !== 'undefined' && (
+              <EventComponent event="click" handler={handleMapClick} />
+            )}
+          </MapContainer>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          Click anywhere on the map to update location
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// Add this event component to handle map clicks
+const EventComponent = dynamic(
+  () => 
+    import('react-leaflet').then((mod) => {
+      return function EventComponent({ event, handler }: any) {
+        const map = mod.useMapEvents({ [event]: handler });
         return null;
+      };
+    }),
+  { ssr: false }
+);
+
+const HiveModal: React.FC<{ 
+  hive: Hive | null; 
+  onClose: () => void;
+  onUpdateGPS: (hiveId: number, newGps: { lat: number; lng: number }) => void;
+}> = ({ hive, onClose, onUpdateGPS }) => {
+  if (!hive) return null;
+
+  const handleGPSUpdate = (newGps: { lat: number; lng: number }) => {
+    if (hive) {
+      onUpdateGPS(hive.id, newGps);
     }
   };
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-6xl max-h-[90vh] w-full overflow-hidden">
-        <div className="flex h-full">
-          {/* Sidebar */}
-          <div className="w-64 bg-gray-50 border-r">
-            <div className="p-4 border-b">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-lg">{hive.name}</h3>
-                <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-                  <X size={20} />
-                </button>
-              </div>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white/95 backdrop-blur-lg rounded-xl max-w-7xl max-h-[90vh] w-full overflow-hidden shadow-2xl border border-white/30">
+        {/* Header */}
+        <div className="p-6 border-b border-white/30 bg-gradient-to-r from-blue-50/80 to-indigo-50/80">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-2xl text-black">{hive.name}</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Status: <span className={`font-semibold ${hive.isActive ? 'text-green-600' : 'text-red-600'}`}>
+                  {hive.isActive ? 'Active' : 'Inactive'}
+                </span>
+              </p>
             </div>
-            <div className="p-4">
-              <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center">
-                <Folder size={16} className="mr-2" />
-                Data Folders
-              </h4>
-              <div className="space-y-1">
-                {folders.map((folder) => (
-                  <button
-                    key={folder}
-                    onClick={() => setActiveFolder(folder)}
-                    className={`w-full text-left px-3 py-2 rounded-lg flex items-center justify-between transition-colors ${
-                      activeFolder === folder ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'
-                    }`}
-                  >
-                    <span className="text-sm">{getFolderLabel(folder)}</span>
-                    <ChevronRight size={16} />
-                  </button>
-                ))}
-              </div>
-            </div>
+            <button 
+              onClick={onClose} 
+              className="text-gray-500 hover:text-gray-700 transition-colors p-2 hover:bg-white/50 rounded-lg"
+            >
+              <X size={24} />
+            </button>
           </div>
-          
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-6">
-              {renderContent()}
+        </div>
+        
+        {/* Content */}
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+          <div className="p-6 space-y-6">
+            {/* Sensor Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <DataChart data={hive.data} type="temperature" title="Internal Temperature" />
+              <DataChart data={hive.data} type="humidity" title="Internal Humidity" />
+              <DataChart data={hive.data} type="weight" title="Weight" />
+              <DataChart data={hive.data} type="battery" title="Battery Level" />
+              
+              {/* External sensors for central hive */}
+              {hive.id === 0 && hive.data[0]?.externalTemperature && (
+                <>
+                  <DataChart data={hive.data} type="externalTemperature" title="External Temperature" />
+                  <DataChart data={hive.data} type="externalHumidity" title="External Humidity" />
+                </>
+              )}
             </div>
+            
+            {/* Central hive additional content */}
+            {hive.id === 0 && (
+              <div className="space-y-6">
+                {/* GPS Section */}
+                {hive.gps && <GPSDisplay gps={hive.gps}  onUpdate={handleGPSUpdate} />}
+                
+                {/* Media Sections */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {hive.images && <MediaGallery files={hive.images} type="image" />}
+                  {hive.sounds && <MediaGallery files={hive.sounds} type="audio" />}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -355,62 +463,234 @@ const HiveModal: React.FC<{ hive: Hive | null; onClose: () => void }> = ({ hive,
   );
 };
 
+// ============== ADDED SIDEBAR COMPONENT ==============
+const Sidebar: React.FC<{ isOpen: boolean; onToggle: () => void }> = ({ isOpen, onToggle }) => {
+  const menuItems = [
+    { icon: Home, label: 'Dashboard', active: true },
+    { icon: BarChart3, label: 'Analytics', active: false },
+    { icon: Bell, label: 'Alerts', active: false },
+    { icon: Users, label: 'Apiaries', active: false },
+    { icon: Settings, label: 'Settings', active: false },
+  ];
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          onClick={onToggle}
+        />
+      )}
+      
+      {/* Sidebar - Now hidden by default on all screen sizes */}
+      <div className={`
+        fixed top-0 left-0 h-full bg-white/90 backdrop-blur-lg shadow-2xl border-r border-white/30 z-50 
+        transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        w-64
+      `}>
+        <div className="p-6">
+          {/* Close button inside sidebar */}
+          <div className="flex justify-between items-center mb-8">
+            <div className="w-32 h-16">
+              <img 
+                src="/FRC_logo.png" 
+                alt="FRC Logo" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = '<div class="w-full h-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white font-bold text-lg rounded-lg">FRC</div>';
+                  }
+                }}
+              />
+            </div>
+            <button
+              onClick={onToggle}
+              className="p-2 rounded-lg hover:bg-white/20 transition-colors"
+            >
+              <X size={20} className="text-gray-600" />
+            </button>
+          </div>
+          
+          {/* Navigation */}
+          <nav className="space-y-2">
+            {menuItems.map((item) => (
+              <button
+                key={item.label}
+                className={`
+                  w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200
+                  ${item.active 
+                    ? 'bg-gradient-to-r from-green-500 to-blue-500 text-white shadow-lg' 
+                    : 'text-gray-600 hover:bg-white/50 hover:text-gray-800'
+                  }
+                `}
+              >
+                <item.icon size={20} className="mr-3" />
+                <span className="font-medium">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+    </>
+  );
+};
+
+
+// ============== MODIFIED DASHBOARD COMPONENT ==============
 const HiveMonitoringDashboard: React.FC = () => {
   const [hives, setHives] = useState<Hive[]>([]);
   const [selectedHive, setSelectedHive] = useState<Hive | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleUpdateGPS = (hiveId: number, newGps: { lat: number; lng: number }) => {
+    setHives(prevHives => 
+      prevHives.map(hive => 
+        hive.id === hiveId ? { ...hive, gps: newGps } : hive
+      )
+    );
+  };
   
   useEffect(() => {
     setHives(generateHives());
   }, []);
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8 flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">Hive Monitoring Dashboard</h1>
-            <p className="text-gray-600">Monitor your beehive network in real-time</p>
+    <div className="min-h-screen relative overflow-hidden flex">
+      {/* Sidebar */}
+      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      
+      {/* Main Content */}
+      <div className="w-full">
+        {/* Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-100 via-blue-100 to-teal-200">
+          {/* Animated gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-green-200/30 via-transparent to-blue-200/30 animate-pulse" 
+               style={{ animationDuration: '8s' }} />
+          
+          {/* Geometric patterns - Hexagons for honeycomb */}
+          <div className="absolute inset-0">
+            <FloatingHexagon delay={0} size="w-32 h-32" position="top-10 left-10" />
+            <FloatingHexagon delay={1} size="w-24 h-24" position="top-32 right-20" />
+            <FloatingHexagon delay={2} size="w-40 h-40" position="bottom-20 left-32" />
+            <FloatingHexagon delay={3} size="w-28 h-28" position="bottom-40 right-10" />
+            <FloatingHexagon delay={1.5} size="w-20 h-20" position="top-1/2 left-1/4" />
+            <FloatingHexagon delay={2.5} size="w-36 h-36" position="top-1/3 right-1/3" />
+            <FloatingHexagon delay={0.5} size="w-16 h-16" position="top-3/4 left-1/2" opacity="opacity-5" />
+            <FloatingHexagon delay={3.5} size="w-44 h-44" position="top-1/6 left-2/3" opacity="opacity-5" />
           </div>
-          <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden">
-            <img 
-              src="/FRC_logo.png" 
-              alt="FRC"
-              className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+          
+          {/* Floating bees */}
+          <div className="absolute inset-0">
+            <FloatingBee delay={0} position="top-1/4 left-1/5" />
+            <FloatingBee delay={2} position="top-1/2 right-1/4" />
+            <FloatingBee delay={4} position="bottom-1/3 left-1/2" />
+            <FloatingBee delay={1} position="top-2/3 right-1/5" size="text-xl" />
+            <FloatingBee delay={3} position="bottom-1/4 left-1/3" size="text-lg" />
+          </div>
+          
+          {/* Honeycomb pattern overlay */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute inset-0" 
+                 style={{
+                   backgroundImage: `radial-gradient(circle at 25px 25px, rgba(251, 191, 36, 0.3) 2px, transparent 2px)`,
+                   backgroundSize: '50px 50px'
+                 }} />
+          </div>
+          
+          {/* Floating particles */}
+          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-green-400 rounded-full opacity-60 animate-bounce" 
+               style={{ animationDelay: '0s', animationDuration: '3s' }} />
+          <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-blue-400 rounded-full opacity-60 animate-bounce" 
+               style={{ animationDelay: '1s', animationDuration: '4s' }} />
+          <div className="absolute bottom-1/3 left-1/3 w-3 h-3 bg-teal-400 rounded-full opacity-60 animate-bounce" 
+               style={{ animationDelay: '2s', animationDuration: '5s' }} />
+          <div className="absolute bottom-1/4 right-1/4 w-2 h-2 bg-green-500 rounded-full opacity-60 animate-bounce" 
+               style={{ animationDelay: '1.5s', animationDuration: '3.5s' }} />
+        </div>
+        
+         {/* Content */}
+        <div className="relative z-10">
+          {/* Header with blurry background colors */}
+          <div className="bg-gradient-to-r from-green-100/60 via-blue-100/60 to-teal-200/60 backdrop-blur-xl border-b border-white/30 shadow-lg">
+            <div className="container mx-auto px-4">
+              <div className="flex flex-col md:flex-row justify-between items-center py-6">
+               {/* Hamburger menu button */}
+                <button
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  className="p-3 rounded-lg hover:bg-white/20 transition-all duration-200 mb-4 md:mb-0"
+                >
+                  <Menu size={24} className="text-gray-700" />
+                </button>
+                
+                {/* Title */}
+                <div className="text-center md:text-left mb-4 md:mb-0">
+                  <h1 className="relative text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-800 via-teal-700 to-gray-800 bg-clip-text text-transparent mb-2 -left-80">
+                    HoneyPark - Dibba
+                  </h1>
+                  <p className=" relative text-gray-700 text-lg font-medium -left-80">
+                    Real-time monitoring and management of your beehive network
+                  </p>
+                </div>
+                
+                {/* FRC Logo */}
+                <div className="w-40 h-16 md:w-48 md:h-20">
+                  <img 
+                    src="/FRC_logo.png" 
+                    alt="FRC Logo" 
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const parent = target.parentElement;
+                      if (parent) {
+                        parent.innerHTML = '<div class="w-full h-full bg-gradient-to-br from-teal-500 to-green-600 flex items-center justify-center text-white font-bold text-lg rounded-lg py-2 px-4">FRC</div>';
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Stats */}
+          <div className="container mx-auto px-4 mt-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white/80 backdrop-blur-lg rounded-lg p-6 shadow-xl border border-white/20 hover:bg-white/90 transition-all duration-300">
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">Total Hives</h3>
+                <p className="text-3xl font-bold bg-gradient-to-r from-gray-700 to-gray-800 bg-clip-text text-transparent">{hives.length}</p>
+              </div>
+              <div className="bg-white/80 backdrop-blur-lg rounded-lg p-6 shadow-xl border border-white/20 hover:bg-white/90 transition-all duration-300">
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">Active Hives</h3>
+                <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">{hives.filter(h => h.isActive).length}</p>
+              </div>
+            </div>
+            
+            {/* Hive Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-fr">
+              {hives.map((hive) => (
+                <HiveCard
+                  key={hive.id}
+                  hive={hive}
+                  onClick={() => setSelectedHive(hive)}
+                />
+              ))}
+            </div>
+          </div>
+          
+          {/* Modal */}
+          {selectedHive && (
+            <HiveModal
+              hive={selectedHive}
+              onClose={() => setSelectedHive(null)}
+              onUpdateGPS={handleUpdateGPS}
             />
-          </div>
+          )}
         </div>
-        
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white rounded-lg p-4 shadow">
-            <h3 className="text-sm font-semibold text-gray-600">Total Hives</h3>
-            <p className="text-2xl font-bold text-gray-800">{hives.length}</p>
-          </div>
-          <div className="bg-white rounded-lg p-4 shadow">
-            <h3 className="text-sm font-semibold text-gray-600">Active Hives</h3>
-            <p className="text-2xl font-bold text-green-600">{hives.filter(h => h.isActive).length}</p>
-          </div>
-        </div>
-        
-        {/* Hive Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-fr">
-          {hives.map((hive) => (
-            <HiveCard
-              key={hive.id}
-              hive={hive}
-              onClick={() => setSelectedHive(hive)}
-            />
-          ))}
-        </div>
-        
-        {/* Modal */}
-        {selectedHive && (
-          <HiveModal
-            hive={selectedHive}
-            onClose={() => setSelectedHive(null)}
-          />
-        )}
       </div>
     </div>
   );

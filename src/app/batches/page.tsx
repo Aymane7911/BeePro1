@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Menu, X, Search, ChevronDown, ChevronUp, Printer, PlusCircle, Check, AlertCircle, MapPin, Package, RefreshCw, Filter, Sparkles, Upload, Trash2, AlertTriangle, CheckCircle, Wallet, Plus, Home, Layers, Activity, Users, Settings, HelpCircle, FileText, Globe } from 'lucide-react';
+import { Check, AlertCircle, Loader, XCircle, CheckCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
@@ -50,6 +50,7 @@ interface Apiary {
 interface FormApiary extends Apiary {
   batchId: string;
   batchNumber: string;
+   honeyCertified: number;
 }
 
 interface CertificationStatus {
@@ -58,7 +59,11 @@ interface CertificationStatus {
   bothCertifications: number;
   uncertified: number;
 }
-
+interface Location {
+  latitude: number | string;
+  longitude: number | string;
+  // other properties...
+}
 interface Batch {
   id: string;
   batchNumber: string;
@@ -397,8 +402,7 @@ const getMaxQuantity = () => {
 
   // Add these new state variables at the top of your component
 const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-const [certificationData, setCertificationData] = useState(null);
-const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
+const [certificationData, setCertificationData] = useState<any>(null);const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
 
 // Function to generate QR code data URL
  // Function to generate QR code using the qrcode library
@@ -829,6 +833,7 @@ const [formData, setFormData] = useState({
     latitude: null as number | null,  // Changed from 0 to null
     longitude: null as number | null, // Changed from 0 to null
     kilosCollected: 0,
+    honeyCertified: 0
   }]
 });
 const [mapsLinkInput, setMapsLinkInput] = useState('');
@@ -1104,8 +1109,9 @@ useEffect(() => {
           number: apiary.number,
           hiveCount: apiary.hiveCount,
           kilosCollected: apiary.kilosCollected || 0,
-          latitude: apiary.latitude || 0,    // Ensure it's never null/undefined
-          longitude: apiary.longitude || 0   // Ensure it's never null/undefined
+          latitude: apiary.latitude ?? null,    // Allow null values
+          longitude: apiary.longitude ?? null,  // Allow null values
+          honeyCertified: apiary.honeyCertified ?? 0  // Add this property
         }));
       }
       return [];
@@ -1115,6 +1121,7 @@ useEffect(() => {
       setFormData(prevState => ({
         ...prevState,
         apiaries: allApiaries
+        // Removed honeyCertified from here since it belongs to individual apiaries
       }));
     }
   }
@@ -1213,7 +1220,7 @@ useEffect(() => {
   if (selectedBatches.length > 0 && showCompleteForm) {
     // Collect all apiaries from selected batches
     const selectedBatchObjects = batches.filter(batch => selectedBatches.includes(batch.id));
-    const existingApiaries : FormApiary[] = [];
+    const existingApiaries: FormApiary[] = [];
     
     // Get existing apiaries from the selected batches
     selectedBatchObjects.forEach(batch => {
@@ -1222,7 +1229,10 @@ useEffect(() => {
           existingApiaries.push({
             ...apiary,
             batchId: batch.id,
-            batchNumber: batch.batchNumber
+            batchNumber: batch.batchNumber,
+            latitude: apiary.latitude ?? null,        // Ensure null instead of undefined
+            longitude: apiary.longitude ?? null,      // Ensure null instead of undefined
+            honeyCertified: apiary.honeyCertified ?? 0 // Ensure number instead of undefined
           });
         });
       }
@@ -1230,22 +1240,23 @@ useEffect(() => {
     
     // If no existing apiaries, initialize with empty form
     if (existingApiaries.length === 0) {
-  setFormData({
-    certificationType: '',
-    productionReport: null as File | null,
-    labReport: null as File | null,
-    apiaries: [{
-      batchId: '',
-      batchNumber: '',
-      name: '',
-      number: '',
-      hiveCount: 0,
-      kilosCollected: 0,
-      latitude: null,  // Changed from 0 to null
-      longitude: null  // Changed from 0 to null
-    }]
-  });
-} else {
+      setFormData({
+        certificationType: '',
+        productionReport: null as File | null,
+        labReport: null as File | null,
+        apiaries: [{
+          batchId: '',
+          batchNumber: '',
+          name: '',
+          number: '',
+          hiveCount: 0,
+          kilosCollected: 0,
+          latitude: null,
+          longitude: null,
+          honeyCertified: 0
+        }]
+      });
+    } else {
       // Use existing apiaries
       setFormData({
         certificationType: '',
@@ -1767,12 +1778,21 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
     }
 
     // STEP 5: Send batch updates to server (✅ REMOVED ALL TOKEN STATS - handled separately above)
-    const serverUpdatePromises = selectedBatches.map(async (batchId) => {
-      const batchUpdate = batchUpdates.find(update => update.batchId === batchId);
-      const currentBatch = batches.find(b => b.id === batchId);
-      const batchApiaries = formData.apiaries ? formData.apiaries.filter(apiary =>
-        apiary.batchId === batchId || !apiary.batchId
-      ) : [];
+  const serverUpdatePromises = selectedBatches.map(async (batchId) => {
+  const batchUpdate = batchUpdates
+    .filter(update => update != null) // Remove null/undefined elements
+    .find(update => update.batchId === batchId);
+  
+  if (!batchUpdate) {
+    console.warn(`No batch update found for batchId: ${batchId}`);
+    return;
+  }
+  
+  const currentBatch = batches.find(b => b.id === batchId);
+  const batchApiaries = formData.apiaries ? formData.apiaries.filter(apiary =>
+    apiary.batchId === batchId || !apiary.batchId
+  ) : [];
+  
 
       const batchData = {
         batchId,
@@ -2269,7 +2289,7 @@ async function saveApiaryToDatabase(apiaryData: any) {
     
   } catch (error) {
     console.error('Error refreshing data:', error);
-    setError(error.message);
+    setError((error as Error).message);
   } finally {
     setIsLoading(false);
   }
@@ -2396,7 +2416,7 @@ const confirmDelete = async () => {
 
         setNotification({
           show: true,
-          message: `Error deleting batch: ${error.message}`,
+          message: `Error deleting batch: ${(error as Error).message}`,
           type: 'error'
         });
 
@@ -2421,7 +2441,7 @@ const confirmDelete = async () => {
     console.error('Error in batch deletion process:', error);
     setNotification({
       show: true,
-      message: `Error: ${error.message}`,
+      message: `Error: ${(error as Error).message}`,
       type: 'error'
     });
   } finally {
@@ -2435,7 +2455,7 @@ const [apiaryJars, setApiaryJars] = useState<{[key: number]: CustomJar[]}>({});
 const [newJarForApiary, setNewJarForApiary] = useState<{[key: number]: Omit<CustomJar, 'id'>}>({});
 const [jarCertifications, setJarCertifications] = useState<Record<string, JarCertification>>({});
 
-const getSelectedType = (certificationState) => {
+const getSelectedType = (certificationState: any) => {
   const { origin, quality } = certificationState || {};
   if (origin && quality) return 'both';
   if (origin) return 'origin';
@@ -2628,13 +2648,13 @@ const addApiaryMarkersToMap = (map: any) => {
 
       if (hasNestedLocation || hasDirectCoordinates) {
         // Get coordinates from the appropriate location
-        const lat = hasNestedLocation 
-          ? (typeof apiary.location.latitude === 'string' ? parseFloat(apiary.location.latitude) : apiary.location.latitude)
-          : (typeof apiary.latitude === 'string' ? parseFloat(apiary.latitude) : apiary.latitude);
-        
-        const lng = hasNestedLocation 
-          ? (typeof apiary.location.longitude === 'string' ? parseFloat(apiary.location.longitude) : apiary.location.longitude)
-          : (typeof apiary.longitude === 'string' ? parseFloat(apiary.longitude) : apiary.longitude);
+        const lat = hasNestedLocation && apiary.location
+  ? (typeof apiary.location.latitude === 'string' ? parseFloat(apiary.location.latitude) : apiary.location.latitude)
+  : (typeof apiary.latitude === 'string' ? parseFloat(apiary.latitude) : apiary.latitude);
+
+const lng = hasNestedLocation && apiary.location
+  ? (typeof apiary.location.longitude === 'string' ? parseFloat(apiary.location.longitude) : apiary.location.longitude)
+  : (typeof apiary.longitude === 'string' ? parseFloat(apiary.longitude) : apiary.longitude);
         
         console.log('Creating marker at:', { lat, lng });
 
@@ -2683,18 +2703,17 @@ const addApiaryMarkersToMap = (map: any) => {
 
         // Add event listeners
         marker.addListener('click', () => {
-          console.log('Apiary marker clicked:', apiary.name);
-          // Create a normalized apiary object for the modal
-          const normalizedApiary = {
-            ...apiary,
-            location: hasNestedLocation ? apiary.location : {
-              latitude: lat,
-              longitude: lng
-            },
-            honeyCollected: apiary.kilosCollected || apiary.honeyCollected || 0
-          };
-          setSelectedApiary(normalizedApiary);
-        });
+  console.log('Apiary marker clicked:', apiary.name);
+  
+  // Create a normalized apiary object for the modal
+  const normalizedApiary: Apiary = {
+    ...apiary,
+    location: hasNestedLocation ? apiary.location : null, // Set to null instead of creating inline object
+    honeyCollected: apiary.kilosCollected || apiary.honeyCollected || 0
+  };
+  
+  setSelectedApiary(normalizedApiary);
+});
 
         // Show info window on hover
         marker.addListener('mouseover', () => {
@@ -2938,74 +2957,7 @@ const removeJarFromApiary = (apiaryIndex: number, jarId: number) => {
     </div>
   );
 }
-  // Verification Status Component
-  const VerificationStatus = ({ verification }: { verification: QualityReportVerification }) => {
-    if (verification.isVerifying) {
-      return (
-        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <div className="flex items-center">
-            <Loader className="h-5 w-5 text-blue-600 mr-2 animate-spin" />
-            <span className="text-blue-800 font-medium">Verifying quality report...</span>
-          </div>
-          <p className="text-blue-600 text-sm mt-1">
-            Please wait while we analyze your document for quality standards compliance.
-          </p>
-        </div>
-      );
-    }
-
-    if (verification.isVerified && verification.result) {
-      return (
-        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
-          <div className="flex items-center">
-            <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
-            <span className="text-green-800 font-medium">Quality report verified successfully!</span>
-          </div>
-          <p className="text-green-600 text-sm mt-1">
-            Document type: {verification.result.doc_type || 'Quality Report'}
-          </p>
-          {verification.result.certificate_generated && (
-            <div className="mt-2">
-              <a 
-                href={`${VERIFICATION_API_URL}/download_certificate/${verification.result.certificate_path?.split('/').pop()}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-green-600 hover:text-green-800 underline text-sm"
-              >
-                📥 Download Verification Certificate
-              </a>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (verification.error || (verification.result && verification.result.status !== 'passed')) {
-      return (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-          <div className="flex items-center">
-            <XCircle className="h-5 w-5 text-red-600 mr-2" />
-            <span className="text-red-800 font-medium">Quality report verification failed</span>
-          </div>
-          <p className="text-red-600 text-sm mt-1">
-            {verification.error || verification.result?.error || 'Document does not meet quality standards'}
-          </p>
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => formData.labReport && verifyQualityReport(formData.labReport)}
-              className="text-red-600 hover:text-red-800 underline text-sm"
-            >
-              🔄 Retry Verification
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
+  
   return (
     <div className="flex flex-col space-y-6 p-6 min-h-screen bg-gradient-to-b from-yellow-200 to-white text-black">
       <Sidebar 

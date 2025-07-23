@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { MapPin, Database, Activity, ChevronRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 interface Apiary {
   id: string;
@@ -20,42 +19,28 @@ const apiaries: Apiary[] = [
     location: 'Dibba, UAE',
     totalHives: 13,
     activeHives: 12,
-    imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=400&fit=crop'
+    imageUrl: 'dibba.png'
   },
   {
-    id: 'frc-fujairah',
-    name: 'FRC Fujairah',
-    location: 'Fujairah, UAE',
+    id: 'frc-abudhabi',
+    name: 'FRC Abu Dhabi',
+    location: 'Abu Dhabi, UAE',
     totalHives: 8,
     activeHives: 7,
-    imageUrl: 'https://images.unsplash.com/photo-1590736969955-71cc94901144?w=600&h=400&fit=crop'
+    imageUrl: 'abudhabi.png'
   },
-  {
-    id: 'manahil-fujairah',
-    name: 'Manahil Fujairah',
-    location: 'Manahil, Fujairah, UAE',
-    totalHives: 15,
-    activeHives: 14,
-    imageUrl: 'https://images.unsplash.com/photo-1571981122606-bc18c2cd7e5c?w=600&h=400&fit=crop'
-  }
+  
 ];
 
 const ApiaryCard: React.FC<{ apiary: Apiary; onClick: () => void }> = ({ apiary, onClick }) => {
-  const router = useRouter();
-  
-  const handleClick = () => {
-    // Navigate to the hive page with apiary ID as a query parameter
-    router.push(`/hive?apiary=${apiary.id}`);
-  };
-  
   const activePercentage = (apiary.activeHives / apiary.totalHives) * 100;
   
   return (
     <div 
-      className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:scale-105 overflow-hidden group"
-      onClick={handleClick}
+      className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:scale-105 overflow-hidden group border border-white/20"
+      onClick={onClick}
     >
-      {/* Image Section - Takes up 60% of the card */}
+      {/* Image Section */}
       <div className="relative h-64 overflow-hidden">
         <img 
           src={apiary.imageUrl}
@@ -64,24 +49,24 @@ const ApiaryCard: React.FC<{ apiary: Apiary; onClick: () => void }> = ({ apiary,
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         <div className="absolute top-4 right-4">
-          <div className={`w-4 h-4 rounded-full ${activePercentage > 90 ? 'bg-green-400' : activePercentage > 70 ? 'bg-yellow-400' : 'bg-red-400'} shadow-lg`} />
+          <div className={`w-4 h-4 rounded-full ${activePercentage > 90 ? 'bg-green-400' : activePercentage > 70 ? 'bg-yellow-400' : 'bg-red-400'} shadow-lg animate-pulse`} />
         </div>
       </div>
       
-      {/* Data Section - Takes up 40% of the card */}
+      {/* Data Section */}
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
+          <h3 className="text-xl font-bold text-gray-800 group-hover:text-amber-600 transition-colors">
             {apiary.name}
           </h3>
           <ChevronRight 
             size={20} 
-            className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" 
+            className="text-gray-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" 
           />
         </div>
         
         <div className="flex items-center text-gray-600">
-          <MapPin size={16} className="mr-2 text-blue-500" />
+          <MapPin size={16} className="mr-2 text-amber-500" />
           <span className="text-sm">{apiary.location}</span>
         </div>
         
@@ -124,67 +109,118 @@ const ApiaryCard: React.FC<{ apiary: Apiary; onClick: () => void }> = ({ apiary,
   );
 };
 
+const FloatingHexagon: React.FC<{ delay: number; size: string; position: string }> = ({ delay, size, position }) => (
+  <div 
+    className={`absolute ${position} ${size} opacity-10 animate-pulse`}
+    style={{ animationDelay: `${delay}s`, animationDuration: '4s' }}
+  >
+    <svg viewBox="0 0 100 100" className="w-full h-full fill-amber-400">
+      <polygon points="50,5 85,25 85,75 50,95 15,75 15,25" />
+    </svg>
+  </div>
+);
+
 const ApiaryDashboard: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="flex justify-center items-center mb-6">
-            <div className="w-16 h-16 bg-amber-500 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-2xl">🐝</span>
-            </div>
-          </div>
-          <h1 className="text-5xl font-bold text-gray-800 mb-4">
-            Apiary Management System
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Monitor and manage your beehive operations across multiple locations in the UAE
-          </p>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Stunning Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-100 via-orange-100 to-yellow-200">
+        {/* Animated gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-amber-200/30 via-transparent to-orange-200/30 animate-pulse" 
+             style={{ animationDuration: '8s' }} />
+        
+        {/* Geometric patterns */}
+        <div className="absolute inset-0">
+          {/* Large hexagonal pattern */}
+          <FloatingHexagon delay={0} size="w-32 h-32" position="top-10 left-10" />
+          <FloatingHexagon delay={1} size="w-24 h-24" position="top-32 right-20" />
+          <FloatingHexagon delay={2} size="w-40 h-40" position="bottom-20 left-32" />
+          <FloatingHexagon delay={3} size="w-28 h-28" position="bottom-40 right-10" />
+          <FloatingHexagon delay={1.5} size="w-20 h-20" position="top-1/2 left-1/4" />
+          <FloatingHexagon delay={2.5} size="w-36 h-36" position="top-1/3 right-1/3" />
         </div>
         
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-white rounded-xl p-6 shadow-lg text-center">
-            <div className="text-3xl font-bold text-blue-600">
-              {apiaries.length}
-            </div>
-            <div className="text-gray-600">Total Apiaries</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-lg text-center">
-            <div className="text-3xl font-bold text-purple-600">
-              {apiaries.reduce((sum, apiary) => sum + apiary.totalHives, 0)}
-            </div>
-            <div className="text-gray-600">Total Hives</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-lg text-center">
-            <div className="text-3xl font-bold text-green-600">
-              {apiaries.reduce((sum, apiary) => sum + apiary.activeHives, 0)}
-            </div>
-            <div className="text-gray-600">Active Hives</div>
-          </div>
+        {/* Subtle dot pattern */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0" 
+               style={{
+                 backgroundImage: `radial-gradient(circle at 25px 25px, rgba(251, 191, 36, 0.3) 2px, transparent 2px)`,
+                 backgroundSize: '50px 50px'
+               }} />
         </div>
         
-        {/* Apiary Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {apiaries.map((apiary) => (
-            <ApiaryCard
-              key={apiary.id}
-              apiary={apiary}
-              onClick={() => {}} // No longer needed, handled in ApiaryCard
-            />
-          ))}
-        </div>
-        
-        {/* Footer */}
-        <div className="mt-16 text-center text-gray-500">
-          <p>© 2025 UAE Beekeeping Initiative. All rights reserved.</p>
+        {/* Floating particles */}
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-amber-400 rounded-full opacity-60 animate-bounce" 
+             style={{ animationDelay: '0s', animationDuration: '3s' }} />
+        <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-orange-400 rounded-full opacity-60 animate-bounce" 
+             style={{ animationDelay: '1s', animationDuration: '4s' }} />
+        <div className="absolute bottom-1/3 left-1/3 w-3 h-3 bg-yellow-400 rounded-full opacity-60 animate-bounce" 
+             style={{ animationDelay: '2s', animationDuration: '5s' }} />
+        <div className="absolute bottom-1/4 right-1/4 w-2 h-2 bg-amber-500 rounded-full opacity-60 animate-bounce" 
+             style={{ animationDelay: '1.5s', animationDuration: '3.5s' }} />
+      </div>
+      
+      {/* Content */}
+      <div className="relative z-10 p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <div className="flex justify-center items-center mb-6">
+              <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-2xl transform hover:scale-110 transition-transform duration-300 border-4 border-white/30">
+                <span className="text-3xl animate-pulse">🐝</span>
+              </div>
+            </div>
+            <h1 className="text-6xl font-bold bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-600 bg-clip-text text-transparent mb-4 drop-shadow-lg">
+              Apiary Management System
+            </h1>
+            <p className="text-xl text-gray-700 max-w-2xl mx-auto font-medium">
+              Monitor and manage your beehive operations across multiple locations in the UAE
+            </p>
+          </div>
+          
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-6 shadow-xl text-center border border-white/20 hover:bg-white/90 transition-all duration-300">
+              <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
+                {apiaries.length}
+              </div>
+              <div className="text-gray-600 font-medium">Total Apiaries</div>
+            </div>
+            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-6 shadow-xl text-center border border-white/20 hover:bg-white/90 transition-all duration-300">
+              <div className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">
+                {apiaries.reduce((sum, apiary) => sum + apiary.totalHives, 0)}
+              </div>
+              <div className="text-gray-600 font-medium">Total Hives</div>
+            </div>
+            <div className="bg-white/80 backdrop-blur-lg rounded-xl p-6 shadow-xl text-center border border-white/20 hover:bg-white/90 transition-all duration-300">
+              <div className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-700 bg-clip-text text-transparent">
+                {apiaries.reduce((sum, apiary) => sum + apiary.activeHives, 0)}
+              </div>
+              <div className="text-gray-600 font-medium">Active Hives</div>
+            </div>
+          </div>
+          
+          {/* Apiary Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {apiaries.map((apiary) => (
+              <ApiaryCard
+                key={apiary.id}
+                apiary={apiary}
+                onClick={() => console.log(`Navigate to ${apiary.id}`)}
+              />
+            ))}
+          </div>
+          
+          {/* Footer */}
+          <div className="mt-16 text-center">
+            <p className="text-gray-600 font-medium bg-white/60 backdrop-blur-sm rounded-full px-6 py-2 inline-block border border-white/30">
+              © 2025 UAE Beekeeping Initiative. All rights reserved.
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 };
-
-
 
 export default ApiaryDashboard;

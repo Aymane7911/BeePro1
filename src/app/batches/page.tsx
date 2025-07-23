@@ -45,6 +45,7 @@ interface Apiary {
   honeyCollected: number;
   kilosCollected: number;
   location?: Location | null;
+  honeyCertified?: number;
 }
 interface FormApiary extends Apiary {
   batchId: string;
@@ -1643,10 +1644,14 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
     // STEP 1: Pre-calculate all batch updates for immediate UI refresh
     const batchUpdates = selectedBatches.map(batchId => {
       const currentBatch = batches.find(b => b.id === batchId);
+      if (!currentBatch) {
+  // Handle the case where batch is not found
+  return null; // or some loading/error component
+}
       const currentAvailableHoney = getRemainingHoneyForBatch(currentBatch);
       
       // PRESERVE ORIGINAL VALUES - Don't overwrite totalKg, totalHoneyCollected, or weightKg
-      const originalHoneyCollected = currentBatch.originalHoneyCollected || 
+      const originalHoneyCollected = currentBatch.totalHoneyCollected || 
                                    currentBatch.totalHoneyCollected || 
                                    currentBatch.totalKg ||
                                    currentBatch.weightKg ||
@@ -1655,7 +1660,7 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
       const batchCertifiedAmount = totalCertifiedAmount;
       const newHoneyRemaining = Math.max(0, currentAvailableHoney - batchCertifiedAmount);
       
-      const previouslyCertified = currentBatch.totalHoneyCertified || currentBatch.honeyCertified || 0;
+      const previouslyCertified = currentBatch.honeyCertified || currentBatch.honeyCertified || 0;
       const totalCumulativeCertified = previouslyCertified + batchCertifiedAmount;
 
       return {
@@ -1668,7 +1673,7 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
           weightKg: originalHoneyCollected,
           // CERTIFICATION TRACKING
           jarsProduced: (currentBatch.jarsProduced || 0) + tokensUsed,
-          jarsUsed: (currentBatch.jarsUsed || 0) + tokensUsed,
+          jarsUsed: (currentBatch.jarUsed || 0) + tokensUsed,
           jarCertifications: {
             ...currentBatch.jarCertifications,
             ...jarCertifications
@@ -1695,7 +1700,7 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
             return {
               ...apiary,
               // Keep original collected amount separate
-              originalKilosCollected: apiary.originalKilosCollected || apiary.kilosCollected,
+              originalKilosCollected: apiary.kilosCollected,
               kilosCollected: newApiaryRemaining,
               honeyCertified: (apiary.honeyCertified || 0) + apiaryCertifiedAmount
             };
@@ -1709,17 +1714,16 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
     localStorage.setItem('tokenBalance', newTokenBalance.toString());
 
     // STEP 3: Update batches state immediately (optimistic update)
-    const updatedBatches = batches.map(batch => {
-      const batchUpdate = batchUpdates.find(update => update.batchId === batch.id);
-      if (batchUpdate) {
-        return {
-          ...batch,
-          ...batchUpdate.updates
-        };
-      }
-      return batch;
-    });
-
+  const updatedBatches = batches.map(batch => {
+  const batchUpdate = batchUpdates.find(update => update?.batchId === batch.id);
+  if (batchUpdate && batchUpdate.updates) {
+    return {
+      ...batch,
+      ...batchUpdate.updates
+    };
+  }
+  return batch;
+});
     // IMMEDIATELY update the batches state for instant UI refresh
     setBatches(updatedBatches);
 
@@ -1766,7 +1770,6 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
     const serverUpdatePromises = selectedBatches.map(async (batchId) => {
       const batchUpdate = batchUpdates.find(update => update.batchId === batchId);
       const currentBatch = batches.find(b => b.id === batchId);
-      
       const batchApiaries = formData.apiaries ? formData.apiaries.filter(apiary =>
         apiary.batchId === batchId || !apiary.batchId
       ) : [];
@@ -1775,7 +1778,7 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
         batchId,
         // ✅ COMPLETELY REMOVED: originOnlyTokens, qualityOnlyTokens, bothTokens
         // ✅ COMPLETELY REMOVED: tokensUsed from batch data
-        updatedFields: batchUpdate.updates,
+        updatedFields: batchUpdate?.updates || {},
         apiaries: batchApiaries.map(apiary => {
           const storedValue = apiaryHoneyValues ? apiaryHoneyValues[`${batchId}-${apiary.number}`] : undefined;
           const currentApiaryHoney = storedValue !== undefined ? storedValue : apiary.kilosCollected;
@@ -1786,12 +1789,13 @@ const totalQualityToAdd = qualityOnlyTokens + bothCertificationsTokens;
           const newApiaryRemaining = Math.max(0, currentApiaryHoney - apiaryCertifiedAmount);
 
           return {
+            ...apiary,
             name: apiary.name,
             number: apiary.number,
             hiveCount: apiary.hiveCount,
             latitude: apiary.latitude !== 0 ? apiary.latitude : null,
             longitude: apiary.longitude !== 0 ? apiary.longitude : null,
-            originalKilosCollected: apiary.originalKilosCollected || apiary.kilosCollected,
+            originalKilosCollected:  apiary.kilosCollected,
             kilosCollected: newApiaryRemaining,
             honeyCertified: (apiary.honeyCertified || 0) + apiaryCertifiedAmount
           };
@@ -2326,7 +2330,15 @@ async function saveApiaryToDatabase(apiaryData: any) {
 
   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
   const [newBatchNumber, setNewBatchNumber] = useState('');
-  const [notification, setNotification] = useState({ show: false, message: '' });
+  const [notification, setNotification] = useState<{
+  show: boolean;
+  message: string;
+  type?: 'error' | 'success' | 'info';
+}>({
+  show: false,
+  message: '',
+  // `type` is optional so you can omit it here
+});
   // Add these to your state declarations
 const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 const [isDeleting, setIsDeleting] = useState(false);

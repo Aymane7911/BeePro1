@@ -386,7 +386,7 @@ const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
 
 // Function to generate QR code data URL
  // Function to generate QR code using the qrcode library
- const generateQRCode = async (data) => {
+ const generateQRCode = async (data: any) => {
   try {
     // Create URL parameters from certification data
     const urlParams = new URLSearchParams({

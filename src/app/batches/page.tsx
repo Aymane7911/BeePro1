@@ -317,7 +317,7 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
         isVerifying: false,
         isVerified: false,
         result: undefined,
-        error: error instanceof Error ? error.message : 'Failed to verify quality report'
+        error: (error instanceof Error ? error.message : 'Failed to verify quality report') as any
       });
     }
   };

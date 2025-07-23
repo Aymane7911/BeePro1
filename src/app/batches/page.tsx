@@ -264,7 +264,7 @@ const addNewJarSize = () => {
 };
 
 const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
- const [qualityVerification, setQualityVerification] = useState<QualityReportVerification>({
+ const [qualityVerification, setQualityVerification] = useState({
     isVerifying: false,
     isVerified: false,
     result: undefined,

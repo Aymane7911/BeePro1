@@ -1,4 +1,4 @@
-// /lib/auth.ts - Updated with databaseId support
+// /lib/auth.ts - Updated with databaseId support and fixed TypeScript errors
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import LinkedInProvider from "next-auth/providers/linkedin";
@@ -7,6 +7,34 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
+
+// Extend NextAuth types
+declare module "next-auth" {
+  interface User {
+    id: string;
+    firstName: string;
+    lastName: string;
+    companyId: string;
+    role: string;
+    databaseId: string;
+  }
+
+  interface Session {
+    user: {
+      id: string;
+      email: string;
+      name?: string | null;
+      image?: string | null;
+      firstName: string;
+      lastName: string;
+      companyId: string;
+      role: string;
+      databaseId: string;
+    };
+  }
+}
+
+
 
 const prisma = new PrismaClient();
 
@@ -24,6 +52,9 @@ export const authOptions: NextAuthOptions = {
           image: profile.picture,
           firstName: profile.given_name || "",
           lastName: profile.family_name || "",
+          companyId: "", // Changed from null to empty string
+          role: "USER", // Keep as string
+          databaseId: "" // Changed from null to empty string
         };
       },
     }),
@@ -38,6 +69,9 @@ export const authOptions: NextAuthOptions = {
           image: profile.profilePicture?.["displayImage~"]?.elements?.[0]?.identifiers?.[0]?.identifier,
           firstName: profile.localizedFirstName || "",
           lastName: profile.localizedLastName || "",
+          companyId: "", // Added missing property
+          role: "USER", // Added missing property
+          databaseId: "" // Added missing property
         };
       },
     }),
@@ -111,28 +145,30 @@ export const authOptions: NextAuthOptions = {
           token.email = dbUser.email;
           token.firstName = dbUser.firstname;
           token.lastName = dbUser.lastname;
-          token.databaseId = dbUser.databaseId; // Add databaseId to token
-          
+          token.databaseId = dbUser.databaseId;
+          token.companyId = ""; // Set default value
+          token.role = "USER"; // Set default value
         }
       }
       return token;
     },
     
     async session({ session, token }) {
-  if (token.userId) {
-    session.user = {
-      id: token.userId.toString(), // Convert number to string for NextAuth compatibility
-      email: token.email as string,
-      name: session.user.name, // Preserve existing name if needed
-      image: session.user.image, // Preserve existing image if needed
-      firstName: token.firstName as string,
-      lastName: token.lastName as string,
-      databaseId: token.databaseId as string, // This is already a string (UUID)
-      role: token.role as string,
-    };
-  }
-  return session;
-},
+      if (token.userId) {
+        session.user = {
+          id: token.userId.toString(),
+          email: token.email as string,
+          name: session.user?.name || null,
+          image: session.user?.image || null,
+          firstName: token.firstName as string,
+          lastName: token.lastName as string,
+          companyId: token.companyId as string,
+          role: token.role as string,
+          databaseId: token.databaseId as string,
+        };
+      }
+      return session;
+    },
   },
   session: {
     strategy: "jwt",

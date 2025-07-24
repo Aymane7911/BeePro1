@@ -64,19 +64,17 @@ const TokenStatistics: React.FC<TokenStatisticsProps> = ({ tokenStats: propToken
   };
 
   const getAuthHeaders = () => {
-    // Try to get token from state first, then localStorage as fallback
-    const token = authToken || localStorage.getItem('authToken');
-    if (token) {
-      return {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      };
-    }
-    
-    return {
-      'Content-Type': 'application/json',
-    };
+  const token = authToken || localStorage.getItem('authToken');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
   };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
 
   // Fetch token stats from API
   const fetchTokenStats = async () => {

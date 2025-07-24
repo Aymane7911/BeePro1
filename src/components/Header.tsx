@@ -128,7 +128,7 @@ const Header = ({
       setTokenStats(data);
     } catch (error) {
       console.error('Error fetching token stats:', error);
-      setTokenError(error.message);
+      setTokenError((error as Error).message);
       // Fallback to default values if fetch fails
       setTokenStats({
         userId: 0,

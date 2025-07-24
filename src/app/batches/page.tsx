@@ -2469,11 +2469,11 @@ const [newJarForApiary, setNewJarForApiary] = useState<{[key: number]: Omit<Cust
 const [jarCertifications, setJarCertifications] = useState<Record<string, JarCertification>>({});
 
 const getSelectedType = (certificationState: any) => {
-  const { origin, quality } = certificationState || {};
+  const { origin, quality } = certificationState ?? {};
   if (origin && quality) return 'both';
   if (origin) return 'origin';
   if (quality) return 'quality';
-  return null;
+  return undefined;
 };
 
 // Add these helper functions

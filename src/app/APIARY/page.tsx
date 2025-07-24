@@ -164,19 +164,23 @@ const ApiaryDashboard: React.FC = () => {
       <div className="relative z-10 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-12">
-            <div className="flex justify-center items-center mb-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-2xl transform hover:scale-110 transition-transform duration-300 border-4 border-white/30">
-                <span className="text-3xl animate-pulse">🐝</span>
-              </div>
-            </div>
-            <h1 className="text-6xl font-bold bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-600 bg-clip-text text-transparent mb-4 drop-shadow-lg">
-              Apiary Management System
-            </h1>
-            <p className="text-xl text-gray-700 max-w-2xl mx-auto font-medium">
-              Monitor and manage your beehive operations across multiple locations in the UAE
-            </p>
-          </div>
+<div className="text-center mb-12">
+  <div className="flex justify-center items-center mb-6">
+<div className="w-80 h-20 flex items-center justify-center  transform hover:scale-110 transition-transform duration-300 overflow-hidden">
+      <img
+        src="/FRC_logo.png"
+        alt="FRC Logo"
+        className="w-full h-full object-cover"
+      />
+    </div>
+  </div>
+  <h1 className="text-6xl font-bold bg-gradient-to-r from-amber-700 via-orange-600 to-yellow-600 bg-clip-text text-transparent mb-4 drop-shadow-lg">
+    BeeNet
+  </h1>
+  <p className="text-xl text-gray-700 max-w-2xl mx-auto font-medium">
+Connecting and visualizing your beehives, anytime, anywhere  </p>
+</div>
+
           
           {/* Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">

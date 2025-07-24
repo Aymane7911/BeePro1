@@ -32,7 +32,7 @@ interface TokenStats {
 }
 
 interface SelectedApiary extends Apiary {
-  kilosCollected: number; // Override to ensure this is always present
+  kilosCollected?: number; // Override to ensure this is always present
 }
 
 interface User {
@@ -60,14 +60,18 @@ interface ApiaryFormData {
   honeyCollected: number;
   location: ApiaryLocation | null;
 }
+  
 
+
+// Parent Component
 interface Apiary {
   id: string;
   name: string;
-  number: string;
+  number: number;
   hiveCount: number;
-  honeyCollected: number,
-  location: ApiaryLocation;
+  honeyCollected?: number;  // Make optional to match child
+  kilosCollected?: number;  // Add missing property
+  location?: ApiaryLocation;
   createdAt?: string;
 }
 
@@ -105,12 +109,13 @@ interface BatchData {
 interface ProcessedBatch {
   id: string;
   name: string;
+  batchNumber?: string; // Add this
   status: string;
   completedChecks: number;
   totalChecks: number;
-  certificationDate: string | null;
-  expiryDate: string | null;
-  totalKg: number; // This should come from batch, not calculated from apiaries
+  certificationDate: string | undefined; // Change to optional: certificationDate?: string;
+  expiryDate: string | undefined; // Change to optional: expiryDate?: string;
+  totalKg: number; // This maps to weightKg in Batch
   jarsUsed: number;
   originOnly: number;
   qualityOnly: number;
@@ -122,29 +127,55 @@ interface ProcessedBatch {
   qualityOnlyPercent: number;
   bothCertificationsPercent: number;
   uncertifiedPercent: number;
+  
+  // Add missing properties from Batch interface
+  weightKg: number;
+  totalHoneyCollected: number;
+  honeyCertified: number;
+  honeyRemaining: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface AppData {
   containers: any[];
   labels: any[];
   batches: BatchData[];
+  jars: Jar[];
   tokenStats: TokenStats;
   certifiedHoneyWeight: CertifiedHoneyWeight;
 }
 
-
-
-// Mock data - in a real implementation, this would come from your backend microservices
+interface IncomingBatchData {
+  batchId?: string;
+  batchName?: string;
+  category?: string;
+  weight?: number;
+  status?: string;
+  completedChecks?: number;
+  totalChecks?: number;
+  certificationDate?: string | null;
+  expiryDate?: string | null;
+  jarsUsed?: number;
+  originOnly?: number;
+  qualityOnly?: number;
+  bothCertifications?: number;
+  uncertified?: number;
+  containerType?: string;
+  labelType?: string;
+}
 const initialData: AppData = {
   containers: [],
   labels: [],
   batches: [],
+  jars: [],
   tokenStats: {
     originOnly: 0,
     qualityOnly: 0,
     bothCertifications: 0,
     remainingTokens: 0,
-    totalTokens: 0
+    totalTokens: 0,
+    usedTokens: 0
   },
   certifiedHoneyWeight: {
     originOnly: 0,
@@ -153,15 +184,19 @@ const initialData: AppData = {
   }
 };
 
+// Mock data - in a real implementation, this would come from your backend microservices
+
+
 interface Apiary {
-  batchId: string,
-  batchNumber: string,
+  id: string;
   name: string;
-  number: string;
+  number: number;
   hiveCount: number;
-  latitude: number;
-  longitude: number;
-  honeyCollected: number;
+  
+  kilosCollected?: number; // Add this if it's a possible property
+  location?: ApiaryLocation;
+  honeyCollected?: number;
+  createdAt?: string;
 }
 interface FormApiary extends Apiary {
   batchId: string;
@@ -173,6 +208,14 @@ interface CertificationStatus {
   qualityOnly: number;
   bothCertifications: number;
   uncertified: number;
+}
+
+interface Jar {
+  id?: string;
+  jarType?: string;
+  labelType?: string;
+  count: number;
+  // Add other jar properties as needed
 }
 
 interface Batch {
@@ -299,7 +342,7 @@ const [user, setUser] = useState<User | null>(null);
   const [batchName, setBatchName] = useState(''); // Added batch name field
 
   // Add this function in your parent component
-const handleUpdateApiaryHiveCount = async (apiaryId: string | number, newHiveCount: number) => {
+const handleUpdateApiaryHiveCount = async (apiaryId: string, newHiveCount: number) => {
   try {
     const token = localStorage.getItem('authToken') || localStorage.getItem('token');
     
@@ -325,7 +368,7 @@ const handleUpdateApiaryHiveCount = async (apiaryId: string | number, newHiveCou
   {/* Add this function to extract coordinates from Google Maps links */}
 
 {/* Add this function to handle manual coordinate input */}
-const parseManualCoordinates = (input) => {
+const parseManualCoordinates = (input: any) => {
   try {
     // Clean the input and try different formats
     const cleanInput = input.trim().replace(/[^\d.,-]/g, '');
@@ -359,7 +402,7 @@ const parseManualCoordinates = (input) => {
 };
 
 {/* Add this function to extract coordinates from Google Maps links */}
-const extractCoordinatesFromMapsLink = async (url) => {
+const extractCoordinatesFromMapsLink = async (url: any) => {
   try {
     // First check if the input looks like manual coordinates
     const manualCoords = parseManualCoordinates(url);
@@ -508,24 +551,7 @@ const handleMapsLinkSubmit = async () => {
 }
 
 // Function to make authenticated API requests
-async function makeAuthenticatedRequest(url, options = {}) {
-  const token = getAuthToken();
-  
-  if (!token) {
-    throw new Error('No authentication token found. Please log in.');
-  }
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    ...options.headers,
-  };
-
-  return fetch(url, {
-    ...options,
-    headers,
-  });
-}
 
  async function saveApiaryToDatabase(apiaryData: any) {
   console.log('=== SAVING APIARY - SINGLE SAVE ===');
@@ -781,141 +807,7 @@ const refreshApiariesFromDatabase = async () => {
 useEffect(() => {
   refreshApiariesFromDatabase();
 }, []);
-  const createApiary = async () => {
-  if (!apiaryFormData.name || !apiaryFormData.number || !apiaryFormData.location) {
-    setNotification({
-      show: true,
-      message: 'Please fill in all required fields and set a location',
-    });
-    setTimeout(() => setNotification({ show: false, message: '' }), 3000);
-    return;
-  }
-
-  // Check if apiary number already exists (with safe array check)
-  if (Array.isArray(availableApiaries) && availableApiaries.some(apiary => apiary.number === apiaryFormData.number)) {
-    setNotification({
-      show: true,
-      message: 'An apiary with this number already exists',
-    });
-    setTimeout(() => setNotification({ show: false, message: '' }), 3000);
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const token = localStorage.getItem("token") || localStorage.getItem('authToken') || localStorage.getItem('auth-token');
-    if (!token) {
-      throw new Error("No token found. Please log in again.");
-    }
-   
-    // Create clean data to avoid circular references
-    const newApiaryData = {
-      name: String(apiaryFormData.name).trim(),
-      number: String(apiaryFormData.number).trim(),
-      hiveCount: Number(apiaryFormData.hiveCount) || 0,
-      location: {
-        latitude: Number(apiaryFormData.location.latitude),
-        longitude: Number(apiaryFormData.location.longitude),
-        // Include location ID if it exists (for existing locations)
-        ...(apiaryFormData.location.id && { locationId: apiaryFormData.location.id })
-      },
-      kilosCollected: Number(apiaryFormData.honeyCollected) || 0
-    };
-
-    console.log('Sending clean apiary data to API:', newApiaryData);
-
-    const response = await fetch('/api/apiaries', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      credentials: 'include',
-      body: JSON.stringify(newApiaryData),
-    });
-
-    console.log('Response status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error Response:', errorText);
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { message: errorText || 'Failed to create apiary' };
-      }
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    console.log('Apiary created successfully:', result);
-
-    // Add the new apiary to available apiaries list with clean data
-    const newApiary = result.apiary || result;
-    const cleanApiary = {
-      id: newApiary.id,
-      name: newApiary.name,
-      number: newApiary.number,
-      hiveCount: Number(newApiary.hiveCount) || 0,
-      honeyCollected: newApiary.honeyCollected,
-      location: {
-        id: newApiary.location?.id,
-        name: newApiary.location?.name,
-        latitude: Number(newApiary.location?.latitude),
-        longitude: Number(newApiary.location?.longitude)
-      }
-    };
-
-    if (Array.isArray(availableApiaries)) {
-      setAvailableApiaries(prev => [cleanApiary, ...prev]);
-    } else {
-      setAvailableApiaries([cleanApiary]);
-    }
-
-    // Store the success message before resetting form
-    const successMessage = `Apiary "${apiaryFormData.name}" created successfully!`;
-
-    // Reset form with clean initial state
-    setApiaryFormData({
-      name: '',
-      number: '',
-      hiveCount: 0,
-      honeyCollected: 0,
-      location: null
-    });
-
-    // Close modal
-    setShowApiaryModal(false);
-
-    setNotification({
-      show: true,
-      message: successMessage,
-    });
-
-    setTimeout(() => {
-      setNotification({ show: false, message: '' });
-    }, 3000);
-
-    // Refresh the apiaries list
-    await refreshApiariesFromDatabase();
-
-  } catch (error) {
-    console.error('Error creating apiary:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    setNotification({
-      show: true,
-      message: `Error: ${errorMessage}`,
-    });
-
-    setTimeout(() => {
-      setNotification({ show: false, message: '' });
-    }, 5000);
-  } finally {
-    setLoading(false);
-  }
-};
+  
  // Fetch batches data
   useEffect(() => {
     const fetchBatches = async () => {
@@ -1001,35 +893,7 @@ const handleLogout = async () => {
   }
 };
 
-// Add this component for displaying saved locations in the apiary modal
-const SavedLocationsSelector = () => (
-  savedApiaryLocations.length > 0 && (
-    <div className="mt-4">
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        Or select from saved locations:
-      </label>
-      <div className="max-h-32 overflow-y-auto space-y-1">
-        {savedApiaryLocations.map((location) => (
-          <button
-            key={location.id}
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleSelectExistingLocation(location);
-            }}
-            className="w-full text-left px-3 py-2 text-sm bg-gray-50 hover:bg-gray-100 rounded border"
-          >
-            <div className="font-medium">{location.name}</div>
-            <div className="text-xs text-gray-500">
-              {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-);
+
 
 // Also add this helper function to clean location data
 const cleanLocationData = (location: any) => {
@@ -1051,17 +915,57 @@ const cleanLocationData = (location: any) => {
   
 
 // 3. Function to fetch saved apiary locations
-const fetchSavedApiaryLocations = async () => {
+// Define interfaces for type safety
+interface LocationTemplate {
+  id: string | number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
+}
+
+interface Apiary {
+  kilosCollected?: any;
+  location: any;
+  id: string;
+  name: string;
+  number: number;
+  latitude?: number;
+  longitude?: number;
+  createdAt?: string;
+  hiveCount: number;
+}
+
+
+
+
+interface ProcessedLocation {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
+  isTemplate: boolean;
+  originalApiaryId?: string | number;
+}
+
+interface ApiariesResponse {
+  apiaries?: Apiary[];
+  data?: Apiary[];
+}
+
+const fetchSavedApiaryLocations = async (): Promise<void> => {
   try {
     // Get auth token
-    let token = null;
+    let token: string | null = null;
     if (typeof window !== 'undefined') {
       token = localStorage.getItem('auth-token') ||
                localStorage.getItem('token') ||
                sessionStorage.getItem('auth-token');
     }
 
-    const headers = {
+    // Define headers with proper typing
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
@@ -1077,19 +981,21 @@ const fetchSavedApiaryLocations = async () => {
       credentials: 'include',
     });
 
-    let locations = [];
+    let locations: ApiaryLocation[] = [];
 
     if (locationsResponse.ok) {
-      const locationTemplates = await locationsResponse.json();
+      const locationTemplates: LocationTemplate[] = await locationsResponse.json();
       console.log('Fetched location templates:', locationTemplates);
       
-      locations = locationTemplates.map(loc => ({
-        id: loc.id,
+      locations = locationTemplates.map((loc: LocationTemplate) => ({
+        id: Number(loc.id),
         name: loc.name,
+        lat: loc.latitude,
+        lng: loc.longitude,
         latitude: loc.latitude,
         longitude: loc.longitude,
         createdAt: loc.createdAt,
-        isTemplate: true // Mark as template
+        isTemplate: true // Mark as template (note: this property might need to be added to your ApiaryLocation type)
       }));
     }
 
@@ -1100,10 +1006,10 @@ const fetchSavedApiaryLocations = async () => {
     });
 
     if (apiariesResponse.ok) {
-      const apiariesData = await apiariesResponse.json();
+      const apiariesData: Apiary[] | ApiariesResponse = await apiariesResponse.json();
       console.log('Fetched apiaries for location extraction:', apiariesData);
       
-      let apiaries = [];
+      let apiaries: Apiary[] = [];
       if (Array.isArray(apiariesData)) {
         apiaries = apiariesData;
       } else if (apiariesData.apiaries && Array.isArray(apiariesData.apiaries)) {
@@ -1113,31 +1019,33 @@ const fetchSavedApiaryLocations = async () => {
       }
 
       // Extract unique locations from apiaries
-      const apiaryLocations = apiaries
-        .filter(apiary => apiary.latitude && apiary.longitude)
-        .map(apiary => ({
-          id: `apiary_${apiary.id}`, // Prefix to avoid ID conflicts
+      const apiaryLocations: ApiaryLocation[] = apiaries
+        .filter((apiary: Apiary) => apiary.latitude && apiary.longitude)
+        .map((apiary: Apiary) => ({
+          id: Number(apiary.id),
           name: `${apiary.name} (${apiary.number})`,
-          latitude: apiary.latitude,
-          longitude: apiary.longitude,
+          lat: apiary.latitude!,
+          lng: apiary.longitude!,
+          latitude: apiary.latitude!,
+          longitude: apiary.longitude!,
           createdAt: apiary.createdAt,
-          isTemplate: false, // Mark as from apiary
-          originalApiaryId: apiary.id
+          isTemplate: false, // Mark as from apiary (note: this property might need to be added to your ApiaryLocation type)
+          originalApiaryId: apiary.id // Note: this property might need to be added to your ApiaryLocation type
         }));
 
       // Remove duplicates based on coordinates (within 0.001 degree tolerance)
-      const uniqueApiaryLocations = apiaryLocations.filter((loc, index, arr) => {
-        return !arr.slice(0, index).some(existingLoc => 
-          Math.abs(existingLoc.latitude - loc.latitude) < 0.001 &&
-          Math.abs(existingLoc.longitude - loc.longitude) < 0.001
+      const uniqueApiaryLocations = apiaryLocations.filter((loc: ApiaryLocation, index: number, arr: ApiaryLocation[]) => {
+        return !arr.slice(0, index).some((existingLoc: ApiaryLocation) => 
+          Math.abs(existingLoc.lat - loc.lat) < 0.001 &&
+          Math.abs(existingLoc.lng - loc.lng) < 0.001
         );
       });
 
       // Also remove apiaries that are too close to existing templates
-      const uniqueNewLocations = uniqueApiaryLocations.filter(apiaryLoc => {
-        return !locations.some(templateLoc => 
-          Math.abs(templateLoc.latitude - apiaryLoc.latitude) < 0.001 &&
-          Math.abs(templateLoc.longitude - apiaryLoc.longitude) < 0.001
+      const uniqueNewLocations = uniqueApiaryLocations.filter((apiaryLoc: ApiaryLocation) => {
+        return !locations.some((templateLoc: ApiaryLocation) => 
+          Math.abs(templateLoc.lat - apiaryLoc.lat) < 0.001 &&
+          Math.abs(templateLoc.lng - apiaryLoc.lng) < 0.001
         );
       });
 
@@ -1151,7 +1059,6 @@ const fetchSavedApiaryLocations = async () => {
     console.error('Error fetching apiary locations:', error);
   }
 };
-
 // 4. Call fetchSavedApiaryLocations on component mount
 useEffect(() => {
   fetchSavedApiaryLocations();
@@ -1185,25 +1092,27 @@ const [tokenBalance, setTokenBalance] = useState(0); // Start with 0
     setLoading(true);
     try {
       // Initialize with default values to prevent null reference errors
-      const defaultData = {
-        containers: [],
-        labels: [],
-        batches: [],
-        tokenStats: {
-          originOnly: 0,
-          qualityOnly: 0,
-          bothCertifications: 0,
-          remainingTokens: 0,
-          totalTokens: 0
-        },
-        certifiedHoneyWeight: {
-          originOnly: 0,
-          qualityOnly: 0,
-          bothCertifications: 0
-        }
-      };
+      const defaultData: AppData = {
+  containers: [],
+  labels: [],
+  batches: [], // This should be BatchData[], not never[]
+  jars: [], // Add the missing jars property
+  tokenStats: {
+    originOnly: 0,
+    qualityOnly: 0,
+    bothCertifications: 0,
+    remainingTokens: 0,
+    totalTokens: 0,
+    usedTokens: 0 // Add missing usedTokens property
+  },
+  certifiedHoneyWeight: {
+    originOnly: 0,
+    qualityOnly: 0,
+    bothCertifications: 0
+  }
+};
 
-      let data = defaultData;
+      let data: AppData = defaultData;
       
       try {
         const token = localStorage.getItem('token') || localStorage.getItem('authtoken');
@@ -1244,7 +1153,7 @@ const [tokenBalance, setTokenBalance] = useState(0); // Start with 0
           // You can add more mock data here if needed
           data = {
             ...defaultData,
-            batches: allBatches
+            batches: allBatches // Make sure allBatches is properly typed as BatchData[]
           };
         }
       } catch (error) {
@@ -1256,56 +1165,18 @@ const [tokenBalance, setTokenBalance] = useState(0); // Start with 0
       data.tokenStats = data.tokenStats || defaultData.tokenStats;
       data.certifiedHoneyWeight = data.certifiedHoneyWeight || defaultData.certifiedHoneyWeight;
 
+    const certifiedTotal = 
+  data.certifiedHoneyWeight.originOnly +
+  data.certifiedHoneyWeight.qualityOnly +
+  data.certifiedHoneyWeight.bothCertifications;
+
+const uncertifiedTotal = data.batches.reduce((sum: number, batch: any) => {
+  return sum + (batch.uncertified ?? 0);
+}, 0);
+
+const totalHoney = certifiedTotal + uncertifiedTotal;
+
       
-
-      const totalHoney =
-        (data.certifiedHoneyWeight.originOnly || 0) +
-        (data.certifiedHoneyWeight.qualityOnly || 0) +
-        (data.certifiedHoneyWeight.bothCertifications || 0) +
-        (data.batches || []).reduce((sum, batch) => sum + (batch.uncertified || 0), 0);
-
-      const newHoneyStatusData = [
-        {
-          name: 'Origin Certified',
-          value: data.certifiedHoneyWeight.originOnly || 0,
-          percentage:
-            totalHoney > 0
-              ? Math.round(((data.certifiedHoneyWeight.originOnly || 0) / totalHoney) * 100)
-              : 0,
-          color: '#3B82F6',
-        },
-        {
-          name: 'Quality Certified',
-          value: data.certifiedHoneyWeight.qualityOnly || 0,
-          percentage:
-            totalHoney > 0
-              ? Math.round(((data.certifiedHoneyWeight.qualityOnly || 0) / totalHoney) * 100)
-              : 0,
-          color: '#10B981',
-        },
-        {
-          name: 'Fully Certified',
-          value: data.certifiedHoneyWeight.bothCertifications || 0,
-          percentage:
-            totalHoney > 0
-              ? Math.round(((data.certifiedHoneyWeight.bothCertifications || 0) / totalHoney) * 100)
-              : 0,
-          color: '#8B5CF6',
-        },
-        {
-          name: 'Uncertified',
-          value: (data.batches || []).reduce((sum, batch) => sum + (batch.uncertified || 0), 0),
-          percentage:
-            totalHoney > 0
-              ? Math.round(
-                  ((data.batches || []).reduce((sum, batch) => sum + (batch.uncertified || 0), 0) /
-                    totalHoney) *
-                    100
-                )
-              : 0,
-          color: '#9CA3AF',
-        },
-      ];
 
       setData(data);
       
@@ -1314,7 +1185,7 @@ const [tokenBalance, setTokenBalance] = useState(0); // Start with 0
       console.error('Error in fetchData:', error);
       setNotification({
         show: true,
-        message: `Error: ${error.message}`,
+        message: `Error: ${(error as Error).message}`,
       });
 
       setTimeout(() => {
@@ -1486,7 +1357,7 @@ const handleBuyTokens = () => {
     console.error('Error creating batch:', error);
     setNotification({
       show: true,
-      message: `Error: ${error.message}`,
+      message: `Error: ${(error as Error).message}`,
     });
 
     setTimeout(() => {
@@ -1511,53 +1382,42 @@ const [expandedBatches, setExpandedBatches] = useState<string[]>([]);
       }
     };
     
-   interface BatchData {
-  id?: string;
-  batchNumber?: string;
-  status?: string;
-  honeyCollected: number; // This should be the batch total, not sum of apiaries
-  completedChecks?: number;
-  totalChecks?: number;
-  certificationDate?: string | null;
-  expiryDate?: string | null;
-  weightKg?: number;
-  totalKg?: number; // ADDED: Batch total amount
-  jarsUsed?: number;
-  originOnly?: number;
-  qualityOnly?: number;
-  bothCertifications?: number;
-  uncertified?: number;
-  containerType?: string;
-  labelType?: string;
-  [key: string]: any;
-}
+
 
 // Convert data.batches to an array if it isn't already
-const batchesArray: BatchData[] = Array.isArray(data.batches) ? data.batches : [];
+const batchesArray: IncomingBatchData[] = Array.isArray(data.batches) ? data.batches : [];
 
-
-  const allBatches: ProcessedBatch[] = batchesArray.map((batch: BatchData) => ({
-  id: batch.id || '',
-  name: batch.batchNumber || '',
+const allBatches: ProcessedBatch[] = batchesArray.map((batch: IncomingBatchData) => ({
+  id: batch.batchId || '',
+  name: batch.batchName || '',
+  batchNumber: batch.batchId || undefined,
   status: batch.status || 'Pending',
   completedChecks: batch.completedChecks || 0,
-  totalChecks: batch.totalChecks || 10, // Provide a default if missing
-  certificationDate: batch.certificationDate || null,
-  expiryDate: batch.expiryDate || null,
-  totalKg: batch.weightKg || 0, // Make sure we use weightKg here
+  totalChecks: batch.totalChecks || 10,
+  certificationDate: batch.certificationDate || undefined,
+  expiryDate: batch.expiryDate || undefined, // Changed from undefined to null
+  totalKg: batch.weight || 0,
   jarsUsed: batch.jarsUsed || 0,
   originOnly: batch.originOnly || 0,
   qualityOnly: batch.qualityOnly || 0,
   bothCertifications: batch.bothCertifications || 0,
   uncertified: batch.uncertified || 0,
-  containerType: batch.containerType,
-  labelType: batch.labelType,
-  // Initialize percentage properties
+  containerType: batch.containerType || '',
+  labelType: batch.labelType || '',
   originOnlyPercent: 0,
   qualityOnlyPercent: 0,
   bothCertificationsPercent: 0,
-  uncertifiedPercent: 0
+  uncertifiedPercent: 0,
+  
+  // Missing properties
+  weightKg: batch.weight || 0,
+  totalHoneyCollected: batch.weight || 0,
+  honeyCertified: (batch.originOnly || 0) + (batch.qualityOnly || 0) + (batch.bothCertifications || 0),
+  honeyRemaining: Math.max(0, (batch.weight || 0) - (batch.jarsUsed || 0)),
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
 }));
+
    // Fix the percentage calculations to properly handle edge cases
 allBatches.forEach(batch => {
   const total = batch.originOnly + batch.qualityOnly + batch.bothCertifications + batch.uncertified;
@@ -1620,10 +1480,11 @@ allBatches.forEach(batch => {
   const [timeRange, setTimeRange] = useState('Monthly');
   const router = useRouter();
 
-  useEffect(() => {
+ useEffect(() => {
   const urlParams = new URLSearchParams(window.location.search);
-  const tokensAdded = parseInt(urlParams.get('tokensAdded'));
-  if (tokensAdded) {
+  const tokensAdded = parseInt(urlParams.get('tokensAdded') || '0');
+  
+  if (tokensAdded > 0) {
     setTokenBalance(prev => prev + tokensAdded);
     // Clean up URL
     window.history.replaceState({}, '', window.location.pathname);
@@ -1895,7 +1756,7 @@ const addApiaryMarkersToMap = (map: any) => {
               latitude: lat,
               longitude: lng
             },
-            honeyCollected: apiary.kilosCollected || apiary.honeyCollected || 0
+            honeyCollected: apiary.kilosCollected  || 0
           };
           setSelectedApiary(normalizedApiary);
         });
@@ -2229,21 +2090,23 @@ const handleLocationCancel = () => {
       updateApiaryHiveCount={handleUpdateApiaryHiveCount}
     />
     
-    <CreateApiaryModal
-      showApiaryModal={showApiaryModal}
-      setShowApiaryModal={setShowApiaryModal}
-      apiaryFormData={apiaryFormData}
-      setApiaryFormData={setApiaryFormData}
-      savedApiaryLocations={savedApiaryLocations}
-      mapsLinkInput={mapsLinkInput}
-      setMapsLinkInput={setMapsLinkInput}
-      handleMapsLinkSubmit={handleMapsLinkSubmit}
-      miniMapRef={miniMapRef}
-      miniGoogleMapRef={miniGoogleMapRef}
-      saveApiaryToDatabase={saveApiaryToDatabase}
-      refreshApiariesFromDatabase={refreshApiariesFromDatabase}
-      isLoadingApiaries={isLoadingApiaries}
-    />
+   <CreateApiaryModal
+  showApiaryModal={showApiaryModal}
+  setShowApiaryModal={setShowApiaryModal}
+  apiaryFormData={apiaryFormData}
+  setApiaryFormData={setApiaryFormData}
+  savedApiaryLocations={savedApiaryLocations}
+  setSavedApiaryLocations={setSavedApiaryLocations} // Add this missing prop
+  mapsLinkInput={mapsLinkInput}
+  setMapsLinkInput={setMapsLinkInput}
+  handleMapsLinkSubmit={handleMapsLinkSubmit}
+  miniMapRef={miniMapRef}
+  miniGoogleMapRef={miniGoogleMapRef}
+  saveApiaryToDatabase={saveApiaryToDatabase}
+  refreshApiariesFromDatabase={refreshApiariesFromDatabase}
+  isLoadingApiaries={isLoadingApiaries}
+  setIsLoadingApiaries={setIsLoadingApiaries} // Add this missing prop
+/>
     
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <TokenWalletSection 
@@ -2293,8 +2156,11 @@ const handleLocationCancel = () => {
     />
     
     {notification.show && (
-      <Notification message={notification.message} />
-    )}
+  <Notification 
+    notification={notification} 
+    setNotification={setNotification} 
+  />
+)}
   </div>
 );
   };

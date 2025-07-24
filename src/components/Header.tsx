@@ -45,7 +45,7 @@ interface Batch {
 
 interface TokenStats {
   id?: number;
-  userId: number;
+  userId?: number;
   totalTokens: number;
   remainingTokens: number;
   originOnly: number;

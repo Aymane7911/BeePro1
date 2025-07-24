@@ -4,18 +4,25 @@ import { Layers, Database, Tag, Package, RefreshCw, Menu, X, Home, Settings, Use
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 
+
+// Updated interface to match your parent component
 interface Apiary {
-  id: string | number;
+  id: string;
   name: string;
-  number: string;
+  number: number;
   hiveCount: number;
+  honeyCollected?: number; // Make this optional
+  location?: {
+    latitude?: number;
+    longitude?: number;
+    locationName?: string;
+  };
+  createdAt?: string;
+  // Keep these for backward compatibility
   latitude?: number;
   longitude?: number;
   locationName?: string;
 }
-
-// Remove the local SelectedApiary interface - use the one from props type
-// The SelectedApiary type should be imported from wherever it's defined in your app
 
 interface CreateBatchModalProps {
   showBatchModal: boolean;
@@ -37,7 +44,7 @@ interface CreateBatchModalProps {
   batches?: any[]; // Add the missing batches prop (optional)
   selectedBatches?: any[]; // Add the missing selectedBatches prop (optional)
   // Add this new prop for updating apiary hive count in database
-  updateApiaryHiveCount?: (apiaryId: string | number, newHiveCount: number) => Promise<void>;
+  updateApiaryHiveCount?: (apiaryId: string, newHiveCount: number) => Promise<void>; // Changed from string | number to string
 }
 
 const CreateBatchModal = ({ 
@@ -62,9 +69,9 @@ const CreateBatchModal = ({
   updateApiaryHiveCount
 }: CreateBatchModalProps) => {
   
-  // Track which apiaries have unsaved changes
-  const [unsavedChanges, setUnsavedChanges] = useState<Set<string | number>>(new Set());
-  const [savingChanges, setSavingChanges] = useState<Set<string | number>>(new Set());
+  // Track which apiaries have unsaved changes - updated to use string
+  const [unsavedChanges, setUnsavedChanges] = useState<Set<string>>(new Set());
+  const [savingChanges, setSavingChanges] = useState<Set<string>>(new Set());
 
   const resetBatchForm = () => {
     setBatchNumber('');
@@ -81,13 +88,17 @@ const CreateBatchModal = ({
     return {
       ...apiary,
       kilosCollected: 0,
-      honeyCollected: 0,
+      honeyCollected: apiary.honeyCollected || 0,
       batchId: undefined,
-      batchNumber: undefined
+      batchNumber: undefined,
+      // Flatten location properties for backward compatibility
+      latitude: apiary.location?.latitude || apiary.latitude,
+      longitude: apiary.location?.longitude || apiary.longitude,
+      locationName: apiary.location?.locationName || apiary.locationName
     };
   };
 
-  const saveHiveCount = async (apiaryId: string | number, newHiveCount: number) => {
+  const saveHiveCount = async (apiaryId: string, newHiveCount: number) => {
     if (!updateApiaryHiveCount) {
       console.warn('updateApiaryHiveCount function not provided');
       return;
@@ -235,12 +246,12 @@ const CreateBatchModal = ({
                   
                   if (apiaryId) {
                     const apiary = availableApiaries.find(a => 
-                      String(a.id) === String(apiaryId)
+                      a.id === apiaryId
                     );
                     
                     if (apiary) {
                       const isAlreadySelected = selectedApiaries.some(a => 
-                        String(a.id) === String(apiary.id)
+                        a.id === apiary.id
                       );
                       
                       if (!isAlreadySelected) {
@@ -262,7 +273,7 @@ const CreateBatchModal = ({
                 <option value="">Select an apiary to add...</option>
                 {availableApiaries
                   .filter(apiary => !selectedApiaries.some(selected => 
-                    String(selected.id) === String(apiary.id)
+                    selected.id === apiary.id
                   ))
                   .map(apiary => (
                     <option key={apiary.id} value={apiary.id}>
@@ -311,7 +322,7 @@ const CreateBatchModal = ({
                                   // Update local state only
                                   setSelectedApiaries(prev => 
                                     prev.map(a => 
-                                      String(a.id) === String(apiary.id) 
+                                      a.id === apiary.id 
                                         ? { ...a, hiveCount: newHiveCount } 
                                         : a
                                     )
@@ -363,7 +374,7 @@ const CreateBatchModal = ({
                                   const newHoneyCollected = parseFloat(e.target.value) || 0;
                                   setSelectedApiaries((prev: any[]) => 
                                     prev.map(a => 
-                                      String(a.id) === String(apiary.id) 
+                                      a.id === apiary.id 
                                         ? { ...a, honeyCollected: newHoneyCollected, kilosCollected: newHoneyCollected } 
                                         : a
                                     )
@@ -401,7 +412,7 @@ const CreateBatchModal = ({
                       type="button"
                       onClick={() => {
                         setSelectedApiaries((prev: any[]) => 
-                          prev.filter(a => String(a.id) !== String(apiary.id))
+                          prev.filter(a => a.id !== apiary.id)
                         );
                         // Remove from unsaved changes when removing apiary
                         setUnsavedChanges(prev => {

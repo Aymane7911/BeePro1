@@ -19,6 +19,7 @@ interface Apiary {
 
 
 
+
 interface CertificationStatus {
   originOnly: number;
   qualityOnly: number;
@@ -237,7 +238,7 @@ setFormData: React.Dispatch<React.SetStateAction<ParentFormData>>;  tokenBalance
   addNewJarSize: (size: number) => void;
   removeJarSize: (size: number) => void;
   convertToGrams: (value: string, unit: string) => number;
-getSelectedType: (certification: Certification) => string | null;  needsProductionReport: () => boolean;
+getSelectedType: (certification: Certification) => "origin" | "quality" | "both" | undefined;  needsProductionReport: () => boolean;
   needsLabReport: () => boolean;
   hasRequiredCertifications?: () => boolean;
   isFormValid: () => boolean;
@@ -299,10 +300,13 @@ const CompleteBatchForm: React.FC<CompleteBatchFormProps> = ({
 const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
 
 // New state variables for document verification
-  const [verificationStatus, setVerificationStatus] = useState({
-    productionReport: null, // null, 'verifying', 'passed', 'failed', 'error'
-    labReport: null
-  });
+  const [verificationStatus, setVerificationStatus] = useState<{
+  productionReport: null | 'verifying' | 'passed' | 'failed' | 'error';
+  labReport: null | 'verifying' | 'passed' | 'failed' | 'error';
+}>({
+  productionReport: null,
+  labReport: null
+});
 
   const [verificationResults, setVerificationResults] = useState({
     productionReport: null,
@@ -311,7 +315,7 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
   
   const [isVerifying, setIsVerifying] = useState(false);
    // Document verification function
-  const verifyDocument = async (file, documentType) => {
+  const verifyDocument = async (file: any, documentType: any) => {
     if (!file) return;
     
     setIsVerifying(true);
@@ -366,7 +370,7 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
       }));
       setVerificationResults(prev => ({
         ...prev,
-        [documentType]: { error: error.message }
+        [documentType]: { error: (error as Error).message }
       }));
     } finally {
       setIsVerifying(false);
@@ -398,60 +402,16 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
 
   type DocumentType = 'productionReport' | 'labReport';
   // Get verification status display
-  const getVerificationStatusDisplay = (documentType : DocumentType) => {
-    const status = verificationStatus[documentType];
-    const result = verificationResults[documentType];
-
-    switch (status) {
-      case 'verifying':
-        return (
-          <div className="flex items-center mt-2 text-blue-600">
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            <span className="text-sm">Verifying document...</span>
-          </div>
-        );
-      case 'passed':
-  return (
-    <div className="flex items-center mt-2 text-green-600">
-      <CheckCircle className="h-4 w-4 mr-2" />
-      <span className="text-sm font-medium">Document verified successfully</span>
-      <span className="ml-2 text-xs text-green-700">
-        Certificate will be available after payment
-      </span>
-    </div>
-  );
-
-      case 'failed':
-        return (
-          <div className="mt-2">
-            <div className="flex items-center text-red-600">
-              <X className="h-4 w-4 mr-2" />
-              <span className="text-sm font-medium">Document verification failed</span>
-            </div>
-            {result?.error && (
-              <p className="text-xs text-red-500 mt-1">{result.error}</p>
-            )}
-          </div>
-        );
-      case 'error':
-        return (
-          <div className="mt-2">
-            <div className="flex items-center text-orange-600">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              <span className="text-sm font-medium">Verification error</span>
-            </div>
-            {result?.error && (
-              <p className="text-xs text-orange-500 mt-1">{result.error}</p>
-            )}
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
+  
   // Enhanced file upload handlers
-  const handleProductionReportUpload = async (e) => {
-  const file = e.target.files[0];
+  const handleProductionReportUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) {
+    // No files selected — bail out
+    return;
+  }
+
+  const file = files[0];
   if (!file) return;
 
   // Update form data with file
@@ -520,7 +480,7 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
     }));
 
     // Show user-friendly error message
-    alert('File upload failed: ' + error.message);
+    alert('File upload failed: ' + (error as Error).message);
   }
 };
 
@@ -661,8 +621,14 @@ const [ipfsHashes, setIpfsHashes] = useState<{
 });
 
 // Updated handleLabReportUpload function
-const handleLabReportUpload = async (e) => {
-  const file = e.target.files[0];
+const handleLabReportUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) {
+    // No files selected — bail out
+    return;
+  }
+
+  const file = files[0];
   
   if (!file) return;
   
@@ -743,7 +709,7 @@ const handleLabReportUpload = async (e) => {
     }));
     
     // Show user-friendly error message
-    alert('File upload failed: ' + error.message);
+    alert('File upload failed: ' + (error as Error).message);
   }
 };
 
@@ -1198,7 +1164,7 @@ const getTotalTokensNeeded = () => {
           </div>
           <button
             type="button"
-            onClick={() => removeJarFromBatch(jar.id)}
+            onClick={() => removeJarFromBatch(String(jar.id))}
             className="text-red-500 hover:text-red-700"
           >
             <X className="h-4 w-4" />
@@ -1351,10 +1317,10 @@ const getTotalTokensNeeded = () => {
                     })
                   };
                   
-                  setJarCertifications({
-                    ...jarCertifications,
-                    [jar.id]: updatedCertification
-                  });
+                 setJarCertifications({
+  ...jarCertifications,
+  [String(jar.id)]: updatedCertification as Certification
+});
                 }}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 rounded"
               />
@@ -1372,15 +1338,23 @@ const getTotalTokensNeeded = () => {
                 id={`quality-${jar.id}`}
                 checked={jarCertifications[jar.id]?.quality || false}
                 onChange={(e) => {
-                  const currentCertification = jarCertifications[jar.id] || {};
-                  const updatedCertification = {
-                    ...currentCertification,
-                    quality: e.target.checked,
-                    selectedType: getSelectedType({
-                      ...currentCertification,
-                      quality: e.target.checked
-                    })
-                  };
+               const currentCertification = jarCertifications[jar.id] || {};
+const baseDefaults = {
+  origin: false,
+  quality: false, 
+  both: false,
+  selectedType: undefined as Certification['selectedType']
+};
+
+const updatedCertification: Certification = {
+  ...baseDefaults,
+  ...currentCertification,
+  quality: e.target.checked,
+  selectedType: getSelectedType({
+    ...currentCertification,
+    quality: e.target.checked
+  })
+};
                   
                   setJarCertifications({
                     ...jarCertifications,

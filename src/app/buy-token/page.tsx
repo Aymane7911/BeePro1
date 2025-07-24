@@ -23,11 +23,8 @@ interface AuthHeaders {
 }
 
 const BuyTokensPage = () => {
-  // Get initial token amount from URL params if redirected from modal
-  const urlParams = new URLSearchParams(window.location.search);
-  const initialTokens = parseInt(urlParams.get('tokens') ?? '100');
-
-  const [tokensToAdd, setTokensToAdd] = useState<number>(initialTokens);
+  // Initialize with default value, will be updated in useEffect
+  const [tokensToAdd, setTokensToAdd] = useState<number>(100);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(null);
   const [selectedPackage, setSelectedPackage] = useState<TokenPackage | null>(null);
@@ -71,8 +68,16 @@ const BuyTokensPage = () => {
     return null;
   };
 
-  // Initialize authentication
+  // Initialize authentication and URL params
   useEffect(() => {
+    // Handle URL params - FIXED: Moved inside useEffect
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const initialTokens = parseInt(urlParams.get('tokens') ?? '100');
+      setTokensToAdd(initialTokens);
+    }
+
+    // Handle authentication
     const token = getTokenFromStorage();
     console.log('🔐 Found token:', token ? 'Yes' : 'No');
     console.log('🔐 Token preview:', token ? `${token.substring(0, 20)}...` : 'null');
@@ -89,17 +94,18 @@ const BuyTokensPage = () => {
 
   // Get authentication headers - Fixed type issue
   const getAuthHeaders = (): Record<string, string> => {
-  const token = authToken || getTokenFromStorage();
-  if (token) {
+    const token = authToken || getTokenFromStorage();
+    if (token) {
+      return {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+    }
     return {
-      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
-  }
-  return {
-    'Content-Type': 'application/json',
   };
-};
+
   // Token packages with enhanced styling data
   const tokenPackages: TokenPackage[] = [
     { 
@@ -230,18 +236,20 @@ const BuyTokensPage = () => {
           await updateTokenBalance(tokensToAdd);
           
           // Update localStorage for immediate UI feedback
-          const currentBalance = parseInt(localStorage.getItem('tokenBalance') || '0');
-          const newBalance = currentBalance + tokensToAdd;
-          localStorage.setItem('tokenBalance', newBalance.toString());
-          
-          // Dispatch custom event to update token balance in UI
-          window.dispatchEvent(new CustomEvent('tokensUpdated', {
-            detail: { 
-              action: 'add',
-              tokensAdded: tokensToAdd,
-              newBalance: newBalance
-            }
-          }));
+          if (typeof window !== 'undefined') {
+            const currentBalance = parseInt(localStorage.getItem('tokenBalance') || '0');
+            const newBalance = currentBalance + tokensToAdd;
+            localStorage.setItem('tokenBalance', newBalance.toString());
+            
+            // Dispatch custom event to update token balance in UI
+            window.dispatchEvent(new CustomEvent('tokensUpdated', {
+              detail: { 
+                action: 'add',
+                tokensAdded: tokensToAdd,
+                newBalance: newBalance
+              }
+            }));
+          }
           
           setPaymentStatus('success');
           console.log(`✅ Successfully purchased ${tokensToAdd} tokens for $${calculatePrice(tokensToAdd)}`);
@@ -273,6 +281,28 @@ const BuyTokensPage = () => {
     setSelectedPackage(null);
   };
 
+  // Safe navigation functions
+  const goToLogin = () => {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+  };
+
+  const goBack = () => {
+    if (typeof window !== 'undefined') {
+      window.history.back();
+    }
+  };
+
+  const goToDashboard = () => {
+    if (typeof window !== 'undefined') {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.pathname = '/dashboard';
+      currentUrl.searchParams.set('tokensAdded', tokensToAdd.toString());
+      window.location.href = currentUrl.toString();
+    }
+  };
+
   // Show authentication warning if not authenticated
   if (!isAuthenticated) {
     return (
@@ -286,7 +316,7 @@ const BuyTokensPage = () => {
             You need to log in to purchase tokens. Please authenticate your account first.
           </p>
           <button
-            onClick={() => window.location.href = '/login'} // Adjust path as needed
+            onClick={goToLogin}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:scale-105 shadow-lg"
           >
             Go to Login
@@ -329,14 +359,7 @@ const BuyTokensPage = () => {
               Buy More Tokens
             </button>
             <button
-              onClick={() => {
-                // Pass the purchased tokens back via URL
-                const currentUrl = new URL(window.location.href);
-                currentUrl.pathname = '/dashboard'; // or wherever your main component is
-                currentUrl.searchParams.set('tokensAdded', tokensToAdd.toString());
-
-                window.location.href = currentUrl.toString();
-              }}
+              onClick={goToDashboard}
               className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200"
             >
               Return to Dashboard
@@ -354,7 +377,7 @@ const BuyTokensPage = () => {
         <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => window.history.back()}
+              onClick={goBack}
               className="flex items-center text-gray-600 hover:text-gray-900 transition-all duration-200 hover:bg-gray-100 px-3 py-2 rounded-lg"
             >
               <ArrowLeft className="w-5 h-5 mr-2" />

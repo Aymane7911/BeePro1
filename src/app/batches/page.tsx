@@ -33,12 +33,41 @@ import ProfileForm from '@/components/ProfileForm';
 import Header1 from '@/components/Header1';
 
 
-interface Apiary {
-  id: string; // Add this
-  batchId: string,
-  batchNumber: string,
+// Remove duplicate interfaces and consolidate your types
+// Make sure you only have ONE definition of each interface
+
+interface Location {
+  id: string;
+  name?: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  // ... other location-related properties
+}
+
+interface LocationCoordinates {
+  latitude: number;
+  longitude: number;
+}
+
+interface ApiaryLocation extends LocationCoordinates {
+  id: number;
   name: string;
-  number: string;
+  latitude: number;
+  longitude: number;
+  createdAt?: string;
+}
+
+interface Apiary {
+  id: string;
+  batchId: string;
+  batchNumber: string;
+  name: string;
+  number: number; // Keep as number since this seems to be the main definition
   hiveCount: number;
   latitude: number;
   longitude: number;
@@ -47,10 +76,11 @@ interface Apiary {
   location?: Location | null;
   honeyCertified?: number;
 }
+
 interface FormApiary extends Apiary {
   batchId: string;
   batchNumber: string;
-   honeyCertified: number;
+  honeyCertified: number;
 }
 
 interface CertificationStatus {
@@ -59,11 +89,7 @@ interface CertificationStatus {
   bothCertifications: number;
   uncertified: number;
 }
-interface Location {
-  latitude: number | string;
-  longitude: number | string;
-  // other properties...
-}
+
 interface Batch {
   id: string;
   batchNumber: string;
@@ -79,17 +105,20 @@ interface Batch {
   labelType: string;
   weightKg: number;
   jarUsed: number;
-   // Certification data fields
+  
+  // Certification data fields
   originOnly: number;
   qualityOnly: number;
   bothCertifications: number;
   uncertified: number;
+  
   // Percentage fields
   originOnlyPercent: number;
   qualityOnlyPercent: number;
   bothCertificationsPercent: number;
   uncertifiedPercent: number;
-   // Progress tracking
+  
+  // Progress tracking
   completedChecks: number;
   totalChecks: number;
   
@@ -108,9 +137,9 @@ interface Batch {
   honeyCertified?: number;
   honeyRemaining?: number;
   totalHoneyCollected?: number;
-   // Relations
-  userId: number;
   
+  // Relations
+  userId: number;
 }
 
 interface TokenStats {
@@ -120,16 +149,7 @@ interface TokenStats {
   qualityOnly: number;
   bothCertifications: number;
 }
-declare global {
-  interface Window {
-    [key: `apiariesMap_${number}`]: google.maps.Map;
-    [key: `apiariesMarker_${number}`]: google.maps.Marker;
-  }
-}
-type MapRef = {
-  map: google.maps.Map;
-  marker: google.maps.Marker;
-};
+
 interface CustomJar {
   id: number;
   size: number;
@@ -144,20 +164,8 @@ interface JarCertification {
   selectedType?: 'origin' | 'quality' | 'both';
 }
 
-interface Location {
-  id: string;
-  // Add other location properties you might need
-  name?: string;
-  address?: string;
-  coordinates?: {
-    latitude: number;
-    longitude: number;
-  };
-  // ... other location-related properties
-}
-
 interface JarDefinition {
-  id: string | number; // Make sure this matches your usage
+  id: string | number;
   size: number;
   quantity: number;
   unit?: string;
@@ -166,24 +174,10 @@ interface JarDefinition {
 interface User {
   passportId?: string;
   passportFile?: string;
-  // Add other user properties as needed
   id?: string;
   name?: string;
   email?: string;
   isProfileComplete: boolean;
-}
-
-interface LocationCoordinates {
-  lat: number;
-  lng: number;
-}
-
-interface ApiaryLocation extends LocationCoordinates {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  createdAt?: string;
 }
 
 interface JarCertifications {
@@ -194,19 +188,6 @@ interface SelectedApiary extends Apiary {
   kilosCollected: number; // Override to ensure this is always present
 }
 
-interface LocationCoordinates {
-  latitude: number;  // Changed from lat to latitude
-  longitude: number; // Changed from lng to longitude
-}
-
-interface ApiaryLocation extends LocationCoordinates {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-  createdAt?: string;
-}
-
 interface ApiaryFormData {
   name: string;
   number: string;
@@ -214,6 +195,19 @@ interface ApiaryFormData {
   honeyCollected: number;
   location: ApiaryLocation | null;
 }
+
+// Global declarations
+declare global {
+  interface Window {
+    [key: `apiariesMap_${number}`]: google.maps.Map;
+    [key: `apiariesMarker_${number}`]: google.maps.Marker;
+  }
+}
+
+type MapRef = {
+  map: google.maps.Map;
+  marker: google.maps.Marker;
+};
 
 
 
@@ -1117,13 +1111,22 @@ useEffect(() => {
       return [];
     });
     
-    if (allApiaries.length > 0) {
-      setFormData(prevState => ({
-        ...prevState,
-        apiaries: allApiaries
-        // Removed honeyCertified from here since it belongs to individual apiaries
-      }));
-    }
+   if (allApiaries.length > 0) {
+  setFormData(prevState => ({
+    ...prevState,
+    apiaries: allApiaries.map(apiary => ({
+      batchId: apiary.batchId || '',
+      batchNumber: apiary.batchNumber || '',
+      name: apiary.name,
+      number: apiary.number.toString(), // Convert number to string if form expects string
+      hiveCount: apiary.hiveCount,
+      latitude: apiary.latitude || null,
+      longitude: apiary.longitude || null,
+      kilosCollected: apiary.kilosCollected || 0,
+      honeyCertified: apiary.honeyCertified || 0,
+    }))
+  }));
+}
   }
 }, [showCompleteForm, selectedBatches, batches]);
   
@@ -1259,11 +1262,21 @@ useEffect(() => {
     } else {
       // Use existing apiaries
       setFormData({
-        certificationType: '',
-        productionReport: null as File | null,
-        labReport: null as File | null,
-        apiaries: existingApiaries
-      });
+  certificationType: '',
+  productionReport: null as File | null,
+  labReport: null as File | null,
+  apiaries: existingApiaries.map(apiary => ({
+    batchId: apiary.batchId || '',
+    batchNumber: apiary.batchNumber || '',
+    name: apiary.name,
+    number: apiary.number.toString(), // Convert number to string
+    hiveCount: apiary.hiveCount,
+    latitude: apiary.latitude || null,
+    longitude: apiary.longitude || null,
+    kilosCollected: apiary.kilosCollected || 0,
+    honeyCertified: apiary.honeyCertified || 0,
+  }))
+});
     }
   }
 }, [selectedBatches, showCompleteForm, batches]);

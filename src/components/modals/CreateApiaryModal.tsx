@@ -7,8 +7,7 @@ import { signOut } from 'next-auth/react';
 interface LocationCoordinates {
   latitude: number;
   longitude: number;
-  lat: number;
-  lng: number;
+  
 }
 
 interface ApiaryLocation extends LocationCoordinates {

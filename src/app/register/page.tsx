@@ -30,7 +30,7 @@ export default function SlidingRegistrationPage() {
     setFormData(prev => ({ ...prev, useEmail: !prev.useEmail }));
   };
 
-  const handleModeSwitch = (adminMode) => {
+  const handleModeSwitch = (adminMode: any) => {
     setIsAdmin(adminMode);
     setError('');
     setFormData(prev => ({

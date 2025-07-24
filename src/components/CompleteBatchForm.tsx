@@ -10,7 +10,7 @@ interface Apiary {
   batchId: string;
   batchNumber: string;
   name: string;
-  number: string;
+  number: number;
   hiveCount: number;
   latitude: number;
   longitude: number;

@@ -49,8 +49,6 @@ interface User {
 interface ApiaryLocation extends LocationCoordinates {
   id: number;
   name: string;
-  latitude: number;
-  longitude: number;
   createdAt?: string;
 }
 interface ApiaryFormData {
@@ -59,6 +57,7 @@ interface ApiaryFormData {
   hiveCount: number;
   honeyCollected: number;
   location: ApiaryLocation | null;
+  locationName?: string;
 }
   
 
@@ -76,8 +75,8 @@ interface Apiary {
 }
 
 interface LocationCoordinates {
-  lat: number;
-  lng: number;
+  latitude: number;
+  longitude: number;
 }
 
 
@@ -1036,16 +1035,16 @@ const fetchSavedApiaryLocations = async (): Promise<void> => {
       // Remove duplicates based on coordinates (within 0.001 degree tolerance)
       const uniqueApiaryLocations = apiaryLocations.filter((loc: ApiaryLocation, index: number, arr: ApiaryLocation[]) => {
         return !arr.slice(0, index).some((existingLoc: ApiaryLocation) => 
-          Math.abs(existingLoc.lat - loc.lat) < 0.001 &&
-          Math.abs(existingLoc.lng - loc.lng) < 0.001
+          Math.abs(existingLoc.latitude - loc.latitude) < 0.001 &&
+          Math.abs(existingLoc.longitude - loc.longitude) < 0.001
         );
       });
 
       // Also remove apiaries that are too close to existing templates
       const uniqueNewLocations = uniqueApiaryLocations.filter((apiaryLoc: ApiaryLocation) => {
         return !locations.some((templateLoc: ApiaryLocation) => 
-          Math.abs(templateLoc.lat - apiaryLoc.lat) < 0.001 &&
-          Math.abs(templateLoc.lng - apiaryLoc.lng) < 0.001
+          Math.abs(templateLoc.latitude - apiaryLoc.latitude) < 0.001 &&
+          Math.abs(templateLoc.longitude - apiaryLoc.longitude) < 0.001
         );
       });
 
@@ -1919,8 +1918,8 @@ const handleLocationConfirm = async (name: string | null = null) => {
 
     // Create clean location data (avoid circular references)
     const locationData = {
-      latitude: Number(selectedLocation.lat),
-      longitude: Number(selectedLocation.lng),
+      latitude: Number(selectedLocation.latitude),
+      longitude: Number(selectedLocation.longitude),
       name: name || `Location ${new Date().toLocaleDateString()}`,
     };
 

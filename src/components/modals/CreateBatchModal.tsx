@@ -6,22 +6,33 @@ import { signOut } from 'next-auth/react';
 
 
 // Updated interface to match your parent component
-interface Apiary {
-  id: string;
-  name: string;
-  number: number;
-  hiveCount: number;
-  honeyCollected?: number; // Make this optional
-  location?: {
-    latitude?: number;
-    longitude?: number;
-    locationName?: string;
-  };
-  createdAt?: string;
-  // Keep these for backward compatibility
+interface ApiaryLocationData {
   latitude?: number;
   longitude?: number;
   locationName?: string;
+}
+
+// Main Apiary interface - use ONLY this one throughout your app
+interface Apiary {
+  id: string;
+  batchId?: string;
+  batchNumber?: string;
+  name: string;
+  number: number;
+  hiveCount: number;
+  honeyCollected?: number;
+  kilosCollected?: number;
+  honeyCertified?: number;
+  
+  // Use the unified location type
+  location?: ApiaryLocationData | null;
+  
+  // Keep these for backward compatibility if needed
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+  
+  createdAt?: string;
 }
 
 interface CreateBatchModalProps {

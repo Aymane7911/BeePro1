@@ -9,7 +9,7 @@ interface Apiary {
   batchId: string;
   batchNumber: string;
   name: string;
-  number: string;
+  number: number;
   hiveCount: number;
   latitude: number;
   longitude: number;
@@ -141,13 +141,7 @@ interface SelectedApiary extends Apiary {
   kilosCollected: number; // Override to ensure this is always present
 }
 
-interface ApiaryFormData {
-  name: string;
-  number: string;
-  hiveCount: number;
-  honeyCollected: number;
-  location: ApiaryLocation | null;
-}
+
 
 // Add missing interfaces
 interface JarDefinition {

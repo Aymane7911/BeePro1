@@ -14,6 +14,19 @@ interface User {
   isProfileComplete: boolean;
   isPremium: boolean;
 }
+type PaymentForm = {
+  cardNumber: string;
+  expiryDate: string;
+  cvv: string;
+  cardholderName: string;
+  email: string;
+  billingAddress: {
+    line1: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  };
+};
 
 export default function Premium() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -46,7 +59,7 @@ export default function Premium() {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const handlePlanSelect = (plan) => {
+  const handlePlanSelect = (plan: any) => {
     setSelectedPlan(plan);
     if (plan === 'premium') {
       setShowPaymentModal(true);
@@ -55,25 +68,31 @@ export default function Premium() {
     }
   };
 
-  const handlePaymentInputChange = (field, value) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setPaymentForm(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setPaymentForm(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
-  };
+ const handlePaymentInputChange = (
+  field: string,
+  value: string
+) => {
+  if (field.includes('.')) {
+    const [parent, child] = field.split('.') as ['billingAddress', keyof PaymentForm['billingAddress']];
 
-  const formatCardNumber = (value) => {
+    setPaymentForm(prev => ({
+      ...prev,
+      billingAddress: {
+        ...prev.billingAddress,
+        [child]: value
+      }
+    }));
+  } else {
+    const topLevel = field as Exclude<keyof PaymentForm, 'billingAddress'>;
+
+    setPaymentForm(prev => ({
+      ...prev,
+      [topLevel]: value
+    }));
+  }
+};
+
+  const formatCardNumber = (value: any) => {
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
     const matches = v.match(/\d{4,16}/g);
     const match = matches && matches[0] || '';
@@ -88,7 +107,7 @@ export default function Premium() {
     }
   };
 
-  const formatExpiryDate = (value) => {
+  const formatExpiryDate = (value: any) => {
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
     if (v.length >= 2) {
       return v.substring(0, 2) + '/' + v.substring(2, 4);
@@ -111,10 +130,10 @@ export default function Premium() {
   };
 
   
-  const handlePaymentSubmit = async (e: React.ChangeEvent<HTMLInputElement>) => {
+ const handlePaymentSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
   setPaymentProcessing(true);
-  
+
   try {
     const token = getAuthToken();
     if (!token) {
@@ -122,14 +141,14 @@ export default function Premium() {
     }
 
     // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Update premium status
     const response = await fetch('/api/user/premium', {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`, // Fixed template literal
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ isPremium: true }),
     });
@@ -140,11 +159,11 @@ export default function Premium() {
     }
 
     const data = await response.json();
-    
+
     // Update state
     setUser(data.user);
     setIsPremiumActive(true);
-    
+
     // Close modal and show success
     setPaymentProcessing(false);
     setShowPaymentModal(false);
@@ -152,19 +171,19 @@ export default function Premium() {
       'Payment successful! You now have access to Premium features. Welcome to HoneyCertify Premium!',
       5000
     );
-    
   } catch (error) {
     console.error('Payment processing error:', error);
     setPaymentProcessing(false);
     showNotification(
-      `Payment failed: ${error.message}. Please try again or contact support.`,
+      `Payment failed: ${(error as Error).message}. Please try again or contact support.`,
       5000
     );
   }
 };
 
+
 // Helper function for notifications
-function showNotification(message, duration) {
+function showNotification(message: any, duration: any) {
   setNotification({ show: true, message });
   setTimeout(() => {
     setNotification({ show: false, message: '' });
@@ -645,6 +664,7 @@ function getAuthToken() {
               </div>
 
               <form onSubmit={handlePaymentSubmit} className="space-y-4">
+                 
                 
         
                 

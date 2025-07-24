@@ -21,11 +21,12 @@ export default function SlidingRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
+  const handleChange = (
+  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+) => {
+  const { name, value } = e.target;
+  setFormData(prev => ({ ...prev, [name]: value }));
+};
   const handleToggleAuth = () => {
     setFormData(prev => ({ ...prev, useEmail: !prev.useEmail }));
   };

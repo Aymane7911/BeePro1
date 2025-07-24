@@ -14,20 +14,24 @@ import { DefaultSession } from 'next-auth';
 declare module 'next-auth' {
   interface Session {
     user: {
+      id: string;
+      email: string;
+      name?: string | null | undefined;
+      image?: string | null | undefined;
+      firstName: string;
+      lastName: string;
       companyId: string;
       role: string;
-    } & DefaultSession['user'];
-  }
-
-  interface User {
-    companyId: string;
-    role: string;
+      databaseId: string;
+    };
   }
 }
+
+  
+
 
 declare module 'next-auth/jwt' {
   interface JWT {
     companyId: string;
-    role: string;
   }
 }

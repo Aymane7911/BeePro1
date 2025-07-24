@@ -5,22 +5,39 @@ import { CreditCard, ArrowLeft, Check, AlertCircle, Loader, Sparkles, Star, Zap 
 import Web3 from "../../web3";
 import { contractAddress, contractABI } from "../../contractsinfo";
 
+// Define types
+interface TokenPackage {
+  tokens: number;
+  price: number;
+  popular: boolean;
+  gradient: string;
+  icon: string;
+  badge: string;
+}
+
+type PaymentStatus = 'success' | 'error' | null;
+
+interface AuthHeaders {
+  'Authorization'?: string;
+  'Content-Type': string;
+}
+
 const BuyTokensPage = () => {
   // Get initial token amount from URL params if redirected from modal
   const urlParams = new URLSearchParams(window.location.search);
   const initialTokens = parseInt(urlParams.get('tokens') ?? '100');
 
-  const [tokensToAdd, setTokensToAdd] = useState(initialTokens);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState(null);
-  const [selectedPackage, setSelectedPackage] = useState(null);
+  const [tokensToAdd, setTokensToAdd] = useState<number>(initialTokens);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(null);
+  const [selectedPackage, setSelectedPackage] = useState<TokenPackage | null>(null);
   
   // Authentication state
-  const [authToken, setAuthToken] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   // Get token from storage (localStorage/sessionStorage)
-  const getTokenFromStorage = () => {
+  const getTokenFromStorage = (): string | null => {
     if (typeof window !== 'undefined') {
       // Debug: Check all possible token storage locations
       console.log('🔍 Checking token storage locations:');
@@ -70,22 +87,21 @@ const BuyTokensPage = () => {
     }
   }, []);
 
-  // Get authentication headers
-  const getAuthHeaders = () => {
-    const token = authToken || getTokenFromStorage();
-    if (token) {
-      return {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      };
-    }
+  // Get authentication headers - Fixed type issue
+  const getAuthHeaders = (): Record<string, string> => {
+  const token = authToken || getTokenFromStorage();
+  if (token) {
     return {
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
+  }
+  return {
+    'Content-Type': 'application/json',
   };
-
+};
   // Token packages with enhanced styling data
-  const tokenPackages = [
+  const tokenPackages: TokenPackage[] = [
     { 
       tokens: 50, 
       price: 5.00, 
@@ -128,17 +144,17 @@ const BuyTokensPage = () => {
     }
   ];
 
-  const calculatePrice = (tokens) => {
+  const calculatePrice = (tokens: number): string => {
     return (tokens * 0.10).toFixed(2);
   };
 
-  const handlePackageSelect = (pkg) => {
+  const handlePackageSelect = (pkg: TokenPackage): void => {
     setSelectedPackage(pkg);
     setTokensToAdd(pkg.tokens);
   };
 
   // Function to update token balance in database
-  const updateTokenBalance = async (tokensToAdd) => {
+  const updateTokenBalance = async (tokensToAdd: number): Promise<any> => {
     try {
       console.log(`🔄 Updating database with ${tokensToAdd} tokens...`);
       
@@ -190,7 +206,7 @@ const BuyTokensPage = () => {
   };
 
   // Simulate Stripe payment process
-  const handleStripePayment = async () => {
+  const handleStripePayment = async (): Promise<void> => {
     // Check authentication first
     if (!isAuthenticated) {
       setPaymentStatus('error');
@@ -230,12 +246,12 @@ const BuyTokensPage = () => {
           setPaymentStatus('success');
           console.log(`✅ Successfully purchased ${tokensToAdd} tokens for $${calculatePrice(tokensToAdd)}`);
           
-        } catch (dbError) {
+        } catch (dbError: unknown) {
           console.error('❌ Database update failed:', dbError);
           setPaymentStatus('error');
           
-          // Show specific error message for authentication issues
-          if (dbError.message.includes('Authentication failed')) {
+          // Show specific error message for authentication issues - Fixed error handling
+          if (dbError instanceof Error && dbError.message.includes('Authentication failed')) {
             alert('Your session has expired. Please log in again.');
           }
           return;
@@ -251,7 +267,7 @@ const BuyTokensPage = () => {
     }
   };
 
-  const resetForm = () => {
+  const resetForm = (): void => {
     setPaymentStatus(null);
     setTokensToAdd(100);
     setSelectedPackage(null);

@@ -8,7 +8,7 @@ export default function RegistrationSelection() {
   const [isAnimating, setIsAnimating] = useState(false);
   const router = useRouter();
 
-  const handleSelection = (type) => {
+  const handleSelection = (type: any) => {
     setSelectedType(type);
     setIsAnimating(true);
     

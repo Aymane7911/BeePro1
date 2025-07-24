@@ -11,7 +11,8 @@ export default function Hero() {
   const router = useRouter();
 
   const ref = useRef(null);
-  const inView = useInView(ref, { once: true, threshold: 0.3 });
+  const inView = useInView(ref, { once: true, margin: "-100px 0px" });
+
   const controls = useAnimation();
 
   useEffect(() => {

@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function ConfirmPage() {
-  const params = useSearchParams();
+function ConfirmPageContent() {
+  const params = useSearchParams(); // Only call this once
   const router = useRouter();
   const hasFetched = useRef(false);  // Prevent double-fetch
 
@@ -15,19 +15,19 @@ export default function ConfirmPage() {
     if (hasFetched.current) return;  // Prevent second call
     hasFetched.current = true;
 
-    const params = useSearchParams();
-if (!params) {
-  setStatus('error');
-  setMessage('Unable to read URL parameters.');
-  return;
-}
+    // Remove the duplicate useSearchParams() call
+    if (!params) {
+      setStatus('error');
+      setMessage('Unable to read URL parameters.');
+      return;
+    }
 
-const token = params.get('token');
-if (!token) {
-  setStatus('error');
-  setMessage('Invalid or missing token.');
-  return;
-}
+    const token = params.get('token');
+    if (!token) {
+      setStatus('error');
+      setMessage('Invalid or missing token.');
+      return;
+    }
 
     fetch(`/api/confirm-email?token=${token}`)
       .then(res => res.json())
@@ -64,5 +64,22 @@ if (!token) {
         </div>
       )}
     </div>
+  );
+}
+
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      <p>Loading...</p>
+    </div>
+  );
+}
+
+export default function ConfirmPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ConfirmPageContent />
+    </Suspense>
   );
 }

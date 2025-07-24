@@ -96,18 +96,18 @@ const TokenWalletOverview: React.FC<TokenWalletOverviewProps> = ({
 }, []);
 
    // Get authentication headers
-  const getAuthHeaders = () => {
-    const token = authToken || getTokenFromStorage();
-    if (token) {
-      return {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      };
-    }
-    return {
-      'Content-Type': 'application/json',
-    };
+  const getAuthHeaders = (): Record<string, string> => {
+  const token = authToken || getTokenFromStorage();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
   };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+};
 
   // Fetch token stats from backend
   const fetchTokenStats = async () => {

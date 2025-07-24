@@ -51,8 +51,8 @@ const AnalyticsHeader: React.FC<AnalyticsHeaderProps> = ({
         gradient: 'from-yellow-500/5 via-transparent to-orange-500/5',
         glow: 'from-yellow-400/10 to-transparent'
       }
-    };
-    return colorMap[color][variant];
+    } as const;
+  return colorMap[color as keyof typeof colorMap]?.[variant as keyof typeof colorMap[keyof typeof colorMap]];
   };
 
   return (

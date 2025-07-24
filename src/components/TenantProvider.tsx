@@ -33,7 +33,6 @@ export function useTenantContext() {
 }
 
 // app/layout.tsx - Root layout with tenant provider
-import { TenantProvider } from './components/TenantProvider';
 import './globals.css';
 
 export default function RootLayout({

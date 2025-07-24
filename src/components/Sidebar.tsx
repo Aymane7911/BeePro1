@@ -9,7 +9,11 @@ interface SidebarProps {
   userPremiumStatus?: boolean; // This will come from the database
   isPremium?: boolean;
 }
-
+interface UserPremiumData {
+  isPremium: boolean;
+  plan?: string;
+  expiryDate?: string;
+}
 // Utility function to get auth token
 const getAuthToken = () => {
   if (typeof window !== 'undefined') {
@@ -32,8 +36,7 @@ const getAuthToken = () => {
 
 const Sidebar = ({ sidebarOpen, toggleSidebar, userPremiumStatus }: SidebarProps) => {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
-  const [userPremiumData, setUserPremiumData] = useState(null);
-  const [loading, setLoading] = useState(true);
+const [userPremiumData, setUserPremiumData] = useState<UserPremiumData | null>(null);  const [loading, setLoading] = useState(true);
   const router = useRouter();
   
   // Fetch user premium status from API
@@ -75,7 +78,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, userPremiumStatus }: SidebarProps
   // Use the premium status from API response, fallback to props, then false
   const isUserPremium = userPremiumData?.isPremium || userPremiumStatus || false;
   
-  const handleAnalyticsClick = (e) => {
+  const handleAnalyticsClick = (e: any) => {
     e.preventDefault();
     if (!isUserPremium) {
       setShowPremiumModal(true);

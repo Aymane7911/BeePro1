@@ -461,7 +461,7 @@ const [certificationData, setCertificationData] = useState<any>(null);const [qrC
   const mapRefs = useRef<MapRef[]>([]);
   const mapsLoaded = useRef(false);
   const googleMapsApiKey = "AIzaSyBhRpOpnKWIXGMOTsdVoGKAnAC94Q0Sgxc"; 
-  type SortableBatchKey = 'batchNumber' | 'name' | 'status' | 'totalKg';
+  type SortableKey = 'batchNumber' | 'name' | 'status' | 'totalKg' | 'createdAt';
 const [certificationAmounts, setCertificationAmounts] = useState({
   origin: 0,
   quality: 0,
@@ -800,7 +800,7 @@ const removeJarFromBatch = (jarId: any) => {
 
 
 
-  const [sortBy, setSortBy] = useState<SortableBatchKey>('batchNumber');
+  const [sortBy, setSortBy] = useState<SortableKey>('batchNumber');
   
 
   const [profileData, setProfileData] = useState({
@@ -1305,7 +1305,7 @@ const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
 };
 
 // Handle profile completion form submission
-const handleProfileSubmit = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleProfileSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   
   // Validate required fields

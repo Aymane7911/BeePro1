@@ -1,13 +1,16 @@
 import React from 'react';
 import { Search, Filter, ChevronUp, ChevronDown } from 'lucide-react';
 
+// Define a type for sortable keys to ensure type safety
+export type SortableKey = 'createdAt' | 'batchNumber' | 'totalKg' | 'name' | 'status';
+
 interface FiltersAndSearchProps {
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   filterStatus: string;
   setFilterStatus: (value: string) => void;
-  sortBy: string;
-  setSortBy: (value: string) => void;
+  sortBy: SortableKey
+  setSortBy: (value: SortableKey) => void;
   sortOrder: string;
   setSortOrder: (value: string) => void;
 }
@@ -22,6 +25,15 @@ const FiltersAndSearch: React.FC<FiltersAndSearchProps> = ({
   sortOrder,
   setSortOrder
 }) => {
+  // Define sort options with proper typing
+  const sortOptions: { value: SortableKey; label: string }[] = [
+    { value: 'createdAt', label: 'Date Created' },
+    { value: 'batchNumber', label: 'Batch Number' },
+    { value: 'totalKg', label: 'Total Kilograms' },
+    { value: 'name', label: 'Name' },
+    { value: 'status', label: 'Status' },
+  ];
+
   return (
     <div className="bg-white p-4 rounded-lg shadow">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
@@ -55,12 +67,14 @@ const FiltersAndSearch: React.FC<FiltersAndSearchProps> = ({
           <span className="text-sm text-gray-600 mr-2">Sort by:</span>
           <select 
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
+            onChange={(e) => setSortBy(e.target.value as SortableKey)}
             className="border border-gray-300 rounded-md px-2 py-2 mr-2 focus:outline-none focus:ring-2 focus:ring-yellow-500"
           >
-            <option value="createdAt">Date Created</option>
-            <option value="batchNumber">Batch Number</option>
-            <option value="totalKg">Total Kilograms</option>
+            {sortOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
           <button
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}

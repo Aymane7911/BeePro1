@@ -14,6 +14,9 @@ interface Apiary {
   locationName?: string;
 }
 
+// Remove the local SelectedApiary interface - use the one from props type
+// The SelectedApiary type should be imported from wherever it's defined in your app
+
 interface CreateBatchModalProps {
   showBatchModal: boolean;
   setShowBatchModal: (show: boolean) => void;
@@ -23,14 +26,16 @@ interface CreateBatchModalProps {
   setBatchName: (value: string) => void;
   batchHoneyCollected: number;
   setBatchHoneyCollected: (value: number) => void;
-  selectedApiaries: Apiary[];
-  setSelectedApiaries: (apiaries: Apiary[] | ((prev: Apiary[]) => Apiary[])) => void;
+  selectedApiaries: any[]; // Use any[] temporarily to avoid type conflicts
+  setSelectedApiaries: React.Dispatch<React.SetStateAction<any[]>>; // Use React's SetStateAction type
   availableApiaries: Apiary[];
   isLoadingApiaries: boolean;
   setShowApiaryModal: (show: boolean) => void;
   createBatch: () => void;
   selectedDropdownApiary: string;
   setSelectedDropdownApiary: (value: string) => void;
+  batches?: any[]; // Add the missing batches prop (optional)
+  selectedBatches?: any[]; // Add the missing selectedBatches prop (optional)
   // Add this new prop for updating apiary hive count in database
   updateApiaryHiveCount?: (apiaryId: string | number, newHiveCount: number) => Promise<void>;
 }
@@ -52,6 +57,8 @@ const CreateBatchModal = ({
   createBatch,
   selectedDropdownApiary,
   setSelectedDropdownApiary,
+  batches, // Add the batches prop to destructuring
+  selectedBatches, // Add the selectedBatches prop to destructuring
   updateApiaryHiveCount
 }: CreateBatchModalProps) => {
   
@@ -69,7 +76,16 @@ const CreateBatchModal = ({
     setSavingChanges(new Set());
   };
 
-
+  // Helper function to convert Apiary to SelectedApiary
+  const convertApiaryToSelectedApiary = (apiary: Apiary): any => {
+    return {
+      ...apiary,
+      kilosCollected: 0,
+      honeyCollected: 0,
+      batchId: undefined,
+      batchNumber: undefined
+    };
+  };
 
   const saveHiveCount = async (apiaryId: string | number, newHiveCount: number) => {
     if (!updateApiaryHiveCount) {
@@ -228,7 +244,9 @@ const CreateBatchModal = ({
                       );
                       
                       if (!isAlreadySelected) {
-                        setSelectedApiaries((prev: Apiary[]) => [...prev, apiary]);
+                        // Convert Apiary to SelectedApiary when adding
+                        const selectedApiary = convertApiaryToSelectedApiary(apiary);
+                        setSelectedApiaries((prev: any[]) => [...prev, selectedApiary]);
                         setTimeout(() => setSelectedDropdownApiary(''), 100);
                       } else {
                         setSelectedDropdownApiary('');
@@ -285,24 +303,24 @@ const CreateBatchModal = ({
                             </label>
                             <div className="flex items-center space-x-2">
                               <input
-  type="number"
-  min="0"
-  value={apiary.hiveCount}
-  onChange={(e) => {
-    const newHiveCount = parseInt(e.target.value) || 0;
-    // Update local state only
-    setSelectedApiaries(prev => 
-      prev.map(a => 
-        String(a.id) === String(apiary.id) 
-          ? { ...a, hiveCount: newHiveCount } 
-          : a
-      )
-    );
-    // Mark as unsaved
-    setUnsavedChanges(prev => new Set(prev).add(apiary.id));
-  }}
-  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-/>
+                                type="number"
+                                min="0"
+                                value={apiary.hiveCount}
+                                onChange={(e) => {
+                                  const newHiveCount = parseInt(e.target.value) || 0;
+                                  // Update local state only
+                                  setSelectedApiaries(prev => 
+                                    prev.map(a => 
+                                      String(a.id) === String(apiary.id) 
+                                        ? { ...a, hiveCount: newHiveCount } 
+                                        : a
+                                    )
+                                  );
+                                  // Mark as unsaved
+                                  setUnsavedChanges(prev => new Set(prev).add(apiary.id));
+                                }}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                              />
                               {unsavedChanges.has(apiary.id) && (
                                 <button
                                   type="button"
@@ -329,6 +347,31 @@ const CreateBatchModal = ({
                                 Unsaved changes - click save to update database
                               </p>
                             )}
+                          </div>
+
+                          {/* Add fields for the additional SelectedApiary properties */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
+                              Honey Collected (kg)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.1"
+                              value={apiary.honeyCollected}
+                                onChange={(e) => {
+                                  const newHoneyCollected = parseFloat(e.target.value) || 0;
+                                  setSelectedApiaries((prev: any[]) => 
+                                    prev.map(a => 
+                                      String(a.id) === String(apiary.id) 
+                                        ? { ...a, honeyCollected: newHoneyCollected, kilosCollected: newHoneyCollected } 
+                                        : a
+                                    )
+                                  );
+                                }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                              placeholder="Enter honey collected from this apiary"
+                            />
                           </div>
                         </div>
                         
@@ -357,7 +400,7 @@ const CreateBatchModal = ({
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedApiaries((prev: Apiary[]) => 
+                        setSelectedApiaries((prev: any[]) => 
                           prev.filter(a => String(a.id) !== String(apiary.id))
                         );
                         // Remove from unsaved changes when removing apiary

@@ -7,6 +7,11 @@ interface TokenStats {
   remainingTokens: number;
   totalTokens: number;
   usedTokens?: number;
+  bothCertifications?: number; // Added to match your prop type
+}
+
+interface TokenStatisticsProps {
+  tokenStats?: TokenStats;
 }
 
 const getTokenFromStorage = (): string | null => {
@@ -21,7 +26,7 @@ const getTokenFromStorage = (): string | null => {
   );
 };
 
-const TokenStatistics: React.FC = () => {
+const TokenStatistics: React.FC<TokenStatisticsProps> = ({ tokenStats: propTokenStats }) => {
   
   // State for API data
   const [apiTokenStats, setApiTokenStats] = useState<TokenStats | null>(null);
@@ -75,6 +80,21 @@ const TokenStatistics: React.FC = () => {
 
   // Fetch token stats from API
   const fetchTokenStats = async () => {
+    // If props are provided, use them instead of fetching
+    if (propTokenStats) {
+      setApiTokenStats(propTokenStats);
+      const totalUsed = propTokenStats.totalTokens - propTokenStats.remainingTokens;
+      setLiveTokenStats({
+        originOnly: propTokenStats.originOnly,
+        qualityOnly: propTokenStats.qualityOnly,
+        totalUsed,
+        uncertified: propTokenStats.remainingTokens
+      });
+      setHasReceivedValidData(true);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -163,10 +183,12 @@ const TokenStatistics: React.FC = () => {
   // Initial fetch
   useEffect(() => {
     fetchTokenStats();
-  }, []);
+  }, [propTokenStats]); // Re-run when props change
 
-  // Handle batch completion events
+  // Handle batch completion events (only if not using props)
   useEffect(() => {
+    if (propTokenStats) return; // Skip event listeners when using props
+
     const handleBatchCompleted = (event: CustomEvent) => {
       const { 
         certificationBreakdown, 
@@ -243,10 +265,10 @@ const TokenStatistics: React.FC = () => {
       window.removeEventListener('batchCompleted', handleBatchCompleted as EventListener);
       window.removeEventListener('batchRollback', handleBatchRollback as EventListener);
     };
-  }, []);
+  }, [propTokenStats]);
 
-  // Use API stats if available, otherwise defaults
-  const stats = apiTokenStats || defaultStats;
+  // Use prop stats, API stats, or defaults in that order
+  const stats = propTokenStats || apiTokenStats || defaultStats;
 
   // Prepare data for charts
   const pieData = [
@@ -305,8 +327,8 @@ const TokenStatistics: React.FC = () => {
     setHasReceivedValidData(false);
   };
 
-  // Loading state
-  if (loading) {
+  // Loading state (skip if using props)
+  if (loading && !propTokenStats) {
     return (
       <div className="bg-white p-4 rounded-lg shadow flex justify-center items-center h-64">
         <div className="flex flex-col items-center">
@@ -317,8 +339,8 @@ const TokenStatistics: React.FC = () => {
     );
   }
 
-  // Error state with auth check
-  if (error) {
+  // Error state with auth check (skip if using props)
+  if (error && !propTokenStats) {
     return (
       <div className="bg-white p-4 rounded-lg shadow">
         <h2 className="text-lg font-semibold text-red-600">Error</h2>
@@ -348,7 +370,7 @@ const TokenStatistics: React.FC = () => {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-semibold">Certification Tokens</h2>
         <div className="flex items-center gap-4">
-          {isAuthenticated && (
+          {isAuthenticated && !propTokenStats && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-green-600">● Connected</span>
               <button 
@@ -357,6 +379,11 @@ const TokenStatistics: React.FC = () => {
               >
                 Logout
               </button>
+            </div>
+          )}
+          {propTokenStats && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-blue-600">● Using provided data</span>
             </div>
           )}
           {isUpdating && (

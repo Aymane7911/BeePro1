@@ -29,14 +29,16 @@ interface CreateApiaryModalProps {
   apiaryFormData: ApiaryFormData;
   setApiaryFormData: (data: ApiaryFormData | ((prev: ApiaryFormData) => ApiaryFormData)) => void;
   savedApiaryLocations: ApiaryLocation[];
+  setSavedApiaryLocations: (locations: ApiaryLocation[] | ((prev: ApiaryLocation[]) => ApiaryLocation[])) => void;
   mapsLinkInput: string;
   setMapsLinkInput: (value: string) => void;
   handleMapsLinkSubmit: () => void;
-  miniMapRef: React.RefObject<HTMLDivElement>;
+  miniMapRef: React.RefObject<HTMLDivElement | null>; // Fixed: Allow null
   miniGoogleMapRef: React.MutableRefObject<any>;
   saveApiaryToDatabase: (apiary: ApiaryFormData) => Promise<void>;
   refreshApiariesFromDatabase: () => Promise<void>;
   isLoadingApiaries: boolean;
+  setIsLoadingApiaries: (loading: boolean) => void;
 }
 
 const CreateApiaryModal = ({
@@ -45,6 +47,7 @@ const CreateApiaryModal = ({
   apiaryFormData,
   setApiaryFormData,
   savedApiaryLocations,
+  setSavedApiaryLocations,
   mapsLinkInput,
   setMapsLinkInput,
   handleMapsLinkSubmit,
@@ -52,7 +55,8 @@ const CreateApiaryModal = ({
   miniGoogleMapRef,
   saveApiaryToDatabase,
   refreshApiariesFromDatabase,
-  isLoadingApiaries
+  isLoadingApiaries,
+  setIsLoadingApiaries
 }: CreateApiaryModalProps) => {
   
   const resetFormData = (): ApiaryFormData => ({

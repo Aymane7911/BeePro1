@@ -6,9 +6,11 @@ interface Apiary {
   name: string;
   number: string;
   hiveCount: number;
-  latitude: number;
-  longitude: number;
+  latitude: number | null; // Changed from number to number | null
+  longitude: number | null; // Changed from number to number | null
   honeyCollected: number;
+  kilosCollected: number; // Added this field
+  honeyCertified: number; // Added this field
 }
 
 interface FormApiary extends Apiary {
@@ -155,22 +157,32 @@ interface ApiaryFormData {
   location: ApiaryLocation | null;
 }
 
-// Add missing interfaces for better type safety
+// Updated FormData interface to match your actual usage
 interface FormData {
   certificationType: string;
   productionReport: File | null;
   labReport: File | null;
-  batchId: string;
-  batchTotalKg: number;
-  apiaries: Apiary[];
+  apiaries: {
+    batchId: string;
+    batchNumber: string;
+    name: string;
+    number: string;
+    hiveCount: number;
+    latitude: number | null;
+    longitude: number | null;
+    kilosCollected: number;
+    honeyCertified: number;
+  }[];
 }
 
+// Updated Notification interface to match your actual usage
 interface Notification {
   show: boolean;
   message: string;
-  type: 'success' | 'error' | 'warning' | 'info';
+  type?: 'success' | 'error' | 'info'; // Removed 'warning' and made optional
 }
 
+// Updated props interface with correct function signatures
 interface SuccessPopupProps {
   show: boolean;
   certificationData: CertificationData | null;
@@ -180,8 +192,8 @@ interface SuccessPopupProps {
   setSelectedBatches: (batches: string[]) => void;
   setBatchJars: (jars: any[]) => void;
   setJarCertifications: (certifications: any) => void;
-  setFormData: (data: FormData) => void;
-  setNotification: (notification: Notification) => void;
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>; // Updated to match React state setter
+  setNotification: React.Dispatch<React.SetStateAction<Notification>>; // Updated to match React state setter
 }
 
 const SuccessPopup: React.FC<SuccessPopupProps> = ({
@@ -203,14 +215,16 @@ const SuccessPopup: React.FC<SuccessPopupProps> = ({
     setSelectedBatches([]);
     setBatchJars([]);
     setJarCertifications({});
+    
+    // Updated to match the new FormData interface
     setFormData({
       certificationType: '',
       productionReport: null,
       labReport: null,
-      batchId: '',
-      batchTotalKg: 0,
       apiaries: []
     });
+    
+    // Updated to match the new Notification interface
     setNotification({
       show: true,
       message: `Batch certification completed successfully! ${certificationData.totalCertified} kg certified in ${certificationData.totalJars} jars.`,

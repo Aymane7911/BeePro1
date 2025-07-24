@@ -1,22 +1,36 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, ChangeEvent, Dispatch, SetStateAction } from 'react';
 import { X, Upload, Check, User, FileText, Camera, Shield, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+
+interface ProfileData {
+  passportId: string;
+  passportScan: File | null;
+}
 
 interface ProfileFormProps {
   show: boolean;
   setShow: (value: boolean) => void;
   onSuccess?: () => void;
+  // Optional external state management
+  profileData?: ProfileData;
+  handleProfileChange?: (field: keyof ProfileData, value: string | File | null) => void;
+  handleFileUpload?: (e: ChangeEvent<HTMLInputElement>) => void;
+  handleProfileSubmit?: (e: React.FormEvent) => Promise<void>; // Fixed: Changed from ChangeEvent to FormEvent
 }
 
 const ProfileForm: React.FC<ProfileFormProps> = ({
   show,
   setShow,
-  onSuccess
+  onSuccess,
+  profileData: externalProfileData,
+  handleProfileChange: externalHandleProfileChange,
+  handleFileUpload: externalHandleFileUpload,
+  handleProfileSubmit: externalHandleProfileSubmit
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profilePhotoRef = useRef<HTMLInputElement>(null);
   
-  // State management
-  const [profileData, setProfileData] = useState({
+  // Internal state (used when no external state is provided)
+  const [internalProfileData, setInternalProfileData] = useState({
     passportId: '',
     passportScan: null as File | null,
   });
@@ -25,6 +39,10 @@ const ProfileForm: React.FC<ProfileFormProps> = ({
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Use external state if provided, otherwise use internal state
+  const profileData = externalProfileData || internalProfileData;
+  const isExternallyControlled = !!externalProfileData;
 
   // Token retrieval function
   const getTokenFromStorage = (): string | null => {
@@ -39,17 +57,26 @@ const ProfileForm: React.FC<ProfileFormProps> = ({
     return null;
   };
 
-  const handleProfileChange = (field: string, value: string) => {
-    setProfileData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleProfileChange = (field: keyof ProfileData, value: string | File | null) => {
+    if (externalHandleProfileChange) {
+      externalHandleProfileChange(field, value);
+    } else {
+      setInternalProfileData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
     // Clear messages when user starts typing
     if (error) setError(null);
     if (success) setSuccess(null);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (externalHandleFileUpload) {
+      externalHandleFileUpload(e);
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (file) {
       // Validate file type
@@ -66,10 +93,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({
         return;
       }
 
-      setProfileData(prev => ({
-        ...prev,
-        passportScan: file
-      }));
+      handleProfileChange('passportScan', file);
       setError(null);
     }
   };
@@ -92,6 +116,12 @@ const ProfileForm: React.FC<ProfileFormProps> = ({
   };
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (externalHandleProfileSubmit) {
+      await externalHandleProfileSubmit(e);
+      return;
+    }
+
     e.preventDefault();
     setSubmitLoading(true);
     setError(null);

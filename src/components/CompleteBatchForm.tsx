@@ -159,19 +159,23 @@ interface SelectedApiary extends Apiary {
 }
 
 interface ApiaryFormData {
+  batchId: string;
+  batchNumber: string;
   name: string;
   number: string;
   hiveCount: number;
-  honeyCollected: number;
-  location: ApiaryLocation | null;
+  latitude: number | null;
+  longitude: number | null;
+  kilosCollected: number;
+  honeyCertified: number;
 }
 
 // Add missing interfaces
 interface JarDefinition {
-  id: string;
+  id: string | number;
   size: number;
   quantity: number;
-  unit: string;
+  unit?: string;
 }
 
 interface Certification {
@@ -182,10 +186,26 @@ interface Certification {
 }
 
 interface FileData {
+  certificationType?: string;
   productionReport?: File | null;
   labReport?: File | null;
+  apiaries?: ApiaryFormData[];
+  
+  // Add additional fields that might be set during the process
+  productionReportPath?: string;
+  productionReportUrl?: string;
+  productionReportIpfsHash?: string;
+  productionReportCertificatePath?: string;
+  
+  labReportPath?: string;
+  labReportUrl?: string;
+  labReportIpfsHash?: string;
+  labReportCertificatePath?: string;
+  
+  // Allow for additional dynamic properties
   [key: string]: any;
 }
+
 
 interface CompleteBatchFormProps {
   show: boolean;
@@ -194,8 +214,7 @@ interface CompleteBatchFormProps {
   batches: Batch[];
   batchJars: JarDefinition[];
   setBatchJars: React.Dispatch<React.SetStateAction<JarDefinition[]>>;
-  jarCertifications: Record<string, Certification>;
-  setJarCertifications: React.Dispatch<React.SetStateAction<Record<string, Certification>>>;
+jarCertifications: Record<string | number, Certification>;  setJarCertifications: React.Dispatch<React.SetStateAction<Record<string, Certification>>>;
   formData: FileData;
   setFormData: React.Dispatch<React.SetStateAction<FileData>>;
   tokenBalance: number;
@@ -213,8 +232,7 @@ interface CompleteBatchFormProps {
   addNewJarSize: (size: number) => void;
   removeJarSize: (size: number) => void;
   convertToGrams: (value: string, unit: string) => number;
-  getSelectedType: (certification: Certification) => string;
-  needsProductionReport: () => boolean;
+getSelectedType: (certification: Certification) => string | null;  needsProductionReport: () => boolean;
   needsLabReport: () => boolean;
   hasRequiredCertifications: () => boolean;
   isFormValid: () => boolean;
@@ -278,7 +296,7 @@ const VERIFICATION_API_URL = 'https://qualityapi.onrender.com';
     productionReport: null, // null, 'verifying', 'passed', 'failed', 'error'
     labReport: null
   });
-  
+
   const [verificationResults, setVerificationResults] = useState({
     productionReport: null,
     labReport: null
@@ -584,9 +602,9 @@ const addJarToBatch = (sizeInGrams: number, quantity: number) => {
     return;
   }
   
-  // Add the jar
-  const newJar = {
-    id: Date.now() + Math.random(),
+  // Add the jar with consistent string id
+  const newJar: JarDefinition = {
+    id: `jar_${Date.now()}_${Math.random()}`, // Ensure string id
     size: sizeInGrams,
     quantity: quantity
   };
@@ -723,7 +741,7 @@ const handleLabReportUpload = async (e) => {
 };
 
 
-   const getTokensNeededForJar = (jar) => {
+   const getTokensNeededForJar = (jar: JarDefinition) => {
   const cert = jarCertifications[jar.id];
   if (!cert) return 0;
   

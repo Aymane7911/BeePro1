@@ -15,12 +15,19 @@ export default function ConfirmPage() {
     if (hasFetched.current) return;  // Prevent second call
     hasFetched.current = true;
 
-    const token = params.get('token');
-    if (!token) {
-      setStatus('error');
-      setMessage('Invalid or missing token.');
-      return;
-    }
+    const params = useSearchParams();
+if (!params) {
+  setStatus('error');
+  setMessage('Unable to read URL parameters.');
+  return;
+}
+
+const token = params.get('token');
+if (!token) {
+  setStatus('error');
+  setMessage('Invalid or missing token.');
+  return;
+}
 
     fetch(`/api/confirm-email?token=${token}`)
       .then(res => res.json())

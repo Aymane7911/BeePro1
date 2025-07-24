@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { AnimatePresence, motion, useAnimation, useInView } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { useRef } from 'react';
+import { easeInOut } from "framer-motion";
 
 export default function Hero() {
   const [showDetails, setShowDetails] = useState(false);
@@ -41,26 +42,26 @@ export default function Hero() {
   };
 
   const itemVariants = {
-    hidden: { y: 50, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        type: "spring",
-        damping: 12,
-        stiffness: 100
-      }
-    }
-  };
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring" as "spring",
+      damping: 20,
+      stiffness: 100,
+    },
+  },
+};
 
   const floatingAnimation = {
-    y: [-10, 10, -10],
-    transition: {
-      duration: 3,
-      repeat: Infinity,
-      ease: "easeInOut"
-    }
-  };
+  y: [0, -20, 0],
+  transition: {
+    duration: 2,
+    repeat: Infinity,
+    ease: easeInOut
+  }
+};
 
   const handleGoogleAuth = () => {
     // Google OAuth 2.0 implementation

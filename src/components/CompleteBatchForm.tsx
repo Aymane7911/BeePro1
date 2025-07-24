@@ -81,7 +81,13 @@ interface TokenStats {
   qualityOnly: number;
   bothCertifications: number;
 }
-
+interface ParentFormData {
+  certificationType: string;
+  productionReport: File | null;
+  labReport: File | null;
+  apiaries: ApiaryFormData[];
+  [key: string]: any;
+}
 
 // Types for verification
 interface VerificationResult {
@@ -215,9 +221,8 @@ interface CompleteBatchFormProps {
   batchJars: JarDefinition[];
   setBatchJars: React.Dispatch<React.SetStateAction<JarDefinition[]>>;
 jarCertifications: Record<string | number, Certification>;  setJarCertifications: React.Dispatch<React.SetStateAction<Record<string, Certification>>>;
-  formData: FileData;
-  setFormData: React.Dispatch<React.SetStateAction<FileData>>;
-  tokenBalance: number;
+  formData: ParentFormData;
+setFormData: React.Dispatch<React.SetStateAction<ParentFormData>>;  tokenBalance: number;
   predefinedJarSizes: number[];
   newJarSize: string;
   setNewJarSize: React.Dispatch<React.SetStateAction<string>>;
@@ -234,9 +239,11 @@ jarCertifications: Record<string | number, Certification>;  setJarCertifications
   convertToGrams: (value: string, unit: string) => number;
 getSelectedType: (certification: Certification) => string | null;  needsProductionReport: () => boolean;
   needsLabReport: () => boolean;
-  hasRequiredCertifications: () => boolean;
+  hasRequiredCertifications?: () => boolean;
   isFormValid: () => boolean;
   handleCompleteBatch: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
+  addJarToBatch: (sizeInGrams: number, quantity: number) => void;
+  isAllHoneyAllocated: () => boolean;
   router: any;
 }
 

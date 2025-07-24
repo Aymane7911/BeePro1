@@ -4,13 +4,16 @@ import { Layers, Database, Tag, Package, RefreshCw, Menu, X, Home, Settings, Use
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 
-interface ApiaryLocation {
-  id: number;
-  name: string;
+interface LocationCoordinates {
   latitude: number;
   longitude: number;
   lat: number;
   lng: number;
+}
+
+interface ApiaryLocation extends LocationCoordinates {
+  id: number;
+  name: string;
   createdAt?: string;
 }
 

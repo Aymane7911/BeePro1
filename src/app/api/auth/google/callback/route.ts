@@ -4,9 +4,15 @@ import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 
+// Configure the database pool with proper settings for Render
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: process.env.NODE_ENV === 'production' ? { 
+    rejectUnauthorized: false 
+  } : false,
+  max: 10, // Reduced pool size for Render
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000, // Increased timeout
 });
 
 interface GoogleUserData {
@@ -18,13 +24,12 @@ interface GoogleUserData {
 }
 
 export async function POST(request: Request) {
-  console.log('=== GOOGLE OAUTH DEBUG START ===');
+  console.log('=== GOOGLE OAUTH START ===');
   
   try {
     // Step 1: Parse request body
     console.log('[STEP 1] Parsing request body...');
     const body = await request.json();
-    console.log('[STEP 1] Request body keys:', Object.keys(body));
     
     const { code, redirect_uri } = body;
 
@@ -36,19 +41,16 @@ export async function POST(request: Request) {
 
     // Step 2: Check environment variables
     console.log('[STEP 2] Checking environment variables...');
-    const envCheck = {
-      GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET,
-      JWT_SECRET: !!process.env.JWT_SECRET,
-      DATABASE_URL: !!process.env.DATABASE_URL,
-      NEXT_PUBLIC_SITE_URL: !!process.env.NEXT_PUBLIC_SITE_URL,
-      DEFAULT_DATABASE_ID: !!process.env.DEFAULT_DATABASE_ID,
-    };
-    console.log('[STEP 2] Environment variables:', envCheck);
+    const requiredEnvVars = [
+      'GOOGLE_CLIENT_ID',
+      'GOOGLE_CLIENT_SECRET', 
+      'JWT_SECRET',
+      'DATABASE_URL',
+      'NEXT_PUBLIC_SITE_URL',
+      'DEFAULT_DATABASE_ID'
+    ];
 
-    const missingVars = Object.entries(envCheck)
-      .filter(([key, exists]) => !exists)
-      .map(([key]) => key);
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
     if (missingVars.length > 0) {
       console.log('[ERROR] Missing environment variables:', missingVars);
@@ -68,7 +70,6 @@ export async function POST(request: Request) {
       grant_type: 'authorization_code',
       redirect_uri: redirect_uri || `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/google/callback`,
     };
-    console.log('[STEP 3] Token exchange redirect_uri:', tokenParams.redirect_uri);
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -78,14 +79,11 @@ export async function POST(request: Request) {
       body: new URLSearchParams(tokenParams),
     });
 
-    console.log('[STEP 3] Token response status:', tokenResponse.status);
-
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
       console.log('[ERROR] Token exchange failed:', errorData);
       return NextResponse.json({ 
         message: 'Failed to exchange code for token',
-        status: tokenResponse.status,
         error: errorData
       }, { status: 400 });
     }
@@ -101,8 +99,6 @@ export async function POST(request: Request) {
       },
     });
 
-    console.log('[STEP 4] User info response status:', userResponse.status);
-
     if (!userResponse.ok) {
       const errorText = await userResponse.text();
       console.log('[ERROR] Failed to fetch user info:', errorText);
@@ -115,39 +111,38 @@ export async function POST(request: Request) {
     const googleUserData: GoogleUserData = await userResponse.json();
     console.log('[STEP 4] ✓ Google user data received for:', googleUserData.email);
 
-    // Step 5: Test database connection
+    // Step 5: Test database connection with retries
     console.log('[STEP 5] Testing database connection...');
-    try {
-      await pool.query('SELECT NOW()');
-      console.log('[STEP 5] ✓ Database connection successful');
-    } catch (dbError: any) {
-      console.log('[ERROR] Database connection failed:', dbError.message);
+    let dbConnected = false;
+    let dbError = null;
+    
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`[STEP 5] Database connection attempt ${attempt}/3...`);
+        await pool.query('SELECT NOW()');
+        console.log('[STEP 5] ✓ Database connection successful');
+        dbConnected = true;
+        break;
+      } catch (error: any) {
+        dbError = error;
+        console.log(`[STEP 5] Database connection attempt ${attempt} failed:`, error.message);
+        if (attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+        }
+      }
+    }
+
+    if (!dbConnected) {
+      console.log('[ERROR] All database connection attempts failed:', dbError?.message);
       return NextResponse.json({ 
         message: 'Database connection error',
-        error: dbError.message
+        error: dbError?.message || 'Connection failed after 3 attempts'
       }, { status: 500 });
     }
 
     // Step 6: Get default database ID
     console.log('[STEP 6] Getting default database...');
-    
-    // Try using environment variable first
-    let defaultDatabaseId = process.env.DEFAULT_DATABASE_ID;
-    
-    if (!defaultDatabaseId) {
-      console.log('[STEP 6] No DEFAULT_DATABASE_ID in env, querying database...');
-      const defaultDatabaseResult = await pool.query(
-        'SELECT id FROM databases WHERE is_active = true ORDER BY created_at ASC LIMIT 1'
-      );
-
-      if (defaultDatabaseResult.rowCount === 0) {
-        console.log('[ERROR] No active database found');
-        return NextResponse.json({ message: 'No active database available' }, { status: 500 });
-      }
-
-      defaultDatabaseId = defaultDatabaseResult.rows[0].id;
-    }
-    
+    const defaultDatabaseId = process.env.DEFAULT_DATABASE_ID!;
     console.log('[STEP 6] ✓ Using database ID:', defaultDatabaseId);
 
     // Step 7: Check for existing user
@@ -156,8 +151,6 @@ export async function POST(request: Request) {
       'SELECT * FROM beeusers WHERE email = $1 AND database_id = $2', 
       [googleUserData.email, defaultDatabaseId]
     );
-    
-    console.log('[STEP 7] Existing user query result rows:', existingUserResult.rowCount);
     
     let user;
 
@@ -169,8 +162,20 @@ export async function POST(request: Request) {
       const lastname = nameParts.slice(1).join(' ') || 'User';
 
       const createUserResult = await pool.query(
-        'INSERT INTO beeusers (database_id, firstname, lastname, email, password, is_confirmed, google_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-        [defaultDatabaseId, firstname, lastname, googleUserData.email, 'google_oauth', true, googleUserData.id]
+        `INSERT INTO beeusers (
+          database_id, firstname, lastname, email, password, 
+          is_confirmed, google_id, role, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING *`,
+        [
+          defaultDatabaseId, 
+          firstname, 
+          lastname, 
+          googleUserData.email, 
+          'google_oauth', 
+          true, 
+          googleUserData.id,
+          'employee'
+        ]
       );
 
       user = createUserResult.rows[0];
@@ -180,16 +185,32 @@ export async function POST(request: Request) {
       console.log('[STEP 8] ✓ Existing user found with ID:', user.id);
 
       // Update user if needed
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+
       if (!user.google_id) {
-        await pool.query('UPDATE beeusers SET google_id = $1 WHERE id = $2', [googleUserData.id, user.id]);
-        user.google_id = googleUserData.id;
-        console.log('[STEP 8] ✓ Google ID updated');
+        updates.push(`google_id = $${paramIndex++}`);
+        values.push(googleUserData.id);
       }
 
       if (!user.is_confirmed) {
-        await pool.query('UPDATE beeusers SET is_confirmed = true WHERE id = $1', [user.id]);
-        user.is_confirmed = true;
-        console.log('[STEP 8] ✓ User email confirmed');
+        updates.push(`is_confirmed = $${paramIndex++}`);
+        values.push(true);
+      }
+
+      if (updates.length > 0) {
+        values.push(user.id);
+        const updateQuery = `UPDATE beeusers SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
+        await pool.query(updateQuery, values);
+        console.log('[STEP 8] ✓ User updated');
+        
+        // Refresh user data
+        const updatedUserResult = await pool.query(
+          'SELECT * FROM beeusers WHERE id = $1', 
+          [user.id]
+        );
+        user = updatedUserResult.rows[0];
       }
     }
 
@@ -240,20 +261,18 @@ export async function POST(request: Request) {
     });
 
     console.log('[STEP 10] ✓ Response prepared successfully');
-    console.log('=== GOOGLE OAUTH DEBUG SUCCESS ===');
+    console.log('=== GOOGLE OAUTH SUCCESS ===');
     
     return response;
 
   } catch (error: any) {
-    console.log('=== GOOGLE OAUTH DEBUG ERROR ===');
+    console.log('=== GOOGLE OAUTH ERROR ===');
     console.error('[FATAL ERROR]', error.message);
     console.error('[STACK TRACE]', error.stack);
-    console.log('=== END ERROR DEBUG ===');
     
     return NextResponse.json({ 
       message: 'Server error during Google authentication',
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     }, { status: 500 });
   }
 }

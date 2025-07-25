@@ -140,10 +140,27 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // Step 6: Get default database ID
-    console.log('[STEP 6] Getting default database...');
-    const defaultDatabaseId = process.env.DEFAULT_DATABASE_ID!;
-    console.log('[STEP 6] ✓ Using database ID:', defaultDatabaseId);
+    // Step 6: Get and verify default database ID
+    console.log('[STEP 6] Getting and verifying default database...');
+    let defaultDatabaseId = process.env.DEFAULT_DATABASE_ID!;
+    
+    // Verify the database exists and get the correct ID
+    const databaseResult = await pool.query(
+      'SELECT id, name, display_name FROM databases WHERE is_active = true LIMIT 1'
+    );
+    
+    if (databaseResult.rowCount === 0) {
+      console.log('[ERROR] No active database found');
+      return NextResponse.json({ 
+        message: 'No active database available',
+        error: 'Database configuration error'
+      }, { status: 500 });
+    }
+    
+    // Use the first active database found
+    defaultDatabaseId = databaseResult.rows[0].id;
+    console.log('[STEP 6] ✓ Using verified database ID:', defaultDatabaseId);
+    console.log('[STEP 6] ✓ Database name:', databaseResult.rows[0].display_name);
 
     // Step 7: Check for existing user
     console.log('[STEP 7] Checking for existing user...');
@@ -180,6 +197,22 @@ export async function POST(request: Request) {
 
       user = createUserResult.rows[0];
       console.log('[STEP 8] ✓ New user created with ID:', user.id);
+      
+      // Initialize TokenStats for new user
+      try {
+        await pool.query(
+          `INSERT INTO "TokenStats" (
+            id, "userId", "totalTokens", "remainingTokens", 
+            "originOnly", "qualityOnly", "bothCertifications", database_id
+          ) VALUES (gen_random_uuid(), $1, 0, 0, 0, 0, 0, $2)`,
+          [user.id, defaultDatabaseId]
+        );
+        console.log('[STEP 8] ✓ TokenStats initialized for new user');
+      } catch (tokenStatsError: any) {
+        console.log('[WARNING] Failed to initialize TokenStats:', tokenStatsError.message);
+        // Don't fail the authentication for this
+      }
+      
     } else {
       user = existingUserResult.rows[0];
       console.log('[STEP 8] ✓ Existing user found with ID:', user.id);
